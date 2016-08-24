@@ -22,16 +22,18 @@ procedure UDP_Client is
    type Jumbo_U8 is
       array (1 .. Base_Udp.Load_Size) of Interfaces.Unsigned_8;
 
+   --  type Jumbo_U64 is
+   --     array (1 .. Base_Udp.Array_Size) of Interfaces.Unsigned_64;
+
       Address  : GNAT.Sockets.Sock_Addr_Type;
       Socket   : GNAT.Sockets.Socket_Type;
 
-      Ack_U8   : Jumbo_U8 := (others => 0);
 
       Packet   : Jumbo_U8 := (others => 0);
       Seq_Nb   : Base_Udp.Header := 0;
       Pkt_Data : Interfaces.Unsigned_64 := 0;
 
-      for Pkt_Data'Address use Packet (2)'Address;
+      for Pkt_Data'Address use Packet (5)'Address;
       for Seq_Nb'Address use Packet'Address;
 
       procedure Send_Packet (Packet_Nb : Jumbo_U8;
@@ -60,9 +62,11 @@ procedure UDP_Client is
       end Send_Packet;
 
       procedure Rcv_Ack is
+         Ack_U8   : Jumbo_U8 := (others => 0);
          Ack      : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
          Data     : Ada.Streams.Stream_Element_Array (1 .. 64);
          Res      : Interfaces.C.int;
+         for Ack'Address use Ack_U8'Address;
          for Data'Address use Ack'Address;
       begin
          Res := GNAT.Sockets.Thin.C_Recv
@@ -71,8 +75,7 @@ procedure UDP_Client is
             ---------- DBG -----------
             Ada.Text_IO.Put_Line ("ACK [" & Res'Img & " ]: Dropped :" & Ack (1)'Img);
             --------------------------
-            Ack_U8 (1) := Ack (1);
-            Ack_U8 (2) := 1;
+            --  Ack_U8 (1) := Ack (1);
             Send_Packet (Ack_U8, True);
          end if;
 
