@@ -3,60 +3,53 @@ with Ada.Text_IO;
 package body Packet_Mgr is
 
    Buffer_Mgr              : Buffer_Management;
-   Log_Seq_Nb              : Natural := 1;
+   --  Log_Seq_Nb              : Natural := 1;
 
    use type Interfaces.Unsigned_8;
    use type Interfaces.Unsigned_16;
    use type Interfaces.Unsigned_64;
 
-   task body Container_To_CSV is
-   begin
-      declare
-         Pkt_Content : Packet_Content;
-         Filled_Buf  : Container;
-         Log_File    : Ada.Text_IO.File_Type;
-         Packet_U64  : Interfaces.Unsigned_64;
-         for Packet_U64'Address use Pkt_Content (2)'Address;
-      begin
-
-         loop
-            accept Log (Buffer   : Container) do
-               Filled_Buf := Buffer;
-            end Log;
-            Ada.Text_IO.Open (Log_File, Ada.Text_IO.Append_File, "recv.csv");
-            Ada.Text_IO.Put_Line (Log_File, "---------------- Full Buffer [" &
-               Log_Seq_Nb'Img & "] State -----------------");
-            for I in Natural range 1 .. Base_Udp.Sequence_Size loop
-               Pkt_Content := Filled_Buf.Buffer (I);
-               Ada.Text_IO.Put_Line (Log_File, I'Img & Packet_U64'Img);
-            end loop;
-            Ada.Text_IO.Put_Line (Log_File, "----------------------------------------------------");
-            Ada.Text_IO.Close (Log_File);
-            Log_Seq_Nb := Log_Seq_Nb + 1;
-         end loop;
-      end;
-   end Container_To_CSV;
+  --   task body Container_To_CSV is
+  --      Pkt_Content : Packet_Content;
+  --      Filled_Buf  : Container;
+  --      Log_File    : Ada.Text_IO.File_Type;
+  --      Packet_U64  : Interfaces.Unsigned_64;
+  --      for Packet_U64'Address use Pkt_Content (2)'Address;
+  --   begin
+  --      loop
+  --         accept Log (Buffer   : Container) do
+  --            Filled_Buf := Buffer;
+  --         end Log;
+  --         Ada.Text_IO.Open (Log_File, Ada.Text_IO.Append_File, "recv.csv");
+  --         Ada.Text_IO.Put_Line (Log_File, "---------------- Full Buffer [" &
+  --            Log_Seq_Nb'Img & "] State -----------------");
+  --         for I in Natural range 1 .. Base_Udp.Sequence_Size loop
+  --            Pkt_Content := Filled_Buf.Buffer (I);
+  --            Ada.Text_IO.Put_Line (Log_File, I'Img & Packet_U64'Img);
+  --         end loop;
+  --         Ada.Text_IO.Put_Line (Log_File, "----------------------------------------------------");
+  --         Ada.Text_IO.Close (Log_File);
+  --         Log_Seq_Nb := Log_Seq_Nb + 1;
+  --      end loop;
+  --   end Container_To_CSV;
 
 
    task body Store_Packet_Task is
+      Pkt_Content : Packet_Content;
+      New_Seq     : Boolean;
+      Ack         : Boolean;
    begin
-      declare
-         Pkt_Content : Packet_Content;
-         New_Seq     : Boolean;
-         Ack         : Boolean;
-      begin
-         loop
-            accept Store (Data            : Packet_Content;
-                          New_Sequence    : Boolean;
-                          Is_Ack          : Boolean) do
-               Pkt_Content := Data;
-               New_Seq     := New_Sequence;
-               Ack         := Is_Ack;
-            end Store;
+      loop
+         accept Store (Data            : Packet_Content;
+                       New_Sequence    : Boolean;
+                       Is_Ack          : Boolean) do
+            Pkt_Content := Data;
+            New_Seq     := New_Sequence;
+            Ack         := Is_Ack;
+         end Store;
 
-            Buffer_Mgr.Store_Packet (Pkt_Content, New_Seq, Ack);
-         end loop;
-      end;
+         Buffer_Mgr.Store_Packet (Pkt_Content, New_Seq, Ack);
+      end loop;
    end Store_Packet_Task;
 
 
@@ -88,7 +81,7 @@ package body Packet_Mgr is
 
             ------- DBG -----------
             pragma Warnings (Off);
-            Container_To_CSV_Task.Log (Pkt_Containers.Full.all);
+            --  Container_To_CSV_Task.Log (Pkt_Containers.Full.all);
             pragma Warnings (On);
             ------------------------
 

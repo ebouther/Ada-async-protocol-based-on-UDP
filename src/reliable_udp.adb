@@ -1,4 +1,3 @@
---  with Ada.Text_IO;
 with Ada.Streams;
 
 package body Reliable_Udp is
@@ -6,63 +5,54 @@ package body Reliable_Udp is
    Ack_Mgr      : Ack_Management;
 
    task body Append_Task is
+      Packet_Lost      : Reliable_Udp.Loss;
+      Client_Addr      : GNAT.Sockets.Sock_Addr_Type;
+      First_D, Last_D  : Base_Udp.Header;
+
    begin
-      declare
-         Packet_Lost      : Reliable_Udp.Loss;
-         Client_Addr      : GNAT.Sockets.Sock_Addr_Type;
-         First_D, Last_D  : Base_Udp.Header;
-      begin
+      accept Append (First_Dropped, Last_Dropped   : Base_Udp.Header;
+                     Client_Address                : GNAT.Sockets.Sock_Addr_Type) do
+         First_D        := First_Dropped;
+         Last_D         := Last_Dropped;
+         Client_Addr    := Client_Address;
+      end Append;
 
-         loop
-               accept Append (First_Dropped, Last_Dropped   : Base_Udp.Header;
-                              Client_Address                : GNAT.Sockets.Sock_Addr_Type) do
-                  First_D        := First_Dropped;
-                  Last_D         := Last_Dropped;
-                  Client_Addr    := Client_Address;
-               end Append;
-
-               if First_D < Last_D then
-                  for I in Base_Udp.Header range First_D .. Last_D loop
-                     Packet_Lost := (Packet     => I,
-                                     Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-                                     Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-                                     From       => Client_Addr);
-                     Ack_Mgr.Append (Packet_Lost);
-                  end loop;
-               else
-                  for I in Base_Udp.Header range First_D .. Base_Udp.Pkt_Max loop
-                     Packet_Lost := (Packet     => I,
-                                     Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-                                     Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-                                     From       => Client_Addr);
-                     Ack_Mgr.Append (Packet_Lost);
-                  end loop;
-
-                  for I in Base_Udp.Header range 0 .. Last_D loop
-                     Packet_Lost := (Packet     => I,
-                                     Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-                                     Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-                                     From       => Client_Addr);
-                     Ack_Mgr.Append (Packet_Lost);
-                  end loop;
-               end if;
-
+      if First_D < Last_D then
+         for I in Base_Udp.Header range First_D .. Last_D loop
+            Packet_Lost := (Packet     => I,
+                            Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                            Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+                            From       => Client_Addr);
+            Ack_Mgr.Append (Packet_Lost);
          end loop;
-      end;
+      else
+         for I in Base_Udp.Header range First_D .. Base_Udp.Pkt_Max loop
+            Packet_Lost := (Packet     => I,
+                            Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                            Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+                            From       => Client_Addr);
+            Ack_Mgr.Append (Packet_Lost);
+         end loop;
+
+         for I in Base_Udp.Header range 0 .. Last_D loop
+            Packet_Lost := (Packet     => I,
+                            Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                            Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+                            From       => Client_Addr);
+            Ack_Mgr.Append (Packet_Lost);
+         end loop;
+      end if;
    end Append_Task;
 
    task body Remove_Task is
+      Pkt   : Base_Udp.Header;
    begin
-      declare
-         Pkt   : Base_Udp.Header;
-      begin
-         loop
+      loop
             accept Remove (Packet : in Base_Udp.Header) do
                Pkt   := Packet;
             end Remove;
             Ack_Mgr.Add_To_Remove_List (Pkt);
-         end loop;
-      end;
+      end loop;
    end Remove_Task;
 
    task body Rm_Task is

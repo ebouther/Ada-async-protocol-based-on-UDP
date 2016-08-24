@@ -3,7 +3,7 @@ with System;
 
 package Base_Udp is
 
-   subtype Header is Interfaces.Unsigned_8;
+   subtype Header is Interfaces.Unsigned_16;
 
    Load_Size      : constant := 8972;
    Array_Size     : constant := Load_Size / 4;

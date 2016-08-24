@@ -33,9 +33,9 @@ package Packet_Mgr is
                    Is_Ack        : Boolean);
    end Store_Packet_Task;
 
-   task type Container_To_CSV is
-      entry Log (Buffer  : Container);
-   end Container_To_CSV;
+  --   task type Container_To_CSV is
+  --      entry Log (Buffer  : Container);
+  --   end Container_To_CSV;
 
 
    protected type Buffer_Management is
@@ -45,7 +45,7 @@ package Packet_Mgr is
 
       private
          Pkt_Containers : Containers;
-         Container_To_CSV_Task   : Container_To_CSV;
+         --  Container_To_CSV_Task   : Container_To_CSV;
    end Buffer_Management;
 
 end Packet_Mgr;
