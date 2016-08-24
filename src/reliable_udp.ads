@@ -13,16 +13,15 @@ with Base_Udp;
 package Reliable_Udp is
 
    use type Interfaces.Unsigned_8;
+   use type Interfaces.Unsigned_16;
+   use type Interfaces.Unsigned_64;
 
    type Loss is
       record
-         Packet      : Interfaces.Unsigned_8;
+         Packet      : Base_Udp.Header;
          Last_Ack    : Ada.Real_Time.Time;
          From        : GNAT.Sockets.Sock_Addr_Type;
-         --  Buffer_Ptr  : System.Address;
       end record;
-
-   --  type Pkt_Nb is range 0 .. 7;
 
    type Header is
       record
@@ -32,14 +31,14 @@ package Reliable_Udp is
 
    for Header use
       record
-         Ack      at 0 range 7 .. 7;
+         Ack      at Base_Udp.Header_Size - 1 range Base_Udp.Header'Size - 1 .. Base_Udp.Header'Size - 1;
          --  Packet   at 0 range 0 .. Base_Udp.Header_Size * 8 - 2;
       end record;
 
    for Header'Alignment use Base_Udp.Header_Size;
 
    package Rm_Container is
-      new Ada.Containers.Vectors (Natural, Interfaces.Unsigned_8);
+      new Ada.Containers.Vectors (Natural, Base_Udp.Header, Interfaces."=");
 
    package Losses_Container is
       new Ada.Containers.Vectors (Natural, Loss);
@@ -53,12 +52,12 @@ package Reliable_Udp is
    end Ack_Task;
 
    task type Append_Task is
-      entry Append (First_Dropped, Last_Dropped : Interfaces.Unsigned_8;
+      entry Append (First_Dropped, Last_Dropped : Base_Udp.Header;
                    Client_Address               : GNAT.Sockets.Sock_Addr_Type);
    end Append_Task;
 
    task type Remove_Task is
-      entry Remove (Packet : in Interfaces.Unsigned_8);
+      entry Remove (Packet : in Base_Udp.Header);
    end Remove_Task;
 
    protected type Ack_Management is
@@ -67,7 +66,7 @@ package Reliable_Udp is
       procedure Update_AckTime (Position  : in Losses_Container.Cursor;
                                Ack_Time   : in Ada.Real_Time.Time);
       procedure Remove;
-      procedure Add_To_Remove_List (Packet : in Interfaces.Unsigned_8);
+      procedure Add_To_Remove_List (Packet : in Base_Udp.Header);
       procedure Ack;
       function Length return Ada.Containers.Count_Type;
 

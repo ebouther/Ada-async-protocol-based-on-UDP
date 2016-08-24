@@ -6,37 +6,63 @@ package body Reliable_Udp is
    Ack_Mgr      : Ack_Management;
 
    task body Append_Task is
-      Packet_Lost      : Reliable_Udp.Loss;
-      Client_Addr      : GNAT.Sockets.Sock_Addr_Type;
-      First_D, Last_D  : Interfaces.Unsigned_8;
    begin
-      loop
-            accept Append (First_Dropped, Last_Dropped   : Interfaces.Unsigned_8;
-                           Client_Address                : GNAT.Sockets.Sock_Addr_Type) do
-               First_D        := First_Dropped;
-               Last_D         := Last_Dropped;
-               Client_Addr    := Client_Address;
-            end Append;
+      declare
+         Packet_Lost      : Reliable_Udp.Loss;
+         Client_Addr      : GNAT.Sockets.Sock_Addr_Type;
+         First_D, Last_D  : Base_Udp.Header;
+      begin
 
-            for I in Interfaces.Unsigned_8 range First_D .. Last_D loop
-               Packet_Lost := (Packet     => I,
-                               Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-                               Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-                               From       => Client_Addr);
-               Ack_Mgr.Append (Packet_Lost);
-            end loop;
-      end loop;
+         loop
+               accept Append (First_Dropped, Last_Dropped   : Base_Udp.Header;
+                              Client_Address                : GNAT.Sockets.Sock_Addr_Type) do
+                  First_D        := First_Dropped;
+                  Last_D         := Last_Dropped;
+                  Client_Addr    := Client_Address;
+               end Append;
+
+               if First_D < Last_D then
+                  for I in Base_Udp.Header range First_D .. Last_D loop
+                     Packet_Lost := (Packet     => I,
+                                     Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                                     Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+                                     From       => Client_Addr);
+                     Ack_Mgr.Append (Packet_Lost);
+                  end loop;
+               else
+                  for I in Base_Udp.Header range First_D .. Base_Udp.Pkt_Max loop
+                     Packet_Lost := (Packet     => I,
+                                     Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                                     Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+                                     From       => Client_Addr);
+                     Ack_Mgr.Append (Packet_Lost);
+                  end loop;
+
+                  for I in Base_Udp.Header range 0 .. Last_D loop
+                     Packet_Lost := (Packet     => I,
+                                     Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                                     Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+                                     From       => Client_Addr);
+                     Ack_Mgr.Append (Packet_Lost);
+                  end loop;
+               end if;
+
+         end loop;
+      end;
    end Append_Task;
 
    task body Remove_Task is
-      Pkt   : Interfaces.Unsigned_8;
    begin
-      loop
-            accept Remove (Packet : in Interfaces.Unsigned_8) do
+      declare
+         Pkt   : Base_Udp.Header;
+      begin
+         loop
+            accept Remove (Packet : in Base_Udp.Header) do
                Pkt   := Packet;
             end Remove;
             Ack_Mgr.Add_To_Remove_List (Pkt);
-      end loop;
+         end loop;
+      end;
    end Remove_Task;
 
    task body Rm_Task is
@@ -84,7 +110,7 @@ package body Reliable_Udp is
       end Update_AckTime;
 
 
-      procedure Add_To_Remove_List (Packet : in Interfaces.Unsigned_8) is
+      procedure Add_To_Remove_List (Packet : in Base_Udp.Header) is
       begin
          Rm_Container.Append (Container   => Remove_List,
                               New_Item    => Packet);
@@ -119,6 +145,7 @@ package body Reliable_Udp is
 
       procedure Ack is
          Ack_Array   : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
+         Seq_Nb      : Base_Udp.Header;
          Data        : Ada.Streams.Stream_Element_Array (1 .. 64);
          Offset      : Ada.Streams.Stream_Element_Offset;
          Cur_Time    : constant Ada.Real_Time.Time := Ada.Real_Time.Clock;
@@ -126,10 +153,12 @@ package body Reliable_Udp is
          Element     : Loss;
 
          for Data'Address use Ack_Array'Address;
+         for Seq_Nb'Address use Ack_Array'Address;
          use type Ada.Real_Time.Time;
          use type Ada.Real_Time.Time_Span;
       begin
          if Losses_Container.Is_Empty (Losses) = False then
+
             while Losses_Container.Has_Element (Cursor) loop
                Element := Losses_Container.Element (Cursor);
                if Cur_Time - Element.Last_Ack >
@@ -137,7 +166,7 @@ package body Reliable_Udp is
                then
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Losses_Container.Replace_Element (Losses, Cursor, Element);
-                  Ack_Array (1) := Element.Packet;
+                  Seq_Nb := Element.Packet;
                   GNAT.Sockets.Send_Socket (Socket, Data, Offset, Element.From);
                   Update_AckTime (Cursor, Ada.Real_Time.Clock);
                end if;

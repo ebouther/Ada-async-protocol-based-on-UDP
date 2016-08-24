@@ -13,6 +13,7 @@ with Base_Udp;
 with Reliable_Udp;
 
 procedure UDP_Client is
+   use type Interfaces.Unsigned_16;
    use type Interfaces.Unsigned_8;
    use type Interfaces.Unsigned_64;
    use type Interfaces.C.int;
@@ -23,11 +24,15 @@ procedure UDP_Client is
 
       Address  : GNAT.Sockets.Sock_Addr_Type;
       Socket   : GNAT.Sockets.Socket_Type;
-      Packet   : Jumbo_U8 := (others => 0);
+
       Ack_U8   : Jumbo_U8 := (others => 0);
+
+      Packet   : Jumbo_U8 := (others => 0);
+      Seq_Nb   : Base_Udp.Header := 0;
       Pkt_Data : Interfaces.Unsigned_64 := 0;
 
       for Pkt_Data'Address use Packet (2)'Address;
+      for Seq_Nb'Address use Packet'Address;
 
       procedure Send_Packet (Packet_Nb : Jumbo_U8;
                              Ack       : Boolean);
@@ -70,6 +75,7 @@ procedure UDP_Client is
             Ack_U8 (2) := 1;
             Send_Packet (Ack_U8, True);
          end if;
+
       end Rcv_Ack;
 
 begin
@@ -85,10 +91,10 @@ begin
    loop
       Send_Packet (Packet, False);
       Rcv_Ack;
-      if Packet (1) = Base_Udp.Pkt_Max then
-         Packet (1) := 0;
+      if Seq_Nb = Base_Udp.Pkt_Max then
+         Seq_Nb := 0;
       else
-         Packet (1) := Packet (1) + 1;
+         Seq_Nb := Seq_Nb + 1;
       end if;
       Pkt_Data := Pkt_Data + 1;
       -- DBG --

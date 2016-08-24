@@ -15,7 +15,7 @@ package Packet_Mgr is
    type Container is
       record
          Buffer      : Sequence;
-         Free_Space  : Interfaces.Unsigned_8 := Base_Udp.Sequence_Size;
+         Free_Space  : Base_Udp.Header := Base_Udp.Sequence_Size;
       end record;
 
    type Container_Ptr is access Container;
