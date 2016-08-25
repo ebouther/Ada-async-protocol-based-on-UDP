@@ -32,7 +32,6 @@ procedure UDP_Server is
    Append_Task          : Reliable_Udp.Append_Task;
    Remove_Task          : Reliable_Udp.Remove_Task;
    Ack_Task             : Reliable_Udp.Ack_Task;
-   Rm_Task              : Reliable_Udp.Rm_Task;
 
    Server               : Socket_Type;
    Address, From        : Sock_Addr_Type;
@@ -186,7 +185,6 @@ begin
 
    Init_Udp;
    Ack_Task.Start;
-   Rm_Task.Start;
    Recv_Packets.Start;
 --  exception
 --     when E : others =>

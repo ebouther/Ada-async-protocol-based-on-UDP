@@ -38,15 +38,8 @@ package Reliable_Udp is
 
    for Header'Alignment use Base_Udp.Header_Size;
 
-   package Rm_Container is
-      new Ada.Containers.Vectors (Natural, Base_Udp.Header, Interfaces."=");
-
    package Losses_Container is
       new Ada.Containers.Vectors (Natural, Loss);
-
-   task type Rm_Task is
-      entry Start;
-   end Rm_Task;
 
    task type Ack_Task is
       entry Start;
@@ -66,14 +59,12 @@ package Reliable_Udp is
       procedure Append (Packet_Lost : in Loss);
       procedure Update_AckTime (Position  : in Losses_Container.Cursor;
                                Ack_Time   : in Ada.Real_Time.Time);
-      procedure Remove;
-      procedure Add_To_Remove_List (Packet : in Base_Udp.Header);
+      procedure Remove (Packet   : Base_Udp.Header);
       procedure Ack;
       function Length return Ada.Containers.Count_Type;
 
       private
       Socket      : GNAT.Sockets.Socket_Type;
-      Remove_List : Rm_Container.Vector;
       Losses      : Losses_Container.Vector;
    end Ack_Management;
 

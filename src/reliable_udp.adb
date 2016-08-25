@@ -1,5 +1,4 @@
 with Ada.Streams;
-with Ada.Text_IO;
 
 package body Reliable_Udp is
 
@@ -52,18 +51,9 @@ package body Reliable_Udp is
             accept Remove (Packet : in Base_Udp.Header) do
                Pkt   := Packet;
             end Remove;
-            Ack_Mgr.Add_To_Remove_List (Pkt);
+            Ack_Mgr.Remove (Pkt);
       end loop;
    end Remove_Task;
-
-   task body Rm_Task is
-   begin
-      accept Start;
-      loop
-         Ada.Text_IO.Put_Line ("Rm_Task");
-         Ack_Mgr.Remove;
-      end loop;
-   end Rm_Task;
 
    task body Ack_Task is
    begin
@@ -102,32 +92,17 @@ package body Reliable_Udp is
       end Update_AckTime;
 
 
-      procedure Add_To_Remove_List (Packet : in Base_Udp.Header) is
-      begin
-         Rm_Container.Append (Container   => Remove_List,
-                              New_Item    => Packet);
-      end Add_To_Remove_List;
-
-      procedure Remove is
+      procedure Remove (Packet   : Base_Udp.Header) is
          Cursor      : Losses_Container.Cursor := Losses.First;
-         Rm_Cursor   : Rm_Container.Cursor;
       begin
 
-         Ada.Text_IO.Put_Line ("Rm_container" & Rm_Container.Element (Rm_Cursor)'Img);
+         --  Ada.Text_IO.Put_Line ("Rm_container" & Rm_Container.Element (Rm_Cursor)'Img);
+
          while Losses_Container.Has_Element (Cursor) loop
-
-            Rm_Cursor := Remove_List.First;
-            while Rm_Container.Has_Element (Rm_Cursor) loop
-
-               if Losses_Container.Element (Cursor).Packet = Rm_Container.Element (Rm_Cursor) then
-                  Losses_Container.Delete (Container  => Losses,
-                                           Position   => Cursor);
-                  Rm_Container.Delete (Container  => Remove_List,
-                                       Position   => Rm_Cursor);
-               end if;
-
-               Rm_Container.Next (Rm_Cursor);
-            end loop;
+            if Interfaces."=" (Losses_Container.Element (Cursor).Packet, Packet) then
+               Losses_Container.Delete (Container => Losses,
+               Position => Cursor);
+            end if;
             Losses_Container.Next (Cursor);
          end loop;
       end Remove;
