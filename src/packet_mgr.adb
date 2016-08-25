@@ -7,6 +7,7 @@ package body Packet_Mgr is
 
    use type Interfaces.Unsigned_8;
    use type Interfaces.Unsigned_16;
+   use type Interfaces.Unsigned_32;
    use type Interfaces.Unsigned_64;
 
   --   task body Container_To_CSV is
@@ -86,18 +87,18 @@ package body Packet_Mgr is
             ------------------------
 
             Pkt_Containers.Full.Buffer := (others => (others => 0));
-            Pkt_Containers.Full.Free_Space := Base_Udp.Sequence_Size;
+            Pkt_Containers.Full.Free_Space := Base_Udp.Header (Base_Udp.Sequence_Size);
          end if;
 
          if Is_Ack then
             pragma Warnings (Off);
             pragma Warnings (On);
          end if;
-         if Pkt_Containers.Near_Full.Buffer (Integer (Seq_Nb) + 1) (42) = 0 then
+         if Pkt_Containers.Near_Full.Buffer (Interfaces.Unsigned_64 (Seq_Nb) + 1) (42) = 0 then
             Cur_Container := Pkt_Containers.Near_Full;
          else
             Cur_Container := Pkt_Containers.Swap;
-            if Pkt_Containers.Swap.Buffer (Integer (Seq_Nb) + 1) (42) = 0 then
+            if Pkt_Containers.Swap.Buffer (Interfaces.Unsigned_64 (Seq_Nb) + 1) (42) = 0 then
                Ada.Text_IO.Put_Line ("***********|| ERROR ||***********" &
                   "Not enough buffer (Swap already used)");
             end if;
@@ -105,9 +106,9 @@ package body Packet_Mgr is
          --  end if;
 
          ------- DBG ------
-         Cur_Container.Buffer (Integer (Seq_Nb) + 1) (42) := 1;
+         Cur_Container.Buffer (Interfaces.Unsigned_64 (Seq_Nb) + 1) (42) := 1;
          ------------------
-         Cur_Container.Buffer (Integer (Seq_Nb) + 1) := Content;
+         Cur_Container.Buffer (Interfaces.Unsigned_64 (Seq_Nb) + 1) := Content;
          Cur_Container.Free_Space := Cur_Container.Free_Space - 1;
 
       end Store_Packet;

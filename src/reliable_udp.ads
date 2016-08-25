@@ -14,6 +14,7 @@ package Reliable_Udp is
 
    use type Interfaces.Unsigned_8;
    use type Interfaces.Unsigned_16;
+   use type Interfaces.Unsigned_32;
    use type Interfaces.Unsigned_64;
 
    type Loss is

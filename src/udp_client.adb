@@ -1,5 +1,5 @@
-with Ada.Command_Line;
 with Ada.Text_IO;
+with Ada.Command_Line;
 with Ada.Streams;
 with Interfaces;
 with Interfaces.C;
@@ -13,8 +13,10 @@ with Base_Udp;
 with Reliable_Udp;
 
 procedure UDP_Client is
-   use type Interfaces.Unsigned_16;
+
    use type Interfaces.Unsigned_8;
+   use type Interfaces.Unsigned_16;
+   use type Interfaces.Unsigned_32;
    use type Interfaces.Unsigned_64;
    use type Interfaces.C.int;
    use type Ada.Streams.Stream_Element_Offset;
@@ -48,7 +50,9 @@ procedure UDP_Client is
          Offset   : Ada.Streams.Stream_Element_Offset;
          Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
          Header   : Reliable_Udp.Header;
+         Seq      : Base_Udp.Header;
 
+         for Seq'Address use Packet_Nb'Address;
          for Data'Address use Packet_Nb'Address;
          for Header'Address use Data'Address;
          pragma Unreferenced (Offset);
@@ -64,18 +68,19 @@ procedure UDP_Client is
       procedure Rcv_Ack is
          Ack_U8   : Jumbo_U8 := (others => 0);
          Ack      : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
+         Seq      : Base_Udp.Header;
          Data     : Ada.Streams.Stream_Element_Array (1 .. 64);
          Res      : Interfaces.C.int;
          for Ack'Address use Ack_U8'Address;
          for Data'Address use Ack'Address;
+         for Seq'Address use Data'Address;
       begin
          Res := GNAT.Sockets.Thin.C_Recv
             (To_Int (Socket), Data (Data'First)'Address, Data'Length, 64);
          if Res /= -1 then
             ---------- DBG -----------
-            Ada.Text_IO.Put_Line ("ACK [" & Res'Img & " ]: Dropped :" & Ack (1)'Img);
+            Ada.Text_IO.Put_Line ("ACK [" & Res'Img & " ]: Dropped :" & Seq'Img);
             --------------------------
-            --  Ack_U8 (1) := Ack (1);
             Send_Packet (Ack_U8, True);
          end if;
 

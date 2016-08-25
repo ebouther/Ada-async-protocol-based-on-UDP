@@ -1,4 +1,5 @@
 with Ada.Streams;
+with Ada.Text_IO;
 
 package body Reliable_Udp is
 
@@ -59,6 +60,7 @@ package body Reliable_Udp is
    begin
       accept Start;
       loop
+         Ada.Text_IO.Put_Line ("Rm_Task");
          Ack_Mgr.Remove;
       end loop;
    end Rm_Task;
@@ -110,6 +112,8 @@ package body Reliable_Udp is
          Cursor      : Losses_Container.Cursor := Losses.First;
          Rm_Cursor   : Rm_Container.Cursor;
       begin
+
+         Ada.Text_IO.Put_Line ("Rm_container" & Rm_Container.Element (Rm_Cursor)'Img);
          while Losses_Container.Has_Element (Cursor) loop
 
             Rm_Cursor := Remove_List.First;
@@ -157,6 +161,7 @@ package body Reliable_Udp is
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Losses_Container.Replace_Element (Losses, Cursor, Element);
                   Seq_Nb := Element.Packet;
+                  --  Ada.Text_IO.Put_Line ("Send Ack : " & Seq_Nb'Img);
                   GNAT.Sockets.Send_Socket (Socket, Data, Offset, Element.From);
                   Update_AckTime (Cursor, Ada.Real_Time.Clock);
                end if;

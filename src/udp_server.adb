@@ -1,6 +1,6 @@
+with Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Streams;
-with Ada.Text_IO;
 with Ada.Unchecked_Conversion;
 with Ada.Calendar;
 --  with Ada.Real_Time;
@@ -14,7 +14,6 @@ pragma Warnings (On);
 with Base_Udp;
 with Output_Data;
 with Reliable_Udp;
-with Packet_Mgr;
 
 procedure UDP_Server is
    use GNAT.Sockets;
@@ -67,10 +66,10 @@ procedure UDP_Server is
          (Receive_Timeout,
          Timeout => 1.0));
       Opt_Return := Thin.C_Setsockopt (S        => To_Int (Server),
-      Level    => 1,
-      Optname  => 46,
-      Optval   => Busy'Address,
-      Optlen   => 4);
+                                       Level    => 1,
+                                       Optname  => 46,
+                                       Optval   => Busy'Address,
+                                       Optlen   => 4);
       Ada.Text_IO.Put_Line ("opt return" & Opt_Return'Img);
       Address.Addr := Any_Inet_Addr;
       Address.Port := 50001;
@@ -101,7 +100,7 @@ procedure UDP_Server is
    task body Receive_Packets is
       use type Ada.Calendar.Time;
 
-      Packet   : Packet_Mgr.Packet_Content := (others => 0);
+      Packet   : array (1 .. Base_Udp.Load_Size) of Interfaces.Unsigned_8 := (others => 0);
       Seq_Nb   : Base_Udp.Header;
       Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
       Header   : Reliable_Udp.Header;
@@ -126,6 +125,7 @@ procedure UDP_Server is
 
                --  Exec_Start := Ada.Real_Time.Clock;
 
+               Ada.Text_IO.Put_Line ("Received Ack : " & Seq_Nb'Img);
                Remove_Task.Remove (Seq_Nb);
 
                --  Dur := Ada.Real_Time.To_Duration (Ada.Real_Time.Clock - Exec_Start);
@@ -140,7 +140,7 @@ procedure UDP_Server is
                if Seq_Nb /= Packet_Number then
                   if Seq_Nb > Packet_Number then
                      Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb - Packet_Number);
-                  else
+                  else -- Doesn't manage disordered packets, if a packet is received before the previous sent.
                      Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb
                      + (Base_Udp.Pkt_Max - Packet_Number));
                      --  New_Seq := True;
