@@ -14,7 +14,7 @@ pragma Warnings (On);
 with Base_Udp;
 with Output_Data;
 with Reliable_Udp;
-with Asynchronous_Fifo;
+with Queue;
 
 procedure UDP_Server is
    use GNAT.Sockets;
@@ -32,12 +32,7 @@ procedure UDP_Server is
       entry Start;
    end Recv_Socket;
 
-   subtype Packet_Stream is Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
-
-   package Socket_Fifo
-      is new Asynchronous_Fifo (Packet_Stream);
-   use Socket_Fifo;
-   Buffer : Fifo;
+   type Packet_Stream is new Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
 
    type Socket_Data is
       record
@@ -46,6 +41,9 @@ procedure UDP_Server is
       end record;
 
    --  Store_Packet_Task    : Packet_Mgr.Store_Packet_Task;
+   package Packet_Queue is new Queue (Packet_Stream);
+   Buffer : Packet_Queue.Synchronized_Queue;
+
    Append_Task          : Reliable_Udp.Append_Task;
    Remove_Task          : Reliable_Udp.Remove_Task;
    Ack_Task             : Reliable_Udp.Ack_Task;
@@ -119,7 +117,7 @@ procedure UDP_Server is
       accept Start;
       loop
          GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-         Buffer.Push (Data);
+         -- Buffer.Append_Wait (Data);
       end loop;
    end Recv_Socket;
 
@@ -141,8 +139,7 @@ procedure UDP_Server is
       accept Start;
       loop
          begin
-            Buffer.Pop (Data);
-            Ada.Text_IO.Put_Line ("Recv Data : " & Seq_Nb'Img);
+            -- Buffer.Remove_Wait (Data);
             if Header.Ack then
                Header.Ack := False;
                --  Ada.Text_IO.Put_Line ("Received Ack : " & Seq_Nb'Img);

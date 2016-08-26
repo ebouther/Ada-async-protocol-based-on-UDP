@@ -59,7 +59,7 @@ package body Packet_Mgr is
       procedure Store_Packet (Data           : Packet_Content;
                               New_Sequence   : Boolean;
                               Is_Ack         : Boolean) is
-         Seq_Nb       : Base_Udp.Header;
+         Seq_Nb         : Base_Udp.Header;
          Content        : Packet_Content;
          Cur_Container  : Container_Ptr := Pkt_Containers.Near_Full;
          Tmp            : array (1 .. 2) of Container_Ptr;
