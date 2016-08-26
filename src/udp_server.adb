@@ -14,6 +14,7 @@ pragma Warnings (On);
 with Base_Udp;
 with Output_Data;
 with Reliable_Udp;
+with Asynchronous_Fifo;
 
 procedure UDP_Server is
    use GNAT.Sockets;
@@ -27,11 +28,28 @@ procedure UDP_Server is
       entry Start;
    end Receive_Packets;
 
+   task type Recv_Socket is
+      entry Start;
+   end Recv_Socket;
+
+   subtype Packet_Stream is Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
+
+   package Socket_Fifo
+      is new Asynchronous_Fifo (Packet_Stream);
+   use Socket_Fifo;
+   Buffer : Fifo;
+
+   type Socket_Data is
+      record
+         Data  : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
+         From  : Sock_Addr_Type;
+      end record;
 
    --  Store_Packet_Task    : Packet_Mgr.Store_Packet_Task;
    Append_Task          : Reliable_Udp.Append_Task;
    Remove_Task          : Reliable_Udp.Remove_Task;
    Ack_Task             : Reliable_Udp.Ack_Task;
+   Recv_Socket_Task     : Recv_Socket;
 
    Server               : Socket_Type;
    Address, From        : Sock_Addr_Type;
@@ -94,65 +112,69 @@ procedure UDP_Server is
       end loop;
    end Timer;
 
+   task body Recv_Socket is
+      Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
+      Last     : Ada.Streams.Stream_Element_Offset;
+   begin
+      accept Start;
+      loop
+         GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
+         Buffer.Push (Data);
+      end loop;
+   end Recv_Socket;
+
+
    task body Receive_Packets is
       use type Ada.Calendar.Time;
 
+      Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
       Packet   : array (1 .. Base_Udp.Load_Size) of Interfaces.Unsigned_8 := (others => 0);
       Seq_Nb   : Base_Udp.Header;
-      Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
       Header   : Reliable_Udp.Header;
-      Last     : Ada.Streams.Stream_Element_Offset;
       --  New_Seq  : Boolean := False;
 
       for Data'Address use Packet'Address;
       for Header'Address use Data'Address;
       for Seq_Nb'Address use Data'Address;
 
-      I        : Integer := 0;
    begin
       accept Start;
       loop
          begin
-            GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-            I := I + 1;
-            if I > 9999900 then
-               Ada.Text_IO.Put_Line ("I: " & I'Img);
+            Buffer.Pop (Data);
+            Ada.Text_IO.Put_Line ("Recv Data : " & Seq_Nb'Img);
+            if Header.Ack then
+               Header.Ack := False;
+               --  Ada.Text_IO.Put_Line ("Received Ack : " & Seq_Nb'Img);
+               --  Remove_Task.Remove (Seq_Nb);
+
+            else
+               --  New_Seq := False;
+               Nb_Packet_Received := Nb_Packet_Received + 1;
+               if Nb_Packet_Received = 1 then
+                  Start_Time := Ada.Calendar.Clock;
+               end if;
+
+               if Seq_Nb /= Packet_Number then
+                  if Seq_Nb > Packet_Number then
+                     Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb - Packet_Number);
+                  else -- Doesn't manage disordered packets, if a packet is received before the previous sent.
+                     Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb
+                        + (Base_Udp.Pkt_Max - Packet_Number));
+                     --  New_Seq := True;
+                  end if;
+
+                  --  Append_Task.Append (Packet_Number, Seq_Nb - 1, From);
+
+                  Packet_Number := Seq_Nb;
+               end if;
+               if Seq_Nb = Base_Udp.Pkt_Max then
+                  Packet_Number := 0;
+                  --  New_Seq := True;
+               else
+                  Packet_Number := Packet_Number + 1;
+               end if;
             end if;
-
-            --  if Header.Ack then
-            --     Header.Ack := False;
-
-            --     --  Ada.Text_IO.Put_Line ("Received Ack : " & Seq_Nb'Img);
-            --     --  Remove_Task.Remove (Seq_Nb);
-
-            --  else
-            --     --  New_Seq := False;
-            --     Nb_Packet_Received := Nb_Packet_Received + 1;
-            --     if Nb_Packet_Received = 1 then
-            --        Start_Time := Ada.Calendar.Clock;
-            --     end if;
-
-            --     if Seq_Nb /= Packet_Number then
-            --        if Seq_Nb > Packet_Number then
-            --           Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb - Packet_Number);
-            --        else -- Doesn't manage disordered packets, if a packet is received before the previous sent.
-            --           Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb
-            --              + (Base_Udp.Pkt_Max - Packet_Number));
-            --           --  New_Seq := True;
-            --        end if;
-
-            --        --  Append_Task.Append (Packet_Number, Seq_Nb - 1, From);
-
-            --        Packet_Number := Seq_Nb;
-            --     end if;
-            --     if Seq_Nb = Base_Udp.Pkt_Max then
-            --        Packet_Number := 0;
-            --        --  New_Seq := True;
-            --     else
-            --        Packet_Number := Packet_Number + 1;
-            --     end if;
-            --  end if;
-
             --  Store_Packet_Task.Store (Data          => Packet,
             --                          New_Sequence  => New_Seq,
             --                          Is_Ack        => False);
@@ -172,6 +194,7 @@ begin
    end if;
 
    Init_Udp;
+   Recv_Socket_Task.Start;
    Ack_Task.Start;
    Recv_Packets.Start;
 --  exception
