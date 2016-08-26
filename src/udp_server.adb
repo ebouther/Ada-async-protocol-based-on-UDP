@@ -32,7 +32,7 @@ procedure UDP_Server is
       entry Start;
    end Recv_Socket;
 
-   type Packet_Stream is new Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
+   subtype Packet_Stream is Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
 
    type Socket_Data is
       record
@@ -41,8 +41,9 @@ procedure UDP_Server is
       end record;
 
    --  Store_Packet_Task    : Packet_Mgr.Store_Packet_Task;
-   package Packet_Queue is new Queue (Packet_Stream);
-   Buffer : Packet_Queue.Synchronized_Queue;
+   package Toto is new Queue (Packet_Stream);
+   use Toto;
+   Buffer : Synchronized_Queue;
 
    Append_Task          : Reliable_Udp.Append_Task;
    Remove_Task          : Reliable_Udp.Remove_Task;

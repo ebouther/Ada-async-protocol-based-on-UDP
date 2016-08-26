@@ -4,7 +4,7 @@ package Queue is
 
    type Element_Type_Array is array (Integer range <>) of Element_Type;
 
-   protected Synchronized_Queue is
+   protected type Synchronized_Queue is
       entry Append_Wait (Data : in Element_Type);
       entry Remove_First_Wait (Data : out Element_Type);
       function Cur_Count return Natural;
