@@ -86,6 +86,8 @@ procedure UDP_Client is
 
       end Rcv_Ack;
 
+      A : Integer := 0;
+
 begin
    Address.Port := 50001;
    if Ada.Command_Line.Argument_Count = 0 then
@@ -105,6 +107,9 @@ begin
          Seq_Nb := Seq_Nb + 1;
       end if;
       Pkt_Data := Pkt_Data + 1;
+      A := A + 1;
+      exit when A = 10000000;
+
       -- DBG --
       --  delay 0.00000001;
       ---------

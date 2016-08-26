@@ -32,7 +32,8 @@ package Reliable_Udp is
 
    for Header use
       record
-         Ack      at Base_Udp.Header_Size - 1 range Base_Udp.Header'Size - 1 .. Base_Udp.Header'Size - 1;
+         Ack      at Base_Udp.Header_Size - 1
+                     range Base_Udp.Header'Size - 1 .. Base_Udp.Header'Size - 1;
          --  Packet   at 0 range 0 .. Base_Udp.Header_Size * 8 - 2;
       end record;
 

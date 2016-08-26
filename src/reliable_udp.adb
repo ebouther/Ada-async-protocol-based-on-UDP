@@ -44,6 +44,7 @@ package body Reliable_Udp is
       end if;
    end Append_Task;
 
+
    task body Remove_Task is
       Pkt   : Base_Udp.Header;
    begin
@@ -54,6 +55,7 @@ package body Reliable_Udp is
             Ack_Mgr.Remove (Pkt);
       end loop;
    end Remove_Task;
+
 
    task body Ack_Task is
    begin

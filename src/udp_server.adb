@@ -35,7 +35,6 @@ procedure UDP_Server is
 
    Server               : Socket_Type;
    Address, From        : Sock_Addr_Type;
-   Watchdog             : Natural := 0;
    Start_Time           : Ada.Calendar.Time;
    Elapsed_Time         : Duration;
    Nb_Packet_Received   : Interfaces.Unsigned_64 := 0;
@@ -95,7 +94,6 @@ procedure UDP_Server is
       end loop;
    end Timer;
 
-
    task body Receive_Packets is
       use type Ada.Calendar.Time;
 
@@ -110,64 +108,54 @@ procedure UDP_Server is
       for Header'Address use Data'Address;
       for Seq_Nb'Address use Data'Address;
 
-      --  Exec_Start  : Ada.Real_Time.Time;
-      --  Dur         : Duration;
-      --  use Ada.Real_Time;
+      I        : Integer := 0;
    begin
       accept Start;
       loop
          begin
             GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-
-            if Header.Ack then
-               Header.Ack := False;
-
-               --  Exec_Start := Ada.Real_Time.Clock;
-
-               Ada.Text_IO.Put_Line ("Received Ack : " & Seq_Nb'Img);
-               Remove_Task.Remove (Seq_Nb);
-
-               --  Dur := Ada.Real_Time.To_Duration (Ada.Real_Time.Clock - Exec_Start);
-               --  Ada.Text_IO.Put_Line ("Remove : " & Dur'Img);
-            else
-               --  New_Seq := False;
-               Nb_Packet_Received := Nb_Packet_Received + 1;
-               if Nb_Packet_Received = 1 then
-                  Start_Time := Ada.Calendar.Clock;
-               end if;
-
-               if Seq_Nb /= Packet_Number then
-                  if Seq_Nb > Packet_Number then
-                     Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb - Packet_Number);
-                  else -- Doesn't manage disordered packets, if a packet is received before the previous sent.
-                     Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb
-                     + (Base_Udp.Pkt_Max - Packet_Number));
-                     --  New_Seq := True;
-                  end if;
-
-                  --  Exec_Start := Ada.Real_Time.Clock;
-
-                  Append_Task.Append (Packet_Number, Seq_Nb - 1, From);
-
-                  --  Dur := Ada.Real_Time.To_Duration (Ada.Real_Time.Clock - Exec_Start);
-                  --  Ada.Text_IO.Put_Line ("Append3 :     " & Dur'Img);
-
-                  Packet_Number := Seq_Nb;
-               end if;
-               if Seq_Nb = Base_Udp.Pkt_Max then
-                  Packet_Number := 0;
-                  --  New_Seq := True;
-               else
-                  Packet_Number := Packet_Number + 1;
-               end if;
+            I := I + 1;
+            if I > 9999900 then
+               Ada.Text_IO.Put_Line ("I: " & I'Img);
             end if;
+
+            --  if Header.Ack then
+            --     Header.Ack := False;
+
+            --     --  Ada.Text_IO.Put_Line ("Received Ack : " & Seq_Nb'Img);
+            --     --  Remove_Task.Remove (Seq_Nb);
+
+            --  else
+            --     --  New_Seq := False;
+            --     Nb_Packet_Received := Nb_Packet_Received + 1;
+            --     if Nb_Packet_Received = 1 then
+            --        Start_Time := Ada.Calendar.Clock;
+            --     end if;
+
+            --     if Seq_Nb /= Packet_Number then
+            --        if Seq_Nb > Packet_Number then
+            --           Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb - Packet_Number);
+            --        else -- Doesn't manage disordered packets, if a packet is received before the previous sent.
+            --           Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb
+            --              + (Base_Udp.Pkt_Max - Packet_Number));
+            --           --  New_Seq := True;
+            --        end if;
+
+            --        --  Append_Task.Append (Packet_Number, Seq_Nb - 1, From);
+
+            --        Packet_Number := Seq_Nb;
+            --     end if;
+            --     if Seq_Nb = Base_Udp.Pkt_Max then
+            --        Packet_Number := 0;
+            --        --  New_Seq := True;
+            --     else
+            --        Packet_Number := Packet_Number + 1;
+            --     end if;
+            --  end if;
+
             --  Store_Packet_Task.Store (Data          => Packet,
             --                          New_Sequence  => New_Seq,
             --                          Is_Ack        => False);
-         exception
-            when Socket_Error =>
-               Watchdog := Watchdog + 1;
-               exit when Watchdog = 10;
          end;
       end loop;
    end Receive_Packets;
