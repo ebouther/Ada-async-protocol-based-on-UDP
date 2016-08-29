@@ -32,6 +32,7 @@ procedure UDP_Server is
       entry Start;
    end Recv_Socket;
 
+   type Packet_Stream_Ptr is access all Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
    subtype Packet_Stream is Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
 
    type Socket_Data is
@@ -41,7 +42,7 @@ procedure UDP_Server is
       end record;
 
    --  Store_Packet_Task    : Packet_Mgr.Store_Packet_Task;
-   package Toto is new Queue (Packet_Stream);
+   package Toto is new Queue (Packet_Stream_Ptr);
    use Toto;
    Buffer : Synchronized_Queue;
 
@@ -112,13 +113,16 @@ procedure UDP_Server is
    end Timer;
 
    task body Recv_Socket is
-      Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
       Last     : Ada.Streams.Stream_Element_Offset;
    begin
       accept Start;
       loop
-         GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-         Buffer.Append_Wait (Data);
+         declare
+            Data     : Packet_Stream_Ptr := new Packet_Stream;
+         begin
+            GNAT.Sockets.Receive_Socket (Server, Data.all, Last, From);
+            Buffer.Append_Wait (Data);
+         end;
       end loop;
    end Recv_Socket;
 
@@ -126,7 +130,8 @@ procedure UDP_Server is
    task body Receive_Packets is
       use type Ada.Calendar.Time;
 
-      Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
+      --  Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
+      Data     : Packet_Stream_Ptr := new Packet_Stream;
       Packet   : array (1 .. Base_Udp.Load_Size) of Interfaces.Unsigned_8 := (others => 0);
       Seq_Nb   : Base_Udp.Header;
       Header   : Reliable_Udp.Header;
@@ -141,6 +146,7 @@ procedure UDP_Server is
       loop
          begin
             Buffer.Remove_First_Wait (Data);
+            Ada.Text_IO.Put_Line ("Received : " & Seq_Nb'Img);
             if Header.Ack then
                Header.Ack := False;
                --  Ada.Text_IO.Put_Line ("Received Ack : " & Seq_Nb'Img);
