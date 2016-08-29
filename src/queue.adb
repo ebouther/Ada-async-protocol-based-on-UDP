@@ -9,9 +9,9 @@ package body Queue is
 
       procedure Append (Data : in Element_Type) is
       begin
-         --  if Count = Pool'Length then
-         --     raise Queue_Error with "Buffer Full";
-         --  end if;
+         if Count = Pool'Length then
+            raise Queue_Error with "Buffer Full";
+         end if;
          Pool (In_Index) := Data;
          In_Index        := (In_Index mod Pool'Length) + 1;
          Count           := Count + 1;
@@ -25,9 +25,9 @@ package body Queue is
 
       procedure Remove_First (Data : out Element_Type) is
       begin
-         --  if Count = 0 then
-         --     raise Queue_Error with "Buffer Empty";
-         --  end if;
+         if Count = 0 then
+            raise Queue_Error with "Buffer Empty";
+         end if;
          Data    := Pool (Out_Index);
          Out_Index := (Out_Index mod Pool'Length) + 1;
          Count     := Count - 1;
