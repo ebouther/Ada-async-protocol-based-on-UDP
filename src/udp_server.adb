@@ -118,7 +118,7 @@ procedure UDP_Server is
       accept Start;
       loop
          GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-         -- Buffer.Append_Wait (Data);
+         Buffer.Append_Wait (Data);
       end loop;
    end Recv_Socket;
 
@@ -140,7 +140,7 @@ procedure UDP_Server is
       accept Start;
       loop
          begin
-            -- Buffer.Remove_Wait (Data);
+            Buffer.Remove_First_Wait (Data);
             if Header.Ack then
                Header.Ack := False;
                --  Ada.Text_IO.Put_Line ("Received Ack : " & Seq_Nb'Img);
@@ -193,7 +193,7 @@ begin
 
    Init_Udp;
    Recv_Socket_Task.Start;
-   Ack_Task.Start;
+   --  Ack_Task.Start;
    Recv_Packets.Start;
 --  exception
 --     when E : others =>
