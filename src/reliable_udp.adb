@@ -11,38 +11,53 @@ package body Reliable_Udp is
       First_D, Last_D  : Base_Udp.Header;
 
    begin
-      accept Append (First_Dropped, Last_Dropped   : Base_Udp.Header;
-                     Client_Address                : GNAT.Sockets.Sock_Addr_Type) do
-         First_D        := First_Dropped;
-         Last_D         := Last_Dropped;
-         Client_Addr    := Client_Address;
-      end Append;
+      loop
+         select
+            accept Append (First_Dropped, Last_Dropped   : Base_Udp.Header;
+                           Client_Address                : GNAT.Sockets.Sock_Addr_Type) do
+               Ada.Text_IO.Put_Line ("--- APPEND");
+               First_D        := First_Dropped;
+               Last_D         := Last_Dropped;
+               Client_Addr    := Client_Address;
+               Ada.Text_IO.Put_Line ("--- DONE");
+            end Append;
 
-      if First_D < Last_D then
-         for I in Base_Udp.Header range First_D .. Last_D loop
-            Packet_Lost := (Packet     => I,
-                            Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-                            Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-                            From       => Client_Addr);
-            Ack_Mgr.Append (Packet_Lost);
-         end loop;
-      else
-         for I in Base_Udp.Header range First_D .. Base_Udp.Pkt_Max loop
-            Packet_Lost := (Packet     => I,
-                            Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-                            Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-                            From       => Client_Addr);
-            Ack_Mgr.Append (Packet_Lost);
-         end loop;
+            if First_D < Last_D then
+               for I in Base_Udp.Header range First_D .. Last_D loop
+                  Packet_Lost := (Packet     => I,
+                                  Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                                  Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+                                  From       => Client_Addr);
+                  Ada.Text_IO.Put_Line ("      Append Procedure Call");
+                  Ack_Mgr.Append (Packet_Lost);
+                  Ada.Text_IO.Put_Line ("      End Append Procedure");
+               end loop;
+            else
+               for I in Base_Udp.Header range First_D .. Base_Udp.Pkt_Max loop
+                  Packet_Lost := (Packet     => I,
+                                  Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                                  Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+                                  From       => Client_Addr);
 
-         for I in Base_Udp.Header range 0 .. Last_D loop
-            Packet_Lost := (Packet     => I,
-                            Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-                            Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-                            From       => Client_Addr);
-            Ack_Mgr.Append (Packet_Lost);
-         end loop;
-      end if;
+                  Ada.Text_IO.Put_Line ("       1 Append Procedure Call");
+                  Ack_Mgr.Append (Packet_Lost);
+                  Ada.Text_IO.Put_Line ("       1 End Append Procedure");
+               end loop;
+
+               for I in Base_Udp.Header range 0 .. Last_D loop
+                  Packet_Lost := (Packet     => I,
+                                  Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                                  Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+                                  From       => Client_Addr);
+                  Ada.Text_IO.Put_Line ("       2 Append Procedure Call");
+                  Ack_Mgr.Append (Packet_Lost);
+                  Ada.Text_IO.Put_Line ("       2 End Append Procedure");
+               end loop;
+            end if;
+         else
+            Ada.Text_IO.Put_Line ("Task Append Busy");
+         end select;
+      end loop;
    end Append_Task;
 
 

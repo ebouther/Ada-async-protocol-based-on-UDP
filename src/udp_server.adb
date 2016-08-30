@@ -181,7 +181,6 @@ procedure UDP_Server is
       loop
          begin
             Buffer.Remove_First_Wait (Data);
-            Ada.Text_IO.Put_Line("---------- Start ---------------");
             --Ada.Text_IO.Put_Line ("Received : " & Seq_Nb.all'Img);
             if Header.all.Ack then
                Header.all.Ack := False;
@@ -209,20 +208,20 @@ procedure UDP_Server is
                   Ada.Text_IO.Put_Line("    ---------- END ----------");
 
                   Packet_Number := Seq_Nb.all;
-                end if;
-                if Seq_Nb.all = Base_Udp.Pkt_Max then
-                   Packet_Number := 0;
-                   --  New_Seq := True;
-                else
-                   Packet_Number := Packet_Number + 1;
-                end if;
-               Ada.Text_IO.Put_Line("---------- END ---------------");
+               end if;
+
+               if Seq_Nb.all = Base_Udp.Pkt_Max then
+                  Packet_Number := 0;
+                  --  New_Seq := True;
+               else
+                  Packet_Number := Packet_Number + 1;
+               end if;
              end if;
 
             --  Store_Packet_Task.Store (Data          => Packet,
             --                          New_Sequence  => New_Seq,
             --                          Is_Ack        => False);
-            Free_Stream(Data);
+            --  Free_Stream(Data);
          end;
       end loop;
    end Process_Packets;
