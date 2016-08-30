@@ -121,25 +121,17 @@ procedure UDP_Server is
    end Timer;
 
    task body Recv_Socket is
-      --  Last     : Ada.Streams.Stream_Element_Offset;
+      Last     : Ada.Streams.Stream_Element_Offset;
       Watchdog : Natural := 0;
-      Data     : Packet_Stream_Ptr := new Packet_Stream;
       use type Interfaces.C.int;
    begin
       accept Start;
       loop
+         declare
+            Data     : Packet_Stream_Ptr := new Packet_Stream;
          begin
-            if GNAT.Sockets.Thin.C_Recv
-               (To_Int (Server), Data.all (Data.all'First)'Address, Data.all'Length, 64) /= -1
-            then
-                  --  GNAT.Sockets.Receive_Socket (Server, Data.all, Last, From);
-                  --  Ada.Text_IO.Put_Line ("Received");
-
+                  GNAT.Sockets.Receive_Socket (Server, Data.all, Last, From);
                   Buffer.Append_Wait (Data);
-                  Data := new Packet_Stream;
-            --  else
-            --      Ada.Text_IO.Put_Line ("Waiting for pkt");
-            end if;
          exception
            when Socket_Error =>
               Watchdog := Watchdog + 1;
