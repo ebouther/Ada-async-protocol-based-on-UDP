@@ -1,9 +1,24 @@
 with Interfaces;
 
 with Base_Udp;
+with Buffers.Local;
 
 package Packet_Mgr is
 
+   package Unsigned_32_Buffers is new
+     Buffers.Generic_Buffers (Element_Type => Interfaces.Unsigned_32);
+
+   task type Producer_Task
+     (Buffer : Buffers.Local.Local_Buffer_Access) is
+     entry Start;
+     entry Stop;
+   end Producer_Task;
+
+   task type Consumer_Task
+     (Buffer : Buffers.Local.Local_Buffer_Access) is
+     entry Start;
+     entry Stop;
+   end Consumer_Task;
 
    type Packet_Content is
       array (1 .. Base_Udp.Load_Size)

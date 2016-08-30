@@ -25,9 +25,9 @@ procedure UDP_Server is
 
    task Timer;
 
-   task type Receive_Packets is
+   task type Process_Packets is
       entry Start;
-   end Receive_Packets;
+   end Process_Packets;
 
    task type Recv_Socket is
       entry Start;
@@ -64,7 +64,7 @@ procedure UDP_Server is
    Last_Nb              : Interfaces.Unsigned_64 := 0;
    Nb_Output            : Natural := 0;
    Log_File             : Ada.Text_IO.File_Type;
-   Recv_Packets         : Receive_Packets;
+   Process_Pkt          : Process_Packets;
    Busy                 : Interfaces.C.int := 50;
    Opt_Return           : Interfaces.C.int;
 
@@ -145,7 +145,7 @@ procedure UDP_Server is
 --      end loop;
 --   end Dbg;
 
-   task body Receive_Packets is
+   task body Process_Packets is
       use type Ada.Calendar.Time;
 
       --  Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
@@ -206,7 +206,7 @@ procedure UDP_Server is
             Free_Stream(Data);
          end;
       end loop;
-   end Receive_Packets;
+   end Process_Packets;
 
 begin
 
@@ -221,8 +221,8 @@ begin
 
    Init_Udp;
    Recv_Socket_Task.Start;
+   Process_Pkt.Start;
    Ack_Task.Start;
-   Recv_Packets.Start;
 --  exception
 --     when E : others =>
 --        Ada.Text_IO.Put_Line (GNAT.Traceback.Symbolic.Symbolic_Traceback (E));
