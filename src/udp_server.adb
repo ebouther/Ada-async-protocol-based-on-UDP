@@ -204,7 +204,11 @@ procedure UDP_Server is
                   end if;
 
                   Ada.Text_IO.Put_Line("    ---------- APP  ----------");
-                  Append_Task.Append (Packet_Number, Seq_Nb.all - 1, From);
+                  select
+                     Append_Task.Append (Packet_Number, Seq_Nb.all - 1, From);
+                  else
+                     Ada.Text_IO.Put_Line ("Task Append Busy");
+                  end select;
                   Ada.Text_IO.Put_Line("    ---------- END ----------");
 
                   Packet_Number := Seq_Nb.all;
