@@ -1,4 +1,5 @@
 with Ada.Streams;
+with Ada.Text_IO;
 
 package body Reliable_Udp is
 
@@ -72,8 +73,8 @@ package body Reliable_Udp is
       procedure Init_Socket is
       begin
          GNAT.Sockets.Create_Socket (Socket,
-         GNAT.Sockets.Family_Inet,
-         GNAT.Sockets.Socket_Datagram);
+                                     GNAT.Sockets.Family_Inet,
+                                     GNAT.Sockets.Socket_Datagram);
       end Init_Socket;
 
 
@@ -130,7 +131,7 @@ package body Reliable_Udp is
       begin
          if Losses_Container.Is_Empty (Losses) = False then
 
-            while Losses_Container.Has_Element (Cursor) loop
+            --  while Losses_Container.Has_Element (Cursor) loop
                Element := Losses_Container.Element (Cursor);
                if Cur_Time - Element.Last_Ack >
                   Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)
@@ -138,12 +139,12 @@ package body Reliable_Udp is
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Losses_Container.Replace_Element (Losses, Cursor, Element);
                   Seq_Nb := Element.Packet;
-                  --  Ada.Text_IO.Put_Line ("Send Ack : " & Seq_Nb'Img);
+                  Ada.Text_IO.Put_Line ("Send Ack : " & Seq_Nb'Img);
                   GNAT.Sockets.Send_Socket (Socket, Data, Offset, Element.From);
                   Update_AckTime (Cursor, Ada.Real_Time.Clock);
                end if;
-               Losses_Container.Next (Cursor);
-            end loop;
+            --     Losses_Container.Next (Cursor);
+            --  end loop;
          end if;
       end Ack;
 

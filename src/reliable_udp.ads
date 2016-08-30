@@ -1,8 +1,8 @@
 with Ada.Real_Time;
 with Ada.Containers.Vectors;
 with Ada.Containers;
-
 with Interfaces;
+with System;
 
 pragma Warnings (Off);
 with GNAT.Sockets.Thin;
@@ -43,6 +43,7 @@ package Reliable_Udp is
       new Ada.Containers.Vectors (Natural, Loss);
 
    task type Ack_Task is
+      pragma Priority (System.Priority'First);
       entry Start;
    end Ack_Task;
 

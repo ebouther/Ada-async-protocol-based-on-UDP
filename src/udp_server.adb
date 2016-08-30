@@ -8,6 +8,9 @@ with Interfaces.C;
 with System.Multiprocessors.Dispatching_Domains;
 with Ada.Unchecked_Deallocation;
 
+with GNAT.Traceback.Symbolic;
+with System;
+
 pragma Warnings (Off);
 with GNAT.Sockets.Thin;
 pragma Warnings (On);
@@ -26,10 +29,12 @@ procedure UDP_Server is
    task Timer;
 
    task type Process_Packets is
+      pragma Priority (System.Priority'Last);
       entry Start;
    end Process_Packets;
 
    task type Recv_Socket is
+      pragma Priority (System.Priority'Last);
       entry Start;
    end Recv_Socket;
 
@@ -100,16 +105,15 @@ procedure UDP_Server is
       use type Ada.Calendar.Time;
    begin
       loop
-         delay 1.0;
          Elapsed_Time := Ada.Calendar.Clock - Start_Time;
-         Output_Data.Display
-            (True,
-            Elapsed_Time,
-            Interfaces.Unsigned_64 (Packet_Number),
-            Missed,
-            Nb_Packet_Received,
-            Last_Nb,
-            Nb_Output);
+       --    Output_Data.Display
+       --       (True,
+       --       Elapsed_Time,
+       --       Interfaces.Unsigned_64 (Packet_Number),
+       --       Missed,
+       --       Nb_Packet_Received,
+       --       Last_Nb,
+       --       Nb_Output);
          Last_Nb := Nb_Packet_Received;
          Nb_Output := Nb_Output + 1;
       end loop;
@@ -131,6 +135,7 @@ procedure UDP_Server is
          exception
             when Socket_Error =>
                Watchdog := Watchdog + 1;
+               Ada.Text_IO.Put_Line ("Socket Error");
                exit when Watchdog = 10;
          end;
       end loop;
@@ -223,7 +228,7 @@ begin
    Recv_Socket_Task.Start;
    Process_Pkt.Start;
    Ack_Task.Start;
---  exception
---     when E : others =>
---        Ada.Text_IO.Put_Line (GNAT.Traceback.Symbolic.Symbolic_Traceback (E));
+exception
+   when E : others =>
+      Ada.Text_IO.Put_Line (GNAT.Traceback.Symbolic.Symbolic_Traceback (E));
 end UDP_Server;
