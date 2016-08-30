@@ -75,14 +75,16 @@ procedure UDP_Client is
          for Data'Address use Ack'Address;
          for Seq'Address use Data'Address;
       begin
-         Res := GNAT.Sockets.Thin.C_Recv
-            (To_Int (Socket), Data (Data'First)'Address, Data'Length, 64);
-         if Res /= -1 then
+         loop
+            Res := GNAT.Sockets.Thin.C_Recv
+               (To_Int (Socket), Data (Data'First)'Address, Data'Length, 64);
+            exit when Res = -1;
             ---------- DBG -----------
             Ada.Text_IO.Put_Line ("ACK [" & Res'Img & " ]: Dropped :" & Seq'Img);
             --------------------------
             Send_Packet (Ack_U8, True);
-         end if;
+            
+         end loop;
 
       end Rcv_Ack;
 

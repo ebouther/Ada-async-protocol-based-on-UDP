@@ -29,7 +29,7 @@ procedure UDP_Server is
    task Timer;
 
    task type Process_Packets is
-      pragma Priority (System.Priority'Last);
+      pragma Priority (System.Priority'Last - 1);
       entry Start;
    end Process_Packets;
 
@@ -105,50 +105,60 @@ procedure UDP_Server is
       use type Ada.Calendar.Time;
    begin
       loop
+         delay 1.0;
          Elapsed_Time := Ada.Calendar.Clock - Start_Time;
-       --    Output_Data.Display
-       --       (True,
-       --       Elapsed_Time,
-       --       Interfaces.Unsigned_64 (Packet_Number),
-       --       Missed,
-       --       Nb_Packet_Received,
-       --       Last_Nb,
-       --       Nb_Output);
-         Last_Nb := Nb_Packet_Received;
+         Output_Data.Display
+            (True,
+            Elapsed_Time,
+            Interfaces.Unsigned_64 (Packet_Number),
+            Missed,
+            Nb_Packet_Received,
+            Last_Nb,
+            Nb_Output);
+           Last_Nb := Nb_Packet_Received;
          Nb_Output := Nb_Output + 1;
       end loop;
    end Timer;
 
    task body Recv_Socket is
-      Last     : Ada.Streams.Stream_Element_Offset;
+      --  Last     : Ada.Streams.Stream_Element_Offset;
       Watchdog : Natural := 0;
+      Data     : Packet_Stream_Ptr := new Packet_Stream;
+      use type Interfaces.C.int;
    begin
       accept Start;
       loop
-         declare
-            Data     : Packet_Stream_Ptr := new Packet_Stream;
          begin
-            GNAT.Sockets.Receive_Socket (Server, Data.all, Last, From);
+            if GNAT.Sockets.Thin.C_Recv
+               (To_Int (Server), Data.all (Data.all'First)'Address, Data.all'Length, 64) /= -1
+            then
+                  --  GNAT.Sockets.Receive_Socket (Server, Data.all, Last, From);
+                  --  Ada.Text_IO.Put_Line ("Received");
 
-            Buffer.Append_Wait (Data);
-
+                  Buffer.Append_Wait (Data);
+                  Data := new Packet_Stream;
+            --  else
+            --      Ada.Text_IO.Put_Line ("Waiting for pkt");
+            end if;
          exception
-            when Socket_Error =>
-               Watchdog := Watchdog + 1;
-               Ada.Text_IO.Put_Line ("Socket Error");
-               exit when Watchdog = 10;
+           when Socket_Error =>
+              Watchdog := Watchdog + 1;
+              Ada.Text_IO.Put_Line ("Socket Error");
+              exit when Watchdog = 10;
+
          end;
       end loop;
+      
    end Recv_Socket;
 
---   task Dbg;
---   task body Dbg is
---   begin
---      loop
---         delay 5.0;      
---         Ada.Text_IO.Put_Line("Buf len : " & Buffer.Cur_Count'Img);
---      end loop;
---   end Dbg;
+   task Dbg;
+   task body Dbg is
+   begin
+      loop
+         delay 5.0;      
+         Ada.Text_IO.Put_Line("Buf len : " & Buffer.Cur_Count'Img);
+      end loop;
+   end Dbg;
 
    task body Process_Packets is
       use type Ada.Calendar.Time;
@@ -171,6 +181,7 @@ procedure UDP_Server is
       loop
          begin
             Buffer.Remove_First_Wait (Data);
+            Ada.Text_IO.Put_Line("---------- Start ---------------");
             --Ada.Text_IO.Put_Line ("Received : " & Seq_Nb.all'Img);
             if Header.all.Ack then
                Header.all.Ack := False;
@@ -193,9 +204,11 @@ procedure UDP_Server is
                       --  New_Seq := True;
                   end if;
 
-                   Append_Task.Append (Packet_Number, Seq_Nb.all - 1, From);
+                  Ada.Text_IO.Put_Line("    ---------- APP  ----------");
+                  Append_Task.Append (Packet_Number, Seq_Nb.all - 1, From);
+                  Ada.Text_IO.Put_Line("    ---------- END ----------");
 
-                   Packet_Number := Seq_Nb.all;
+                  Packet_Number := Seq_Nb.all;
                 end if;
                 if Seq_Nb.all = Base_Udp.Pkt_Max then
                    Packet_Number := 0;
@@ -203,6 +216,7 @@ procedure UDP_Server is
                 else
                    Packet_Number := Packet_Number + 1;
                 end if;
+               Ada.Text_IO.Put_Line("---------- END ---------------");
              end if;
 
             --  Store_Packet_Task.Store (Data          => Packet,

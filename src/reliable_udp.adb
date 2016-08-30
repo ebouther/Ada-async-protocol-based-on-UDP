@@ -118,33 +118,43 @@ package body Reliable_Udp is
       procedure Ack is
          Ack_Array   : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
          Seq_Nb      : Base_Udp.Header;
+         --  Header      : Reliable_Udp.Header;
          Data        : Ada.Streams.Stream_Element_Array (1 .. 64);
          Offset      : Ada.Streams.Stream_Element_Offset;
          Cur_Time    : constant Ada.Real_Time.Time := Ada.Real_Time.Clock;
          Cursor      : Losses_Container.Cursor := Losses.First;
          Element     : Loss;
+         --  First       : Boolean := True;
 
          for Data'Address use Ack_Array'Address;
          for Seq_Nb'Address use Ack_Array'Address;
+         --  for Header'Address use Ack_Array'Address;
          use type Ada.Real_Time.Time;
          use type Ada.Real_Time.Time_Span;
       begin
          if Losses_Container.Is_Empty (Losses) = False then
 
-            --  while Losses_Container.Has_Element (Cursor) loop
+            while Losses_Container.Has_Element (Cursor) loop
                Element := Losses_Container.Element (Cursor);
                if Cur_Time - Element.Last_Ack >
                   Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)
                then
+                 --   if Header.Ack then
+                 --      Header.Ack := False;
+                 --   end if;
+                 --   if First then
+                 --      First := False;
+                 --      Header.Ack := True;
+                 --   end if;
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Losses_Container.Replace_Element (Losses, Cursor, Element);
                   Seq_Nb := Element.Packet;
-                  Ada.Text_IO.Put_Line ("Send Ack : " & Seq_Nb'Img);
+                  --Ada.Text_IO.Put_Line ("Send Ack : " & Seq_Nb'Img);
                   GNAT.Sockets.Send_Socket (Socket, Data, Offset, Element.From);
                   Update_AckTime (Cursor, Ada.Real_Time.Clock);
                end if;
-            --     Losses_Container.Next (Cursor);
-            --  end loop;
+               Losses_Container.Next (Cursor);
+            end loop;
          end if;
       end Ack;
 
