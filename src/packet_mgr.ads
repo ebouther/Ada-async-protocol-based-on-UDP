@@ -4,6 +4,7 @@ with Base_Udp;
 
 package Packet_Mgr is
 
+
    type Packet_Content is
       array (1 .. Base_Udp.Load_Size)
          of Interfaces.Unsigned_8;

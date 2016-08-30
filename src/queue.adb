@@ -28,7 +28,7 @@ package body Queue is
          if Count = 0 then
             raise Queue_Error with "Buffer Empty";
          end if;
-         Data    := Pool (Out_Index);
+         Data      := Pool (Out_Index);
          Out_Index := (Out_Index mod Pool'Length) + 1;
          Count     := Count - 1;
       end Remove_First;

@@ -1,5 +1,7 @@
 with Ada.Text_IO;
 
+with Buffers.Local;
+
 package body Packet_Mgr is
 
    Buffer_Mgr              : Buffer_Management;
