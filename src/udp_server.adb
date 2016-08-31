@@ -174,7 +174,6 @@ procedure UDP_Server is
       loop
          begin
             Buffer.Remove_First_Wait (Data);
-            --Ada.Text_IO.Put_Line ("Received : " & Seq_Nb.all'Img);
             if Header.all.Ack then
                Header.all.Ack := False;
                --Ada.Text_IO.Put_Line ("Received Ack : " & Seq_Nb.all'Img);
@@ -190,11 +189,11 @@ procedure UDP_Server is
                if Seq_Nb.all /= Packet_Number then
                   if Seq_Nb.all > Packet_Number then
                       Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb.all - Packet_Number);
-                  else --  Doesn't manage disordered packets
-                       --  if a packet is received before the previous sent.
-                      Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb.all
-                         + (Base_Udp.Pkt_Max - Packet_Number));
-                      --  New_Seq := True;
+                 --  else --  Doesn't manage disordered packets
+                 --       --  if a packet is received before the previous sent.
+                 --      Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb.all
+                 --         + (Base_Udp.Pkt_Max - Packet_Number));
+                 --      --  New_Seq := True;
                   end if;
 
                   --select

@@ -67,9 +67,7 @@ package body Reliable_Udp is
       Ack_Mgr.Init_Socket;
       accept Start;
       loop
-         if Integer (Ack_Mgr.Length) > 10 then
-            Ack_Mgr.Ack;
-         end if;
+         Ack_Mgr.Ack;
       end loop;
    end Ack_Task;
 
@@ -145,11 +143,6 @@ package body Reliable_Udp is
                if Cur_Time - Element.Last_Ack >
                   Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)
                then
-                  if Losses_Container.Has_Element (Losses_Container.Next (Cursor)) = False then
-                     Header.Ack := True;
-                  else
-                     Header.Ack := False;
-                  end if; 
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Losses_Container.Replace_Element (Losses, Cursor, Element);
                   Seq_Nb := Element.Packet;
