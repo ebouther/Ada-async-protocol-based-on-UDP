@@ -1,5 +1,4 @@
 with Ada.Streams;
-with Ada.Text_IO;
 
 package body Reliable_Udp is
 
@@ -20,13 +19,13 @@ package body Reliable_Udp is
          end Append;
 
          --  if First_D < Last_D then
-            for I in Base_Udp.Header range First_D .. Last_D loop
-               Packet_Lost := (Packet     => I,
-                               Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-                               Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-                               From       => Client_Addr);
-               Ack_Mgr.Append (Packet_Lost);
-            end loop;
+         for I in Base_Udp.Header range First_D .. Last_D loop
+            Packet_Lost := (Packet     => I,
+                            Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                            Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+                            From       => Client_Addr);
+            Ack_Mgr.Append (Packet_Lost);
+         end loop;
          --  else
          --     for I in Base_Udp.Header range First_D .. Base_Udp.Pkt_Max loop
          --        Packet_Lost := (Packet     => I,
@@ -35,7 +34,7 @@ package body Reliable_Udp is
          --                        From       => Client_Addr);
 
          --        Ack_Mgr.Append (Packet_Lost);
-         --        
+
          --     end loop;
 
          --     for I in Base_Udp.Header range 0 .. Last_D loop
@@ -122,7 +121,7 @@ package body Reliable_Udp is
       procedure Ack is
          Ack_Array   : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
          Seq_Nb      : Base_Udp.Header;
-         Header      : Reliable_Udp.Header;
+         Head        : Reliable_Udp.Header;
          Data        : Ada.Streams.Stream_Element_Array (1 .. 64);
          Offset      : Ada.Streams.Stream_Element_Offset;
          Cur_Time    : constant Ada.Real_Time.Time := Ada.Real_Time.Clock;
@@ -132,7 +131,7 @@ package body Reliable_Udp is
 
          for Data'Address use Ack_Array'Address;
          for Seq_Nb'Address use Ack_Array'Address;
-         for Header'Address use Ack_Array'Address;
+         for Head'Address use Ack_Array'Address;
          use type Ada.Real_Time.Time;
          use type Ada.Real_Time.Time_Span;
       begin
@@ -146,7 +145,7 @@ package body Reliable_Udp is
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Losses_Container.Replace_Element (Losses, Cursor, Element);
                   Seq_Nb := Element.Packet;
-                  --Ada.Text_IO.Put_Line ("Send Ack : " & Seq_Nb'Img);
+                  --  Ada.Text_IO.Put_Line ("Send Ack : " & Seq_Nb'Img);
                   GNAT.Sockets.Send_Socket (Socket, Data, Offset, Element.From);
                   Update_AckTime (Cursor, Ada.Real_Time.Clock);
                end if;

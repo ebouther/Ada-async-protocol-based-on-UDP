@@ -85,7 +85,7 @@ procedure UDP_Client is
             ---------- DBG -----------
             Ada.Text_IO.Put_Line ("ACK [" & Res'Img & " ]: Dropped :" & Seq'Img);
             --------------------------
-            
+
             Send_Packet (Ack_U8, True);
          end loop;
 

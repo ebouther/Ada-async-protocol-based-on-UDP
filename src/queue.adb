@@ -17,7 +17,7 @@ package body Queue is
          Count           := Count + 1;
       end Append;
 
-      entry Remove_First_Wait(Data : out Element_Type)
+      entry Remove_First_Wait (Data : out Element_Type)
          when Count > 0 is
       begin
          Remove_First (Data);
@@ -35,12 +35,12 @@ package body Queue is
 
       function Cur_Count return Natural is
       begin
-          return Synchronized_Queue.Count;
+         return Synchronized_Queue.Count;
       end Cur_Count;
 
       function Max_Count return Natural is
       begin
-          return Pool'Length;
+         return Pool'Length;
       end Max_Count;
    end Synchronized_Queue;
 
