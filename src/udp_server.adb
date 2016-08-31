@@ -3,7 +3,6 @@ with Ada.Command_Line;
 with Ada.Streams;
 with Ada.Unchecked_Conversion;
 with Ada.Calendar;
---  with Ada.Real_Time;
 with Interfaces.C;
 with System.Multiprocessors.Dispatching_Domains;
 with Ada.Unchecked_Deallocation;
@@ -18,6 +17,7 @@ pragma Warnings (On);
 with Base_Udp;
 with Output_Data;
 with Reliable_Udp;
+with Packet_Mgr;
 with Queue;
 
 procedure UDP_Server is
@@ -47,7 +47,7 @@ procedure UDP_Server is
    --        From  : Sock_Addr_Type;
    --     end record;
 
-   --  Store_Packet_Task    : Packet_Mgr.Store_Packet_Task;
+   Store_Packet_Task    : Packet_Mgr.Store_Packet_Task;
 
    procedure Free_Stream is new Ada.Unchecked_Deallocation (Packet_Stream, Packet_Stream_Ptr);
 
@@ -159,7 +159,7 @@ procedure UDP_Server is
       Packet   : Base_Udp.Packet_Payload := (others => 0);
       Seq_Nb   : access Base_Udp.Header;
       Header   : access Reliable_Udp.Header;
-      --  New_Seq  : Boolean := False;
+      New_Seq  : Boolean := False;
 
       for Data'Address use Packet'Address;
       pragma Import (Ada, Data);
@@ -179,7 +179,7 @@ procedure UDP_Server is
 
                Remove_Task.Remove (Seq_Nb.all);
             else
-               --  New_Seq := False;
+               New_Seq := False;
                Nb_Packet_Received := Nb_Packet_Received + 1;
                if Nb_Packet_Received = 1 then
                   Start_Time := Ada.Calendar.Clock;
@@ -209,15 +209,15 @@ procedure UDP_Server is
 
                if Seq_Nb.all = Base_Udp.Pkt_Max then
                   Packet_Number := 0;
-                  --  New_Seq := True;
+                  New_Seq := True;
                else
                   Packet_Number := Packet_Number + 1;
                end if;
             end if;
 
-            --  Store_Packet_Task.Store (Data          => Packet,
-            --                          New_Sequence  => New_Seq,
-            --                          Is_Ack        => False);
+            Store_Packet_Task.Store (Data          => Packet,
+                                    New_Sequence  => New_Seq,
+                                    Is_Ack        => False);
             Free_Stream (Data);
          end;
       end loop;

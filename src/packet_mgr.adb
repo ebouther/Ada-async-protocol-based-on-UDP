@@ -1,8 +1,10 @@
 with Ada.Text_IO;
+with Interfaces;
+with Ada.Exceptions;
+with System;
 
 package body Packet_Mgr is
 
-   Buffer_Mgr              : Buffer_Management;
    --  Log_Seq_Nb              : Natural := 1;
 
    use type Interfaces.Unsigned_8;
@@ -34,33 +36,6 @@ package body Packet_Mgr is
   --      end loop;
   --   end Container_To_CSV;
 
-   package Packet_Buffers is new
-      Buffers.Generic_Buffers (Element_Type => Packet_Payload);
-
-  --   procedure Producer (Buffer : Buffers.Local.Local_Buffer_Access) is
-  --      begin
-  --         declare
-  --            use Unsigned_32_Buffers;
-  --            Buffer_Handle : Buffers.Buffer_Handle_Type;
-  --         begin
-  --            Buffer.Get_Free_Buffer (Buffer_Handle);
-  --            declare
-  --               type Data_Array is new
-  --                 Element_Array
-  --                 (1 .. To_Word_Count
-  --                  (Buffers.Get_Available_Bytes (Buffer_Handle)));
-  --               Datas : Data_Array;
-  --               for Datas'Address use Buffers.Get_Address (Buffer_Handle);
-  --            begin
-  --               for I in Datas'Range loop
-  --                  Datas (I) := Interfaces.Unsigned_32 (I);
-  --               end loop;
-  --               Buffers.Set_Used_Bytes (Buffer_Handle,
-  --                                       To_Bytes (Datas'Length));
-  --            end;
-  --            Buffer.Release_Free_Buffer (Buffer_Handle);
-  --                  end;
-  --   end Producer;
 
    task body Consumer_Task is
    begin
@@ -96,25 +71,24 @@ package body Packet_Mgr is
    end Consumer_Task;
 
    task body Store_Packet_Task is
-      Pkt_Content    : Packet_Payload;
+      Pkt_Content    : Base_Udp.Packet_Payload;
       Pkt_Nb         : Base_Udp.Header;
+      pragma Warnings (Off);
       New_Seq, Ack   : Boolean;
+      pragma Warnings (On);
 
       Buffer_Handle  : Buffers.Buffer_Handle_Type;
-      Buffer         : aliased Buffers.Local.Local_Buffer_Access;
-      type Data_Array is new
-        Packet_Buffers.Element_Array
-        (1 .. Packet_Buffers.To_Word_Count
-         (Buffers.Get_Available_Bytes (Buffer_Handle)));
-      Datas : Data_Array;
-      for Datas'Address use Buffers.Get_Address (Buffer_Handle);
+
+
       for Pkt_Nb'Address use Pkt_Content'Address;
+
    begin
-      Buffer.Initialise (100, Size => (Packet_Payload'Size / System.Storage_Unit) * Base_Udp.Pkt_Max);
+      Buffer.Initialise (100, Size => Buffers.Buffer_Size_Type
+         ((Base_Udp.Packet_Payload'Size / System.Storage_Unit) * Base_Udp.Pkt_Max));
       Buffer.Get_Free_Buffer (Buffer_Handle);
       loop
          select
-            accept Store (Data            : Packet_Payload;
+            accept Store (Data            : Base_Udp.Packet_Payload;
                           New_Sequence    : Boolean;
                           Is_Ack          : Boolean) do
                Pkt_Content := Data;
@@ -128,13 +102,17 @@ package body Packet_Mgr is
             end if;
 
             declare
+               type Data_Array is new
+                 Packet_Buffers.Element_Array
+                 (1 .. Packet_Buffers.To_Word_Count
+                  (Buffers.Get_Available_Bytes (Buffer_Handle)));
+
                Datas : Data_Array;
-               Pkt   : Packet_Payload := (others => 0);
                for Datas'Address use Buffers.Get_Address (Buffer_Handle);
             begin
-               Datas (Pkt_Nb + 1) := Pkt_Content;
+               Datas (Integer (Pkt_Nb) + 1) := Pkt_Content;
                Buffers.Set_Used_Bytes (Buffer_Handle,
-                                       To_Bytes (Datas'Length));
+                                       Packet_Buffers.To_Bytes (Datas'Length));
             end;
          else
             Ada.Text_IO.Put_Line ("Store Packet Task Busy...");
@@ -149,65 +127,65 @@ package body Packet_Mgr is
    end Store_Packet_Task;
 
 
-   protected body Buffer_Management is
+   --   protected body Buffer_Management is
 
-      procedure Store_Packet (Data           : Packet_Content;
-                              New_Sequence   : Boolean;
-                              Is_Ack         : Boolean) is
-         Seq_Nb         : Base_Udp.Header;
-         Content        : Packet_Content;
-         Cur_Container  : Container_Ptr := Pkt_Containers.Near_Full;
-         Tmp            : array (1 .. 2) of Container_Ptr;
-         for Content'Address use Data'Address;
-         for Seq_Nb'Address use Data'Address;
-      begin
-         if New_Sequence then
-            --  Cur_Container := Pkt_Containers.Swap;
-            pragma Warnings (Off);
-            pragma Warnings (On);
-         end if;
+   --      procedure Store_Packet (Data           : Packet_Content;
+   --                              New_Sequence   : Boolean;
+   --                              Is_Ack         : Boolean) is
+   --         Seq_Nb         : Base_Udp.Header;
+   --         Content        : Packet_Content;
+   --         Cur_Container  : Container_Ptr := Pkt_Containers.Near_Full;
+   --         Tmp            : array (1 .. 2) of Container_Ptr;
+   --         for Content'Address use Data'Address;
+   --         for Seq_Nb'Address use Data'Address;
+   --      begin
+   --         if New_Sequence then
+   --            --  Cur_Container := Pkt_Containers.Swap;
+   --            pragma Warnings (Off);
+   --            pragma Warnings (On);
+   --         end if;
 
-         if Pkt_Containers.Near_Full.Free_Space = 0 then
+   --         if Pkt_Containers.Near_Full.Free_Space = 0 then
 
-            Tmp (1) := Pkt_Containers.Swap;
-            Tmp (2) := Pkt_Containers.Full;
-            Pkt_Containers.Full := Pkt_Containers.Near_Full;
-            Pkt_Containers.Near_Full := Tmp (1);
-            Pkt_Containers.Swap := Tmp (2);
+   --            Tmp (1) := Pkt_Containers.Swap;
+   --            Tmp (2) := Pkt_Containers.Full;
+   --            Pkt_Containers.Full := Pkt_Containers.Near_Full;
+   --            Pkt_Containers.Near_Full := Tmp (1);
+   --            Pkt_Containers.Swap := Tmp (2);
 
-            ------- DBG -----------
-            pragma Warnings (Off);
-            --  Container_To_CSV_Task.Log (Pkt_Containers.Full.all);
-            pragma Warnings (On);
-            ------------------------
+   --            ------- DBG -----------
+   --            pragma Warnings (Off);
+   --            --  Container_To_CSV_Task.Log (Pkt_Containers.Full.all);
+   --            pragma Warnings (On);
+   --            ------------------------
 
-            Pkt_Containers.Full.Buffer := (others => (others => 0));
-            Pkt_Containers.Full.Free_Space := Base_Udp.Header (Base_Udp.Sequence_Size);
-         end if;
+   --            Pkt_Containers.Full.Buffer := (others => (others => 0));
+   --            Pkt_Containers.Full.Free_Space := Base_Udp.Header (Base_Udp.Sequence_Size);
+   --         end if;
 
-         if Is_Ack then
-            pragma Warnings (Off);
-            pragma Warnings (On);
-         end if;
-         if Pkt_Containers.Near_Full.Buffer (Interfaces.Unsigned_64 (Seq_Nb) + 1) (42) = 0 then
-            Cur_Container := Pkt_Containers.Near_Full;
-         else
-            Cur_Container := Pkt_Containers.Swap;
-            if Pkt_Containers.Swap.Buffer (Interfaces.Unsigned_64 (Seq_Nb) + 1) (42) = 0 then
-               Ada.Text_IO.Put_Line ("***********|| ERROR ||***********" &
-                  "Not enough buffer (Swap already used)");
-            end if;
-         end if;
-         --  end if;
+   --         if Is_Ack then
+   --            pragma Warnings (Off);
+   --            pragma Warnings (On);
+   --         end if;
+   --         if Pkt_Containers.Near_Full.Buffer (Interfaces.Unsigned_64 (Seq_Nb) + 1) (42) = 0 then
+   --            Cur_Container := Pkt_Containers.Near_Full;
+   --         else
+   --            Cur_Container := Pkt_Containers.Swap;
+   --            if Pkt_Containers.Swap.Buffer (Interfaces.Unsigned_64 (Seq_Nb) + 1) (42) = 0 then
+   --               Ada.Text_IO.Put_Line ("***********|| ERROR ||***********" &
+   --                  "Not enough buffer (Swap already used)");
+   --            end if;
+   --         end if;
+   --         --  end if;
 
-         ------- DBG ------
-         Cur_Container.Buffer (Interfaces.Unsigned_64 (Seq_Nb) + 1) (42) := 1;
-         ------------------
-         Cur_Container.Buffer (Interfaces.Unsigned_64 (Seq_Nb) + 1) := Content;
-         Cur_Container.Free_Space := Cur_Container.Free_Space - 1;
+   --         ------- DBG ------
+   --         Cur_Container.Buffer (Interfaces.Unsigned_64 (Seq_Nb) + 1) (42) := 1;
+   --         ------------------
+   --         Cur_Container.Buffer (Interfaces.Unsigned_64 (Seq_Nb) + 1) := Content;
+   --         Cur_Container.Free_Space := Cur_Container.Free_Space - 1;
 
-      end Store_Packet;
+   --      end Store_Packet;
 
-   end Buffer_Management;
+   --   end Buffer_Management;
 
 end Packet_Mgr;

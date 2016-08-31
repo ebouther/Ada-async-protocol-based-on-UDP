@@ -1,44 +1,31 @@
-with Interfaces;
-
 with Base_Udp;
 with Buffers.Local;
 
 package Packet_Mgr is
 
-   package Unsigned_32_Buffers is new
-     Buffers.Generic_Buffers (Element_Type => Interfaces.Unsigned_32);
+   package Packet_Buffers is new
+      Buffers.Generic_Buffers (Element_Type => Base_Udp.Packet_Payload);
 
-   task type Producer_Task
-     (Buffer : Buffers.Local.Local_Buffer_Access) is
-     entry Start;
-     entry Stop;
-   end Producer_Task;
+   Buffer         : aliased Buffers.Local.Local_Buffer_Access;
+   --  type Container is
+   --     record
+   --        Buffer      : Sequence;
+   --        Free_Space  : Base_Udp.Header := Base_Udp.Header (Base_Udp.Sequence_Size);
+   --     end record;
 
-   task type Consumer_Task
-     (Buffer : Buffers.Local.Local_Buffer_Access) is
-     entry Start;
-     entry Stop;
-   end Consumer_Task;
+   --  type Container_Ptr is access Container;
 
-   type Container is
-      record
-         Buffer      : Sequence;
-         Free_Space  : Base_Udp.Header := Base_Udp.Header (Base_Udp.Sequence_Size);
-      end record;
-
-   type Container_Ptr is access Container;
-
-   type Containers is
-      record
-         Swap        : Container_Ptr := new Container;
-         Near_Full   : Container_Ptr := new Container;
-         Full        : Container_Ptr := new Container;
-      end record;
+   --  type Containers is
+   --     record
+   --        Swap        : Container_Ptr := new Container;
+   --        Near_Full   : Container_Ptr := new Container;
+   --        Full        : Container_Ptr := new Container;
+   --     end record;
 
    task Consumer_Task;
 
    task type Store_Packet_Task is
-      entry Store (Data          : Packet_Content;
+      entry Store (Data          : Base_Udp.Packet_Payload;
                    New_Sequence  : Boolean;
                    Is_Ack        : Boolean);
    end Store_Packet_Task;
@@ -48,14 +35,14 @@ package Packet_Mgr is
   --   end Container_To_CSV;
 
 
-   protected type Buffer_Management is
-      procedure Store_Packet (Data           : Packet_Content;
-                              New_Sequence   : Boolean;
-                              Is_Ack         : Boolean);
+  --   protected type Buffer_Management is
+  --      procedure Store_Packet (Data           : Base_Udp.Packet_Payload;
+  --                              New_Sequence   : Boolean;
+  --                              Is_Ack         : Boolean);
 
-      private
-         Pkt_Containers : Containers;
-         --  Container_To_CSV_Task   : Container_To_CSV;
-   end Buffer_Management;
+  --      private
+  --         Pkt_Containers : Containers;
+  --         --  Container_To_CSV_Task   : Container_To_CSV;
+  --   end Buffer_Management;
 
 end Packet_Mgr;
