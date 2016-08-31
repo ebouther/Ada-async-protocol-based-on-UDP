@@ -10,102 +10,6 @@ package body Packet_Mgr is
    use type Interfaces.Unsigned_32;
    use type Interfaces.Unsigned_64;
 
-   package Packet_Buffers is new
-     Buffers.Generic_Buffers (Element_Type => Packet_Content);
-   task type Producer_Task
-     (Buffer : Buffers.Local.Local_Buffer_Access) is
-     entry Start;
-     entry Stop;
-   end Producer_Task;
-   task type Consumer_Task
-     (Buffer : Buffers.Local.Local_Buffer_Access) is
-     entry Start;
-     entry Stop;
-   end Consumer_Task;
-   task body Producer_Task is
-   begin
-      accept Start;
-      loop
-         Ada.Text_IO.Put_Line ("producer task waiting");
-         delay 1.0;
-         select
-            accept Stop;
-            exit;
-         else
-            declare
-               use Packet_Buffers;
-               Buffer_Handle : Buffers.Buffer_Handle_Type;
-            begin
-               Buffer.Get_Free_Buffer (Buffer_Handle);
-               declare
-                  type Data_Array is new
-                    Element_Array
-                    (1 .. To_Word_Count
-                     (Buffers.Get_Available_Bytes (Buffer_Handle)));
-                  Datas : Data_Array;
-                  Pkt   : Packet_Content := (others => 0);
-                  for Datas'Address use Buffers.Get_Address (Buffer_Handle);
-               begin
-                  for I in Datas'Range loop
-                     Pkt (1) := I;
-                     Datas (I) := Pkt;
-                  end loop;
-                  Buffers.Set_Used_Bytes (Buffer_Handle,
-                                          To_Bytes (Datas'Length));
-               end;
-               Buffer.Release_Free_Buffer (Buffer_Handle);
-            exception
-               when E : others =>
-                  Ada.Text_IO.Put_Line ("exception : " &
-                                        Ada.Exceptions.Exception_Name (E) &
-                                        " message : " &
-                                        Ada.Exceptions.Exception_Message (E));
-            end;
-         end select;
-      end loop;
-   end Producer_Task;
-
-   task body Consumer_Task is
-   begin
-      accept Start;
-      loop
-         select
-            accept Stop;
-            exit;
-         else
-            declare
-               use Packet_Buffers;
-               Buffer_Handle : Buffers.Buffer_Handle_Type;
-            begin
-               select
-                  Buffer.Get_Full_Buffer (Buffer_Handle);
-                  declare
-                     type Data_Array is new Element_Array
-                       (1 .. To_Word_Count
-                        (Buffers.Get_Used_Bytes (Buffer_Handle)));
-                     Datas : Data_Array;
-                     for Datas'Address use Buffers.Get_Address (Buffer_Handle);
-                  begin
-                     Ada.Text_IO.Put_Line ("data (data'first) : " &
-                                           Datas (Datas'First)'Img);
-                  end;
-                  Buffer.Release_Full_Buffer (Buffer_Handle);
-               or
-                  delay 0.5;
-                  Ada.Text_IO.Put_Line ("waiting for full buffer");
-               end select;
-            exception
-               when E : others =>
-                  Ada.Text_IO.Put_Line ("exception : " &
-                                        Ada.Exceptions.Exception_Name (E) &
-                                        " message : " &
-                                        Ada.Exceptions.Exception_Message (E));
-            end;
-         end select;
-      end loop;
-   end Consumer_Task;
-
-
   --   task body Container_To_CSV is
   --      Pkt_Content : Packet_Content;
   --      Filled_Buf  : Container;
@@ -130,23 +34,118 @@ package body Packet_Mgr is
   --      end loop;
   --   end Container_To_CSV;
 
+   package Packet_Buffers is new
+      Buffers.Generic_Buffers (Element_Type => Packet_Payload);
 
-   task body Store_Packet_Task is
-      Pkt_Content : Packet_Content;
-      New_Seq     : Boolean;
-      Ack         : Boolean;
+  --   procedure Producer (Buffer : Buffers.Local.Local_Buffer_Access) is
+  --      begin
+  --         declare
+  --            use Unsigned_32_Buffers;
+  --            Buffer_Handle : Buffers.Buffer_Handle_Type;
+  --         begin
+  --            Buffer.Get_Free_Buffer (Buffer_Handle);
+  --            declare
+  --               type Data_Array is new
+  --                 Element_Array
+  --                 (1 .. To_Word_Count
+  --                  (Buffers.Get_Available_Bytes (Buffer_Handle)));
+  --               Datas : Data_Array;
+  --               for Datas'Address use Buffers.Get_Address (Buffer_Handle);
+  --            begin
+  --               for I in Datas'Range loop
+  --                  Datas (I) := Interfaces.Unsigned_32 (I);
+  --               end loop;
+  --               Buffers.Set_Used_Bytes (Buffer_Handle,
+  --                                       To_Bytes (Datas'Length));
+  --            end;
+  --            Buffer.Release_Free_Buffer (Buffer_Handle);
+  --                  end;
+  --   end Producer;
+
+   task body Consumer_Task is
    begin
       loop
-         accept Store (Data            : Packet_Content;
-                       New_Sequence    : Boolean;
-                       Is_Ack          : Boolean) do
-            Pkt_Content := Data;
-            New_Seq     := New_Sequence;
-            Ack         := Is_Ack;
-         end Store;
+         declare
+            use Packet_Buffers;
+            Buffer_Handle : Buffers.Buffer_Handle_Type;
+         begin
+            Buffer.Get_Full_Buffer (Buffer_Handle);
+            declare
 
-         Buffer_Mgr.Store_Packet (Pkt_Content, New_Seq, Ack);
+               type Data_Array is new Element_Array
+                 (1 .. To_Word_Count
+                  (Buffers.Get_Used_Bytes (Buffer_Handle)));
+
+               Datas : Data_Array;
+
+               for Datas'Address use Buffers.Get_Address (Buffer_Handle);
+            begin
+               Ada.Text_IO.Put_Line ("Released");
+               --  Ada.Text_IO.Put_Line ("data (data'first) : " &
+               --                        Datas (Datas'First)'Img);
+            end;
+            Buffer.Release_Full_Buffer (Buffer_Handle);
+         exception
+            when E : others =>
+               Ada.Text_IO.Put_Line ("exception : " &
+                                     Ada.Exceptions.Exception_Name (E) &
+                                     " message : " &
+                                     Ada.Exceptions.Exception_Message (E));
+         end;
       end loop;
+   end Consumer_Task;
+
+   task body Store_Packet_Task is
+      Pkt_Content    : Packet_Payload;
+      Pkt_Nb         : Base_Udp.Header;
+      New_Seq, Ack   : Boolean;
+
+      Buffer_Handle  : Buffers.Buffer_Handle_Type;
+      Buffer         : aliased Buffers.Local.Local_Buffer_Access;
+      type Data_Array is new
+        Packet_Buffers.Element_Array
+        (1 .. Packet_Buffers.To_Word_Count
+         (Buffers.Get_Available_Bytes (Buffer_Handle)));
+      Datas : Data_Array;
+      for Datas'Address use Buffers.Get_Address (Buffer_Handle);
+      for Pkt_Nb'Address use Pkt_Content'Address;
+   begin
+      Buffer.Initialise (100, Size => (Packet_Payload'Size / System.Storage_Unit) * Base_Udp.Pkt_Max);
+      Buffer.Get_Free_Buffer (Buffer_Handle);
+      loop
+         select
+            accept Store (Data            : Packet_Payload;
+                          New_Sequence    : Boolean;
+                          Is_Ack          : Boolean) do
+               Pkt_Content := Data;
+               New_Seq     := New_Sequence;
+               Ack         := Is_Ack;
+            end Store;
+
+            if New_Seq then
+               Buffer.Release_Free_Buffer (Buffer_Handle);
+               Buffer.Get_Free_Buffer (Buffer_Handle);
+            end if;
+
+            declare
+               Datas : Data_Array;
+               Pkt   : Packet_Payload := (others => 0);
+               for Datas'Address use Buffers.Get_Address (Buffer_Handle);
+            begin
+               Datas (Pkt_Nb + 1) := Pkt_Content;
+               Buffers.Set_Used_Bytes (Buffer_Handle,
+                                       To_Bytes (Datas'Length));
+            end;
+         else
+            Ada.Text_IO.Put_Line ("Store Packet Task Busy...");
+         end select;
+      end loop;
+      exception
+            when E : others =>
+               Ada.Text_IO.Put_Line ("exception : " &
+                                     Ada.Exceptions.Exception_Name (E) &
+                                     " message : " &
+                                     Ada.Exceptions.Exception_Message (E));
    end Store_Packet_Task;
 
 

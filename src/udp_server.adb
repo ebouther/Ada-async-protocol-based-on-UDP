@@ -155,9 +155,8 @@ procedure UDP_Server is
    task body Process_Packets is
       use type Ada.Calendar.Time;
 
-      --  Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
       Data     : Packet_Stream_Ptr;
-      Packet   : array (1 .. Base_Udp.Load_Size) of Interfaces.Unsigned_8 := (others => 0);
+      Packet   : Base_Udp.Packet_Payload := (others => 0);
       Seq_Nb   : access Base_Udp.Header;
       Header   : access Reliable_Udp.Header;
       --  New_Seq  : Boolean := False;
@@ -189,19 +188,21 @@ procedure UDP_Server is
                if Seq_Nb.all /= Packet_Number then
                   if Seq_Nb.all > Packet_Number then
                       Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb.all - Packet_Number);
-                 --  else --  Doesn't manage disordered packets
-                 --       --  if a packet is received before the previous sent.
-                 --      Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb.all
-                 --         + (Base_Udp.Pkt_Max - Packet_Number));
-                 --      --  New_Seq := True;
+                  else --  Doesn't manage disordered packets
+                       --  if a packet is received before the previous sent.
+                      
+                      --Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb.all
+                      --  + (Base_Udp.Pkt_Max - Packet_Number));
+                       Ada.Text_IO.Put_Line ("BAD ORDER");
+
+                      --  New_Seq := True;
                   end if;
 
-                  --select
-                     Append_Task.Append (Packet_Number, Seq_Nb.all - 1, From);
-                  --else
-                  --   Ada.Text_IO.Put_Line ("Append Task Busy");
-                  --end select;
-
+                     Append_Task.Append (Packet_Number,
+                                         (if (Seq_Nb.all - 1 >= 0)
+                                             then Seq_Nb.all
+                                             else Base_Udp.Pkt_Max),
+                                         From);
                    Packet_Number := Seq_Nb.all;
                end if;
 

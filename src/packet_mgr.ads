@@ -20,14 +20,6 @@ package Packet_Mgr is
      entry Stop;
    end Consumer_Task;
 
-   type Packet_Content is
-      array (1 .. Base_Udp.Load_Size)
-         of Interfaces.Unsigned_8;
-
-   type Sequence is
-      array (1 .. Base_Udp.Sequence_Size)
-         of Packet_Content;
-
    type Container is
       record
          Buffer      : Sequence;
@@ -42,6 +34,8 @@ package Packet_Mgr is
          Near_Full   : Container_Ptr := new Container;
          Full        : Container_Ptr := new Container;
       end record;
+
+   task Consumer_Task;
 
    task type Store_Packet_Task is
       entry Store (Data          : Packet_Content;
