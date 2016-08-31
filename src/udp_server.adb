@@ -29,12 +29,12 @@ procedure UDP_Server is
    task Timer;
 
    task type Process_Packets is
-      pragma Priority (System.Priority'Last - 1);
+      --  pragma Priority (System.Priority'Last - 1);
       entry Start;
    end Process_Packets;
 
    task type Recv_Socket is
-      pragma Priority (System.Priority'Last);
+      --  pragma Priority (System.Priority'Last);
       entry Start;
    end Recv_Socket;
 
@@ -53,7 +53,7 @@ procedure UDP_Server is
 
    package Sync_Queue is new Queue (Packet_Stream_Ptr);
    Buffer               : Sync_Queue.Synchronized_Queue;
-
+  
    Append_Task          : Reliable_Udp.Append_Task;
    Remove_Task          : Reliable_Udp.Remove_Task;
    Ack_Task             : Reliable_Udp.Ack_Task;
@@ -147,7 +147,7 @@ procedure UDP_Server is
    task body Dbg is
    begin
       loop
-         delay 5.0;      
+         delay 1.0;      
          Ada.Text_IO.Put_Line("Buf len : " & Buffer.Cur_Count'Img);
       end loop;
    end Dbg;
@@ -156,13 +156,14 @@ procedure UDP_Server is
       use type Ada.Calendar.Time;
 
       --  Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
-      Data     : Packet_Stream_Ptr := new Packet_Stream;
+      Data     : Packet_Stream_Ptr;
       Packet   : array (1 .. Base_Udp.Load_Size) of Interfaces.Unsigned_8 := (others => 0);
       Seq_Nb   : access Base_Udp.Header;
       Header   : access Reliable_Udp.Header;
       --  New_Seq  : Boolean := False;
 
       for Data'Address use Packet'Address;
+      pragma Import (Ada, Data);
       for Header'Address use Packet'Address;
       pragma Import (Ada, Header);
       for Seq_Nb'Address use Data'Address;
@@ -176,7 +177,8 @@ procedure UDP_Server is
             --Ada.Text_IO.Put_Line ("Received : " & Seq_Nb.all'Img);
             if Header.all.Ack then
                Header.all.Ack := False;
-               Ada.Text_IO.Put_Line ("Received Ack : " & Seq_Nb.all'Img);
+               --Ada.Text_IO.Put_Line ("Received Ack : " & Seq_Nb.all'Img);
+
                Remove_Task.Remove (Seq_Nb.all);
             else
            --  New_Seq := False;
@@ -195,15 +197,13 @@ procedure UDP_Server is
                       --  New_Seq := True;
                   end if;
 
-                  Ada.Text_IO.Put_Line("    ---------- APP  ----------");
-                  select
+                  --select
                      Append_Task.Append (Packet_Number, Seq_Nb.all - 1, From);
-                  else
-                     Ada.Text_IO.Put_Line ("Task Append Busy");
-                  end select;
-                  Ada.Text_IO.Put_Line("    ---------- END ----------");
+                  --else
+                  --   Ada.Text_IO.Put_Line ("Append Task Busy");
+                  --end select;
 
-                  Packet_Number := Seq_Nb.all;
+                   Packet_Number := Seq_Nb.all;
                end if;
 
                if Seq_Nb.all = Base_Udp.Pkt_Max then
@@ -212,12 +212,12 @@ procedure UDP_Server is
                else
                   Packet_Number := Packet_Number + 1;
                end if;
-             end if;
+            end if;
 
             --  Store_Packet_Task.Store (Data          => Packet,
             --                          New_Sequence  => New_Seq,
             --                          Is_Ack        => False);
-            --  Free_Stream(Data);
+            Free_Stream(Data);
          end;
       end loop;
    end Process_Packets;

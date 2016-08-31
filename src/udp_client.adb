@@ -67,23 +67,34 @@ procedure UDP_Client is
 
       procedure Rcv_Ack is
          Ack_U8   : Jumbo_U8 := (others => 0);
+         Header   : Reliable_Udp.Header;
          Ack      : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
          Seq      : Base_Udp.Header;
          Data     : Ada.Streams.Stream_Element_Array (1 .. 64);
          Res      : Interfaces.C.int;
+         Wait_Ack : Boolean := False;
+
          for Ack'Address use Ack_U8'Address;
          for Data'Address use Ack'Address;
+         for Header'Address use Ack'Address;
          for Seq'Address use Data'Address;
       begin
          loop
+            if Header.Ack = True and Wait_Ack then
+               Wait_Ack := False;
+               Ada.Text_IO.Put_Line ("-- Done --");
+            end if;
             Res := GNAT.Sockets.Thin.C_Recv
                (To_Int (Socket), Data (Data'First)'Address, Data'Length, 64);
-            exit when Res = -1;
-            ---------- DBG -----------
-            Ada.Text_IO.Put_Line ("ACK [" & Res'Img & " ]: Dropped :" & Seq'Img);
-            --------------------------
-            Send_Packet (Ack_U8, True);
-            
+            if Res /= -1 then
+               Wait_Ack := True;
+               ---------- DBG -----------
+               Ada.Text_IO.Put_Line ("ACK [" & Res'Img & " ]: Dropped :" & Seq'Img);
+               --------------------------
+               
+               Send_Packet (Ack_U8, True);
+            end if;
+            exit when Wait_Ack = False;
          end loop;
 
       end Rcv_Ack;

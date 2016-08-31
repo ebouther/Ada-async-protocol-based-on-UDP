@@ -14,7 +14,7 @@ package Queue is
       procedure Append (Data : in Element_Type);
       procedure Remove_First (Data : out Element_Type);
    private
-      Pool                 : Element_Type_Array (1 .. 10000);
+      Pool                 : Element_Type_Array (1 .. 1000000);
       Count                : Natural := 0;
       In_Index, Out_Index  : Positive := 1;
    end Synchronized_Queue;
