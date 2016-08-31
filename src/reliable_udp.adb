@@ -19,7 +19,7 @@ package body Reliable_Udp is
             Client_Addr    := Client_Address;
          end Append;
 
-         if First_D < Last_D then
+         --  if First_D < Last_D then
             for I in Base_Udp.Header range First_D .. Last_D loop
                Packet_Lost := (Packet     => I,
                                Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
@@ -27,24 +27,25 @@ package body Reliable_Udp is
                                From       => Client_Addr);
                Ack_Mgr.Append (Packet_Lost);
             end loop;
-         else
-            for I in Base_Udp.Header range First_D .. Base_Udp.Pkt_Max loop
-               Packet_Lost := (Packet     => I,
-                               Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-                               Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-                               From       => Client_Addr);
+         --  else
+         --     for I in Base_Udp.Header range First_D .. Base_Udp.Pkt_Max loop
+         --        Packet_Lost := (Packet     => I,
+         --                        Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+         --                        Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+         --                        From       => Client_Addr);
 
-               Ack_Mgr.Append (Packet_Lost);
-            end loop;
+         --        Ack_Mgr.Append (Packet_Lost);
+         --        
+         --     end loop;
 
-            for I in Base_Udp.Header range 0 .. Last_D loop
-               Packet_Lost := (Packet     => I,
-                               Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-                               Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-                               From       => Client_Addr);
-               Ack_Mgr.Append (Packet_Lost);
-            end loop;
-         end if;
+         --     for I in Base_Udp.Header range 0 .. Last_D loop
+         --        Packet_Lost := (Packet     => I,
+         --                        Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+         --                        Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+         --                        From       => Client_Addr);
+         --        Ack_Mgr.Append (Packet_Lost);
+         --     end loop;
+         --  end if;
       end loop;
    end Append_Task;
 
@@ -66,7 +67,9 @@ package body Reliable_Udp is
       Ack_Mgr.Init_Socket;
       accept Start;
       loop
-         Ack_Mgr.Ack;
+         if Integer (Ack_Mgr.Length) > 10 then
+            Ack_Mgr.Ack;
+         end if;
       end loop;
    end Ack_Task;
 
@@ -107,7 +110,7 @@ package body Reliable_Udp is
          while Losses_Container.Has_Element (Cursor) loop
             if Interfaces."=" (Losses_Container.Element (Cursor).Packet, Packet) then
                Losses_Container.Delete (Container => Losses,
-               Position => Cursor);
+                                        Position  => Cursor);
             end if;
             Losses_Container.Next (Cursor);
          end loop;
@@ -144,7 +147,6 @@ package body Reliable_Udp is
                then
                   if Losses_Container.Has_Element (Losses_Container.Next (Cursor)) = False then
                      Header.Ack := True;
-                     Ada.Text_IO.Put_Line ("DONE");
                   else
                      Header.Ack := False;
                   end if; 
