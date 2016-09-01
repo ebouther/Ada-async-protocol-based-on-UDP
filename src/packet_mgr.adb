@@ -41,7 +41,7 @@ package body Packet_Mgr is
 
    task body Consumer_Task is
    begin
-      Buffer.Initialise (1, Size => Buffers.Buffer_Size_Type (16));
+      Buffer.Initialise (100, Size => Buffers.Buffer_Size_Type (Base_Udp.Pkt_Max * 2));
          --  ((Base_Udp.Packet_Payload'Size / System.Storage_Unit) * Base_Udp.Pkt_Max));
       loop
          declare
@@ -61,6 +61,8 @@ package body Packet_Mgr is
             begin
                Ada.Text_IO.Put_Line ("------  data (data'first) : ------" &
                                      Datas (Datas'First)'Img);
+               Ada.Text_IO.Put_Line ("------  data (data'last) : ------" &
+                                     Datas (Datas'Last)'Img);
             end;
             Buffer.Release_Full_Buffer (Buffer_Handle);
          exception
@@ -79,43 +81,56 @@ package body Packet_Mgr is
       pragma Warnings (Off);
       New_Seq, Ack   : Boolean;
       pragma Warnings (On);
+      Pos            : Integer;
+      Buf_Per_Seq    : Integer := 1;
 
       for Pkt_Nb'Address use Pkt_Content'Address;
 
       use Packet_Buffers;
       Buffer_Handle  : Buffers.Buffer_Handle_Type;
-
    begin
       Buffer.Get_Free_Buffer (Buffer_Handle);
-      loop
-         accept Store (Data            : in Base_Udp.Packet_Stream;
-                       New_Sequence    : in Boolean;
-                       Is_Ack          : in Boolean) do
-            Pkt_Content := Data;
-            New_Seq     := New_Sequence;
-            Ack         := Is_Ack;
-         end Store;
 
-         if New_Seq then
-            Buffer.Release_Free_Buffer (Buffer_Handle);
-            Buffer.Get_Free_Buffer (Buffer_Handle);
-         end if;
+     --   if New_Seq then
+     --      Buffer.Release_Free_Buffer (Buffer_Handle);
+     --      Buffer.Get_Free_Buffer (Buffer_Handle);
+     --   end if;
+      declare
+         type Data_Array is new
+           Packet_Buffers.Element_Array
+           (1 .. Packet_Buffers.To_Word_Count
+            (Buffers.Get_Available_Bytes (Buffer_Handle)));
 
-         declare
-            type Data_Array is new
-              Packet_Buffers.Element_Array
-              (1 .. Packet_Buffers.To_Word_Count
-               (Buffers.Get_Available_Bytes (Buffer_Handle)));
+         Datas : Data_Array;
+         for Datas'Address use Buffers.Get_Address (Buffer_Handle);
+      begin
+         loop
+            accept Store (Data            : in Base_Udp.Packet_Stream;
+                          New_Sequence    : in Boolean;
+                          Is_Ack          : in Boolean) do
+               Pkt_Content := Data;
+               New_Seq     := New_Sequence;
+               Ack         := Is_Ack;
+            end Store;
 
-            Datas : Data_Array;
-            for Datas'Address use Buffers.Get_Address (Buffer_Handle);
-         begin
-            Datas (Datas'First) := Interfaces.Unsigned_64 (Pkt_Nb);  --  Pkt_Content;
+            Pos := Integer (Pkt_Nb);
+
+            if Pos >= Datas'Length then
+               Pos := Pos mod Datas'Length;
+            end if;
+
+            Datas (Pos + 1) := Interfaces.Unsigned_64 (Pkt_Nb);
             Buffers.Set_Used_Bytes (Buffer_Handle,
                                     Packet_Buffers.To_Bytes (Datas'Length));
-            Buffer.Release_Free_Buffer (Buffer_Handle);
-         end;
-      end loop;
+
+            if Pos > Datas'Length * Buf_Per_Seq then
+               Buffer.Release_Free_Buffer (Buffer_Handle);
+               Buf_Per_Seq := Buf_Per_Seq + 1;
+               Buffer.Get_Free_Buffer (Buffer_Handle);
+            end if;
+
+         end loop;
+      end;
       exception
             when E : others =>
                Ada.Text_IO.Put_Line ("exception : " &

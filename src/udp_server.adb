@@ -180,11 +180,7 @@ procedure UDP_Server is
                New_Seq := False;
                Nb_Packet_Received := Nb_Packet_Received + 1;
                if Nb_Packet_Received = 1 then
-                  Ada.Text_IO.Put_Line ("Store : " & Seq_Nb.all'Img);
                   Start_Time := Ada.Calendar.Clock;
-                  Store_Packet_Task.Store (Data          => Data.all,
-                                           New_Sequence  => New_Seq,
-                                           Is_Ack        => False);
                end if;
 
                if Seq_Nb.all /= Packet_Number then
@@ -216,6 +212,9 @@ procedure UDP_Server is
                   Packet_Number := Packet_Number + 1;
                end if;
             end if;
+            Store_Packet_Task.Store (Data        => Data.all,
+                                   New_Sequence  => New_Seq,
+                                   Is_Ack        => False);
 
             Free_Stream (Data);
          end;
