@@ -1,5 +1,6 @@
 with Interfaces;
 with System;
+with Ada.Streams;
 
 package Base_Udp is
 
@@ -16,5 +17,11 @@ package Base_Udp is
 
    type Packet_Payload is
       array (1 .. Base_Udp.Load_Size) of Interfaces.Unsigned_8;
+
+   type Packet_Stream_Ptr is
+      access all Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
+
+   subtype Packet_Stream is
+      Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
 
 end Base_Udp;

@@ -38,8 +38,6 @@ procedure UDP_Server is
       entry Start;
    end Recv_Socket;
 
-   type Packet_Stream_Ptr is access all Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
-   subtype Packet_Stream is Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
 
    --  type Socket_Data is
    --     record
@@ -49,9 +47,9 @@ procedure UDP_Server is
 
    Store_Packet_Task    : Packet_Mgr.Store_Packet_Task;
 
-   procedure Free_Stream is new Ada.Unchecked_Deallocation (Packet_Stream, Packet_Stream_Ptr);
+   procedure Free_Stream is new Ada.Unchecked_Deallocation (Base_Udp.Packet_Stream, Base_Udp.Packet_Stream_Ptr);
 
-   package Sync_Queue is new Queue (Packet_Stream_Ptr);
+   package Sync_Queue is new Queue (Base_Udp.Packet_Stream_Ptr);
    Buffer               : Sync_Queue.Synchronized_Queue;
 
    Append_Task          : Reliable_Udp.Append_Task;
@@ -128,10 +126,10 @@ procedure UDP_Server is
       accept Start;
       loop
          declare
-            Data     : constant Packet_Stream_Ptr := new Packet_Stream;
+            Data     : constant Base_Udp.Packet_Stream_Ptr := new Base_Udp.Packet_Stream;
          begin
-                  GNAT.Sockets.Receive_Socket (Server, Data.all, Last, From);
-                  Buffer.Append_Wait (Data);
+            GNAT.Sockets.Receive_Socket (Server, Data.all, Last, From);
+            Buffer.Append_Wait (Data);
          exception
             when Socket_Error =>
                Watchdog := Watchdog + 1;
@@ -155,7 +153,7 @@ procedure UDP_Server is
    task body Process_Packets is
       use type Ada.Calendar.Time;
 
-      Data     : Packet_Stream_Ptr;
+      Data     : Base_Udp.Packet_Stream_Ptr;
       Packet   : Base_Udp.Packet_Payload := (others => 0);
       Seq_Nb   : access Base_Udp.Header;
       Header   : access Reliable_Udp.Header;
@@ -182,7 +180,11 @@ procedure UDP_Server is
                New_Seq := False;
                Nb_Packet_Received := Nb_Packet_Received + 1;
                if Nb_Packet_Received = 1 then
+                  Ada.Text_IO.Put_Line ("Store : " & Seq_Nb.all'Img);
                   Start_Time := Ada.Calendar.Clock;
+                  Store_Packet_Task.Store (Data          => Data.all,
+                                           New_Sequence  => New_Seq,
+                                           Is_Ack        => False);
                end if;
 
                if Seq_Nb.all /= Packet_Number then
@@ -215,9 +217,6 @@ procedure UDP_Server is
                end if;
             end if;
 
-            Store_Packet_Task.Store (Data          => Packet,
-                                    New_Sequence  => New_Seq,
-                                    Is_Ack        => False);
             Free_Stream (Data);
          end;
       end loop;

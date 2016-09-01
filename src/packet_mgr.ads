@@ -1,12 +1,14 @@
 with Base_Udp;
-with Buffers.Local;
+
+with Interfaces;
+with Buffers;
 
 package Packet_Mgr is
 
    package Packet_Buffers is new
-      Buffers.Generic_Buffers (Element_Type => Base_Udp.Packet_Payload);
+      Buffers.Generic_Buffers
+         (Element_Type => Interfaces.Unsigned_64);
 
-   Buffer         : aliased Buffers.Local.Local_Buffer_Access;
    --  type Container is
    --     record
    --        Buffer      : Sequence;
@@ -25,7 +27,7 @@ package Packet_Mgr is
    task Consumer_Task;
 
    task type Store_Packet_Task is
-      entry Store (Data          : Base_Udp.Packet_Payload;
+      entry Store (Data          : Base_Udp.Packet_Stream;
                    New_Sequence  : Boolean;
                    Is_Ack        : Boolean);
    end Store_Packet_Task;

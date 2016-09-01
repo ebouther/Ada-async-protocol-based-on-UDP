@@ -1,7 +1,8 @@
 with Ada.Text_IO;
-with Interfaces;
+--  with Interfaces;
 with Ada.Exceptions;
-with System;
+--  with System;
+with Buffers.Local;
 
 package body Packet_Mgr is
 
@@ -36,9 +37,12 @@ package body Packet_Mgr is
   --      end loop;
   --   end Container_To_CSV;
 
+   Buffer      : aliased Buffers.Local.Local_Buffer_Type;
 
    task body Consumer_Task is
    begin
+      Buffer.Initialise (1, Size => Buffers.Buffer_Size_Type (16));
+         --  ((Base_Udp.Packet_Payload'Size / System.Storage_Unit) * Base_Udp.Pkt_Max));
       loop
          declare
             use Packet_Buffers;
@@ -55,9 +59,8 @@ package body Packet_Mgr is
 
                for Datas'Address use Buffers.Get_Address (Buffer_Handle);
             begin
-               Ada.Text_IO.Put_Line ("Released");
-               --  Ada.Text_IO.Put_Line ("data (data'first) : " &
-               --                        Datas (Datas'First)'Img);
+               Ada.Text_IO.Put_Line ("------  data (data'first) : ------" &
+                                     Datas (Datas'First)'Img);
             end;
             Buffer.Release_Full_Buffer (Buffer_Handle);
          exception
@@ -71,52 +74,47 @@ package body Packet_Mgr is
    end Consumer_Task;
 
    task body Store_Packet_Task is
-      Pkt_Content    : Base_Udp.Packet_Payload;
+      Pkt_Content    : Base_Udp.Packet_Stream;
       Pkt_Nb         : Base_Udp.Header;
       pragma Warnings (Off);
       New_Seq, Ack   : Boolean;
       pragma Warnings (On);
 
-      Buffer_Handle  : Buffers.Buffer_Handle_Type;
-
-
       for Pkt_Nb'Address use Pkt_Content'Address;
 
+      use Packet_Buffers;
+      Buffer_Handle  : Buffers.Buffer_Handle_Type;
+
    begin
-      Buffer.Initialise (100, Size => Buffers.Buffer_Size_Type
-         ((Base_Udp.Packet_Payload'Size / System.Storage_Unit) * Base_Udp.Pkt_Max));
       Buffer.Get_Free_Buffer (Buffer_Handle);
       loop
-         select
-            accept Store (Data            : Base_Udp.Packet_Payload;
-                          New_Sequence    : Boolean;
-                          Is_Ack          : Boolean) do
-               Pkt_Content := Data;
-               New_Seq     := New_Sequence;
-               Ack         := Is_Ack;
-            end Store;
+         accept Store (Data            : in Base_Udp.Packet_Stream;
+                       New_Sequence    : in Boolean;
+                       Is_Ack          : in Boolean) do
+            Pkt_Content := Data;
+            New_Seq     := New_Sequence;
+            Ack         := Is_Ack;
+         end Store;
 
-            if New_Seq then
-               Buffer.Release_Free_Buffer (Buffer_Handle);
-               Buffer.Get_Free_Buffer (Buffer_Handle);
-            end if;
+         if New_Seq then
+            Buffer.Release_Free_Buffer (Buffer_Handle);
+            Buffer.Get_Free_Buffer (Buffer_Handle);
+         end if;
 
-            declare
-               type Data_Array is new
-                 Packet_Buffers.Element_Array
-                 (1 .. Packet_Buffers.To_Word_Count
-                  (Buffers.Get_Available_Bytes (Buffer_Handle)));
+         declare
+            type Data_Array is new
+              Packet_Buffers.Element_Array
+              (1 .. Packet_Buffers.To_Word_Count
+               (Buffers.Get_Available_Bytes (Buffer_Handle)));
 
-               Datas : Data_Array;
-               for Datas'Address use Buffers.Get_Address (Buffer_Handle);
-            begin
-               Datas (Integer (Pkt_Nb) + 1) := Pkt_Content;
-               Buffers.Set_Used_Bytes (Buffer_Handle,
-                                       Packet_Buffers.To_Bytes (Datas'Length));
-            end;
-         else
-            Ada.Text_IO.Put_Line ("Store Packet Task Busy...");
-         end select;
+            Datas : Data_Array;
+            for Datas'Address use Buffers.Get_Address (Buffer_Handle);
+         begin
+            Datas (Datas'First) := Interfaces.Unsigned_64 (Pkt_Nb);  --  Pkt_Content;
+            Buffers.Set_Used_Bytes (Buffer_Handle,
+                                    Packet_Buffers.To_Bytes (Datas'Length));
+            Buffer.Release_Free_Buffer (Buffer_Handle);
+         end;
       end loop;
       exception
             when E : others =>
