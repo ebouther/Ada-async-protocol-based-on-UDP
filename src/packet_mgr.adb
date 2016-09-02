@@ -203,7 +203,6 @@ package body Packet_Mgr is
    ---------------------
 
    task body Consumer_Task is
-      Handler  : Buffers.Buffer_Handle_Type;
       --  Cursor   : Handle_Vector.Cursor;
    begin
       loop
@@ -211,6 +210,7 @@ package body Packet_Mgr is
          if Handle_Vector.Is_Empty (Buffer_Handler.Handle) = False then
             declare
                use Packet_Buffers;
+               Handler  : Buffers.Buffer_Handle_Type;
             begin
 
                --  Handler := Handle_Vector.First_Element (Buffer_Handler.Handle);
@@ -230,14 +230,16 @@ package body Packet_Mgr is
 
                   for Datas'Address use Buffers.Get_Address (Handler);
                begin
-                  Ada.Text_IO.Put_Line ("------  data (data'first) : ------" &
-                     Datas (Datas'First)'Img);
-                  Ada.Text_IO.Put_Line ("------  data (data'last) : ------" &
-                     Datas (Datas'Last)'Img);
+                  for I in Datas'Range loop
+                     Ada.Text_IO.Put_Line (I'Img &
+                        Datas (Datas'Last)'Img);
+                  end loop;
                end;
 
-              --   Cursor := Buffer_Handler.Handle.First;
-              --   Delete_Buffer_At (Cursor);
+             --   Cursor := Buffer_Handler.Handle.First;
+             --   Delete_Buffer_At (Cursor);
+
+               Buffer_Handler.Buffer.Release_Full_Buffer (Handler);
 
             exception
                when E : others =>
