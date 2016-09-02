@@ -45,13 +45,9 @@ package Packet_Mgr is
    procedure Init_Buffer;
    procedure Append_New_Buffer;
    procedure Release_Free_Buffer_At (Cursor : Handle_Vector.Cursor);
-   procedure Delete_Buffer_At (Cursor : in out Handle_Vector.Cursor);
    procedure Set_Used_Bytes_At (Cursor : Handle_Vector.Cursor;
                                 Length : Integer);
-
-   task Consumer_Task is
-      entry Start;
-   end Consumer_Task;
+   procedure Get_Filled_Buf;
 
    task type Store_Packet_Task is
       entry Store (Data          : Base_Udp.Packet_Stream;

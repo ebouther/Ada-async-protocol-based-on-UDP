@@ -80,38 +80,16 @@ package body Packet_Mgr is
    --  Release_Free_Buffer_At  --
    ------------------------------
 
-   procedure Release_Free_Buffer_At (Cursor : in Handle_Vector.Cursor) is
+   procedure Release_Free_Buffer_At (Cursor : Handle_Vector.Cursor) is
       Handler  : access Buffers.Buffer_Handle_Type;
    begin
       Handler := Handle_Vector.Element (Cursor);
 
       Buffer_Handler.Buffer.Release_Free_Buffer (Handler.all);
 
-      Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
-                                     Position   => Cursor,
-                                     New_Item   => Handler);
-   end Release_Free_Buffer_At;
-
-
-   ------------------------
-   --  Delete_Buffer_At  --
-   ------------------------
-
-   procedure Delete_Buffer_At (Cursor : in out Handle_Vector.Cursor) is
-      Handler  : access Buffers.Buffer_Handle_Type;
-   begin
-      Handler := Handle_Vector.Element (Cursor);
-
-      Buffer_Handler.Buffer.Release_Full_Buffer (Handler.all);
-
-      --  Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
-      --                                 Index      => Buffer_Handler.Handle.First_Index,
-      --                                 New_Item   => Handler);
-
       Free_Buffer_Handle (Handler);
-      Buffer_Handler.Handle.Delete (Cursor);
 
-   end Delete_Buffer_At;
+   end Release_Free_Buffer_At;
 
 
    -------------------------
@@ -163,12 +141,13 @@ package body Packet_Mgr is
          if New_Seq then
 
             Set_Used_Bytes_At (Buffer_Handler.Prod_Cursor, Integer (Base_Udp.Sequence_Size));
-            Ada.Text_IO.Put_Line ("Release Buffer");
+            Ada.Text_IO.Put_Line ("*** Release Buffer ***");
             Release_Free_Buffer_At (Buffer_Handler.Prod_Cursor);
+            Buffer_Handler.Handle.Delete (Buffer_Handler.Prod_Cursor);
 
-            Consumer_Task.Start;
+            Get_Filled_Buf;
 
-            Ada.Text_IO.Put_Line ("Create a New Handler with New Buffer");
+            Ada.Text_IO.Put_Line ("*** Create a New Handler with New Buffer ***");
             Append_New_Buffer;
 
          end if;
@@ -198,59 +177,44 @@ package body Packet_Mgr is
    end Store_Packet_Task;
 
 
-   ---------------------
-   --  Consumer_Task  --
-   ---------------------
+   ----------------------
+   --  Get_Filled_Buf  --
+   ----------------------
 
-   task body Consumer_Task is
-      --  Cursor   : Handle_Vector.Cursor;
+   procedure Get_Filled_Buf is
    begin
-      loop
-         accept Start;
-         if Handle_Vector.Is_Empty (Buffer_Handler.Handle) = False then
-            declare
-               use Packet_Buffers;
-               Handler  : Buffers.Buffer_Handle_Type;
-            begin
+      declare
+         use Packet_Buffers;
+         Handler  : Buffers.Buffer_Handle_Type;
+      begin
 
-               --  Handler := Handle_Vector.First_Element (Buffer_Handler.Handle);
-               Ada.Text_IO.Put_Line ("_________Waiting for full buffer__________");
-               Buffer_Handler.Buffer.Get_Full_Buffer (Handler);
-               Ada.Text_IO.Put_Line ("_________Got Full Buffer__________");
-               --  Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
-               --                                 Index      => Buffer_Handler.Handle.First_Index,
-               --                                 New_Item   => Handler);
+         Buffer_Handler.Buffer.Get_Full_Buffer (Handler);
 
-               declare
-                  type Data_Array is new Element_Array
-                     (1 .. To_Word_Count
-                        (Buffers.Get_Used_Bytes (Handler)));
+         declare
+            type Data_Array is new Element_Array
+               (1 .. To_Word_Count
+                  (Buffers.Get_Used_Bytes (Handler)));
 
-                  Datas : Data_Array;
+            Datas : Data_Array;
 
-                  for Datas'Address use Buffers.Get_Address (Handler);
-               begin
-                  for I in Datas'Range loop
-                     Ada.Text_IO.Put_Line (I'Img &
-                        Datas (I)'Img);
-                  end loop;
-               end;
+            for Datas'Address use Buffers.Get_Address (Handler);
+         begin
+            for I in Datas'Range loop
+               Ada.Text_IO.Put_Line (I'Img &
+                  Datas (I)'Img);
+            end loop;
+         end;
 
-             --   Cursor := Buffer_Handler.Handle.First;
-             --   Delete_Buffer_At (Cursor);
+         Buffer_Handler.Buffer.Release_Full_Buffer (Handler);
 
-               Buffer_Handler.Buffer.Release_Full_Buffer (Handler);
-
-            exception
-               when E : others =>
-                  Ada.Text_IO.Put_Line ("exception : " &
-                     Ada.Exceptions.Exception_Name (E) &
-                     " message : " &
-                     Ada.Exceptions.Exception_Message (E));
-            end;
-         end if;
-      end loop;
-   end Consumer_Task;
+      exception
+         when E : others =>
+            Ada.Text_IO.Put_Line ("exception : " &
+               Ada.Exceptions.Exception_Name (E) &
+               " message : " &
+               Ada.Exceptions.Exception_Message (E));
+      end;
+   end Get_Filled_Buf;
 
 
    --   protected body Buffer_Management is
