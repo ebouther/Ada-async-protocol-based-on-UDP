@@ -1,9 +1,10 @@
-with Base_Udp;
-
 with Interfaces;
+with Ada.Containers.Vectors;
+with Ada.Unchecked_Deallocation;
+
+with Base_Udp;
 with Buffers.Local;
 
-with Ada.Containers.Vectors;
 
 package Packet_Mgr is
 
@@ -37,7 +38,16 @@ package Packet_Mgr is
    --        Full        : Container_Ptr := new Container;
    --     end record;
 
+   procedure Free_Buffer_Handle is
+      new Ada.Unchecked_Deallocation
+         (Buffers.Buffer_Handle_Type, Buffers.Buffer_Handle_Access);
+
    procedure Init_Buffer;
+   procedure Append_New_Buffer;
+   procedure Release_Free_Buffer_At (Cursor : Handle_Vector.Cursor);
+   procedure Delete_Buffer_At (Cursor : in out Handle_Vector.Cursor);
+   procedure Set_Used_Bytes_At (Cursor : Handle_Vector.Cursor;
+                                Length : Integer);
 
    task Consumer_Task is
       entry Start;

@@ -40,25 +40,103 @@ package body Packet_Mgr is
    Buffer_Handler : Buf_Handler;
 
 
+   -------------------
+   --  Init_Buffer  --
+   -------------------
+
    procedure Init_Buffer is
-      Handler  : access Buffers.Buffer_Handle_Type;
    begin
 
       Buffer_Handler.Buffer.Initialise (10, Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * System.Storage_Unit));
 
+      Append_New_Buffer;
+
+   end Init_Buffer;
+
+   -------------------------
+   --  Append_New_Buffer  --
+   -------------------------
+
+   procedure Append_New_Buffer is
+      Handler  : access Buffers.Buffer_Handle_Type;
+   begin
+
       Handle_Vector.Append (Buffer_Handler.Handle, New_Item => new Buffers.Buffer_Handle_Type);
 
-      Buffer_Handler.Prod_Cursor := Buffer_Handler.Handle.First;
+      Buffer_Handler.Prod_Cursor := Buffer_Handler.Handle.Last;
 
       Handler := Handle_Vector.Element (Buffer_Handler.Prod_Cursor);
+
       Buffer_Handler.Buffer.Get_Free_Buffer (Handler.all);
 
       Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
                                      Position   => Buffer_Handler.Prod_Cursor,
                                      New_Item   => Handler);
+   end Append_New_Buffer;
 
-   end Init_Buffer;
+
+   ------------------------------
+   --  Release_Free_Buffer_At  --
+   ------------------------------
+
+   procedure Release_Free_Buffer_At (Cursor : in Handle_Vector.Cursor) is
+      Handler  : access Buffers.Buffer_Handle_Type;
+   begin
+      Handler := Handle_Vector.Element (Cursor);
+
+      Buffer_Handler.Buffer.Release_Free_Buffer (Handler.all);
+
+      Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
+                                     Position   => Cursor,
+                                     New_Item   => Handler);
+   end Release_Free_Buffer_At;
+
+
+   ------------------------
+   --  Delete_Buffer_At  --
+   ------------------------
+
+   procedure Delete_Buffer_At (Cursor : in out Handle_Vector.Cursor) is
+      Handler  : access Buffers.Buffer_Handle_Type;
+   begin
+      Handler := Handle_Vector.Element (Cursor);
+
+      Buffer_Handler.Buffer.Release_Full_Buffer (Handler.all);
+
+      --  Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
+      --                                 Index      => Buffer_Handler.Handle.First_Index,
+      --                                 New_Item   => Handler);
+
+      Free_Buffer_Handle (Handler);
+      Buffer_Handler.Handle.Delete (Cursor);
+
+   end Delete_Buffer_At;
+
+
+   -------------------------
+   --  Set_Used_Bytes_At  --
+   -------------------------
+
+   procedure Set_Used_Bytes_At (Cursor : in Handle_Vector.Cursor;
+                                Length : in Integer) is
+      Handler  : access Buffers.Buffer_Handle_Type;
+   begin
+
+      Handler  := Handle_Vector.Element (Cursor);
+
+      Buffers.Set_Used_Bytes (Handler.all,
+                              Packet_Buffers.To_Bytes (Length));
+
+      Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
+                                     Position   => Cursor,
+                                     New_Item   => Handler);
+   end Set_Used_Bytes_At;
+
+
+   -------------------------
+   --  Store_Packet_Task  --
+   -------------------------
 
    task body Store_Packet_Task is
       Pkt_Content    : Base_Udp.Packet_Stream;
@@ -70,10 +148,6 @@ package body Packet_Mgr is
 
       use Packet_Buffers;
       for Pkt_Nb'Address use Pkt_Content'Address;
-
-            -----  DBG  ----
-      Handler  : access Buffers.Buffer_Handle_Type;
-            ----------------
 
    begin
       Init_Buffer;
@@ -89,27 +163,12 @@ package body Packet_Mgr is
          if New_Seq then
 
             Ada.Text_IO.Put_Line ("Release Buffer");
-            Handler := Handle_Vector.Element (Buffer_Handler.Prod_Cursor);
+            Release_Free_Buffer_At (Buffer_Handler.Prod_Cursor);
 
-            Buffer_Handler.Buffer.Release_Free_Buffer (Handler.all);
-
-            Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
-                                           Position   => Buffer_Handler.Prod_Cursor,
-                                           New_Item   => Handler);
+            Consumer_Task.Start;
 
             Ada.Text_IO.Put_Line ("Create a New Handler with New Buffer");
-            Handle_Vector.Append (Buffer_Handler.Handle, New_Item => new Buffers.Buffer_Handle_Type);
-
-            Handler := Handle_Vector.Last_Element (Buffer_Handler.Handle);
-
-            Buffer_Handler.Buffer.Get_Free_Buffer (Handler.all);
-
-            Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
-                                           Position   => Buffer_Handler.Handle.Last,
-                                           New_Item   => Handler);
-
-            --  Move cursor to new buffer.
-            Handle_Vector.Next (Buffer_Handler.Prod_Cursor);
+            Append_New_Buffer;
 
          end if;
 
@@ -127,12 +186,7 @@ package body Packet_Mgr is
 
             Datas (Integer (Pkt_Nb) + 1) := Interfaces.Unsigned_64 (Pkt_Nb);
 
-            Handler  := Handle_Vector.Element (Buffer_Handler.Prod_Cursor);
-            Buffers.Set_Used_Bytes (Handler.all,
-                                    Packet_Buffers.To_Bytes (Datas'Length));
-            Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
-                                           Position   => Buffer_Handler.Prod_Cursor,
-                                           New_Item   => Handler);
+            Set_Used_Bytes_At (Buffer_Handler.Prod_Cursor, Datas'Length);
          end;
       end loop;
    exception
@@ -144,55 +198,55 @@ package body Packet_Mgr is
    end Store_Packet_Task;
 
 
+   ---------------------
+   --  Consumer_Task  --
+   ---------------------
+
    task body Consumer_Task is
-      Handler  : access Buffers.Buffer_Handle_Type;
+      Handler  : Buffers.Buffer_Handle_Type;
+      --  Cursor   : Handle_Vector.Cursor;
    begin
-      accept Start;
       loop
-         declare
-            use Packet_Buffers;
-         begin
-
+         accept Start;
+         if Handle_Vector.Is_Empty (Buffer_Handler.Handle) = False then
             declare
+               use Packet_Buffers;
             begin
-               Handler := Handle_Vector.First_Element (Buffer_Handler.Handle);
-               Buffer_Handler.Buffer.Get_Full_Buffer (Handler.all);
-               Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
-                                              Index      => Buffer_Handler.Handle.First_Index,
-                                              New_Item   => Handler);
+
+               --  Handler := Handle_Vector.First_Element (Buffer_Handler.Handle);
+               Ada.Text_IO.Put_Line ("_________Waiting for full buffer__________");
+               Buffer_Handler.Buffer.Get_Full_Buffer (Handler);
+               Ada.Text_IO.Put_Line ("_________Got Full Buffer__________");
+               --  Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
+               --                                 Index      => Buffer_Handler.Handle.First_Index,
+               --                                 New_Item   => Handler);
+
+               declare
+                  type Data_Array is new Element_Array
+                     (1 .. To_Word_Count
+                        (Buffers.Get_Used_Bytes (Handler)));
+
+                  Datas : Data_Array;
+
+                  for Datas'Address use Buffers.Get_Address (Handler);
+               begin
+                  Ada.Text_IO.Put_Line ("------  data (data'first) : ------" &
+                     Datas (Datas'First)'Img);
+                  Ada.Text_IO.Put_Line ("------  data (data'last) : ------" &
+                     Datas (Datas'Last)'Img);
+               end;
+
+              --   Cursor := Buffer_Handler.Handle.First;
+              --   Delete_Buffer_At (Cursor);
+
+            exception
+               when E : others =>
+                  Ada.Text_IO.Put_Line ("exception : " &
+                     Ada.Exceptions.Exception_Name (E) &
+                     " message : " &
+                     Ada.Exceptions.Exception_Message (E));
             end;
-
-            declare
-               type Data_Array is new Element_Array
-                  (1 .. To_Word_Count
-                     (Buffers.Get_Used_Bytes (Handle_Vector.Element (Buffer_Handler.Prod_Cursor).all)));
-
-               Datas : Data_Array;
-
-               for Datas'Address use Buffers.Get_Address (Handle_Vector.Element (Buffer_Handler.Prod_Cursor).all);
-            begin
-               Ada.Text_IO.Put_Line ("------  data (data'first) : ------" &
-                  Datas (Datas'First)'Img);
-               Ada.Text_IO.Put_Line ("------  data (data'last) : ------" &
-                  Datas (Datas'Last)'Img);
-            end;
-
-            Handler := Handle_Vector.Element (Buffer_Handler.Prod_Cursor);
-
-            Buffer_Handler.Buffer.Release_Full_Buffer (Handler.all);
-
-            Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
-                                           Index      => Buffer_Handler.Handle.First_Index,
-                                           New_Item   => Handler);
-
-            Handle_Vector.Delete_First (Buffer_Handler.Handle);
-         exception
-            when E : others =>
-               Ada.Text_IO.Put_Line ("exception : " &
-                  Ada.Exceptions.Exception_Name (E) &
-                  " message : " &
-                  Ada.Exceptions.Exception_Message (E));
-         end;
+         end if;
       end loop;
    end Consumer_Task;
 
