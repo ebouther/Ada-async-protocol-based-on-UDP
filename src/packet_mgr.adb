@@ -162,6 +162,7 @@ package body Packet_Mgr is
 
          if New_Seq then
 
+            Set_Used_Bytes_At (Buffer_Handler.Prod_Cursor, Integer (Base_Udp.Sequence_Size));
             Ada.Text_IO.Put_Line ("Release Buffer");
             Release_Free_Buffer_At (Buffer_Handler.Prod_Cursor);
 
@@ -186,15 +187,14 @@ package body Packet_Mgr is
 
             Datas (Integer (Pkt_Nb) + 1) := Interfaces.Unsigned_64 (Pkt_Nb);
 
-            Set_Used_Bytes_At (Buffer_Handler.Prod_Cursor, Datas'Length);
          end;
       end loop;
    exception
       when E : others =>
          Ada.Text_IO.Put_Line ("exception : " &
-         Ada.Exceptions.Exception_Name (E) &
-         " message : " &
-         Ada.Exceptions.Exception_Message (E));
+            Ada.Exceptions.Exception_Name (E) &
+            " message : " &
+            Ada.Exceptions.Exception_Message (E));
    end Store_Packet_Task;
 
 
@@ -232,7 +232,7 @@ package body Packet_Mgr is
                begin
                   for I in Datas'Range loop
                      Ada.Text_IO.Put_Line (I'Img &
-                        Datas (Datas'Last)'Img);
+                        Datas (I)'Img);
                   end loop;
                end;
 
