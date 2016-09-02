@@ -7,10 +7,9 @@ with Ada.Containers.Vectors;
 
 package Packet_Mgr is
 
-   use type Buffers.Buffer_Handle_Type;
 
    package Handle_Vector is
-      new Ada.Containers.Vectors (Natural, Buffers.Buffer_Handle_Type);
+      new Ada.Containers.Vectors (Natural, Buffers.Buffer_Handle_Access, Buffers."=");
 
    type Buf_Handler is
       record
@@ -37,6 +36,8 @@ package Packet_Mgr is
    --        Near_Full   : Container_Ptr := new Container;
    --        Full        : Container_Ptr := new Container;
    --     end record;
+
+   procedure Init_Buffer;
 
    task Consumer_Task is
       entry Start;
