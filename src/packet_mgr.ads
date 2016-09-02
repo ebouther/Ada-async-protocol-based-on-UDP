@@ -3,12 +3,20 @@ with Base_Udp;
 with Interfaces;
 with Buffers.Local;
 
+with Ada.Containers.Vectors;
+
 package Packet_Mgr is
+
+   use type Buffers.Buffer_Handle_Type;
+
+   package Handle_Vector is
+      new Ada.Containers.Vectors (Natural, Buffers.Buffer_Handle_Type);
 
    type Buf_Handler is
       record
-         Buffer         : aliased Buffers.Local.Local_Buffer_Type;
-         Handle  : Buffers.Buffer_Handle_Type;
+         Buffer      : aliased Buffers.Local.Local_Buffer_Type;
+         Handle      : Handle_Vector.Vector;
+         Prod_Cursor : Handle_Vector.Cursor;
       end record;
 
    package Packet_Buffers is new
@@ -30,7 +38,9 @@ package Packet_Mgr is
    --        Full        : Container_Ptr := new Container;
    --     end record;
 
-   task Consumer_Task;
+   task Consumer_Task is
+      entry Start;
+   end Consumer_Task;
 
    task type Store_Packet_Task is
       entry Store (Data          : Base_Udp.Packet_Stream;

@@ -47,7 +47,9 @@ procedure UDP_Server is
 
    Store_Packet_Task    : Packet_Mgr.Store_Packet_Task;
 
-   procedure Free_Stream is new Ada.Unchecked_Deallocation (Base_Udp.Packet_Stream, Base_Udp.Packet_Stream_Ptr);
+   procedure Free_Stream is
+      new Ada.Unchecked_Deallocation
+         (Base_Udp.Packet_Stream, Base_Udp.Packet_Stream_Ptr);
 
    package Sync_Queue is new Queue (Base_Udp.Packet_Stream_Ptr);
    Buffer               : Sync_Queue.Synchronized_Queue;

@@ -39,30 +39,140 @@ package body Packet_Mgr is
 
    Buffer_Handler : Buf_Handler;
 
+   --  Need an Ada Vector which contains Buffer_Handlers and create / delete at each new seq
+   task body Store_Packet_Task is
+      Pkt_Content    : Base_Udp.Packet_Stream;
+      Pkt_Nb         : Base_Udp.Header;
+
+      pragma Warnings (Off);
+      New_Seq, Ack   : Boolean;
+      pragma Warnings (On);
+
+      use Packet_Buffers;
+      for Pkt_Nb'Address use Pkt_Content'Address;
+   begin
+      --   if New_Seq then
+      --      Buffer_Handler.Buffer.Release_Free_Buffer (Buffer_Handler.Handle);
+      --      Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handle);
+      --   end if;
+
+      Buffer_Handler.Buffer.Initialise (10, Size => Buffers.Buffer_Size_Type
+         (Base_Udp.Sequence_Size * System.Storage_Unit));
+
+      declare
+         Handler  : Buffers.Buffer_Handle_Type;
+      begin
+         Buffer_Handler.Buffer.Get_Free_Buffer (Handler);
+         Handle_Vector.Append (Buffer_Handler.Handle, New_Item => Handler);
+      end;
+
+      loop
+         accept Store (Data            : in Base_Udp.Packet_Stream;
+                       New_Sequence    : in Boolean;
+                       Is_Ack          : in Boolean) do
+            Pkt_Content := Data;
+            New_Seq     := New_Sequence;
+            Ack         := Is_Ack;
+         end Store;
+
+         if New_Seq then
+            declare
+               Handler  : Buffers.Buffer_Handle_Type;
+            begin
+               Ada.Text_IO.Put_Line ("Release Buffer");
+               Handler := Handle_Vector.Element (Buffer_Handler.Prod_Cursor);
+               Buffer_Handler.Buffer.Release_Free_Buffer (Handler);
+               Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
+                                              Position   => Buffer_Handler.Prod_Cursor,
+                                              New_Item   => Handler);
+            end;
+
+            declare
+               Handler  : Buffers.Buffer_Handle_Type;
+            begin
+               Ada.Text_IO.Put_Line ("Create a New Handler with New Buffer");
+               Buffer_Handler.Buffer.Get_Free_Buffer (Handler);
+               Handle_Vector.Append (Buffer_Handler.Handle, New_Item => Handler);
+               --  Move cursor to next buffer.
+               Handle_Vector.Next (Buffer_Handler.Prod_Cursor);
+            end;
+
+         end if;
+
+         declare
+            type Data_Array is new
+               Packet_Buffers.Element_Array
+                  (1 .. Packet_Buffers.To_Word_Count
+                     (Buffers.Get_Available_Bytes (Handle_Vector.Element (Buffer_Handler.Prod_Cursor))));
+               Datas : Data_Array;
+               for Datas'Address use Buffers.Get_Address
+                  (Handle_Vector.Element (Buffer_Handler.Prod_Cursor));
+         begin
+            --  Ada.Text_IO.Put_Line ("Len : " & Datas'Length'Img);
+            --  Ada.Text_IO.Put_Line ("Seq : " & Base_Udp.Sequence_Size'Img);
+            --  Ada.Text_IO.Put_Line ("Bytes : " & Buffers.Get_Available_Bytes (Buffer_Handler.Handle)'Img);
+
+            Datas (Integer (Pkt_Nb) + 1) := Interfaces.Unsigned_64 (Pkt_Nb);
+
+            declare
+               Handler  : Buffers.Buffer_Handle_Type;
+            begin
+               Handler  := Handle_Vector.Element (Buffer_Handler.Prod_Cursor);
+               Buffers.Set_Used_Bytes (Handler,
+                                       Packet_Buffers.To_Bytes (Datas'Length));
+               Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
+                                              Position   => Buffer_Handler.Prod_Cursor,
+                                              New_Item   => Handler);
+            end;
+
+         end;
+      end loop;
+   exception
+      when E : others =>
+         Ada.Text_IO.Put_Line ("exception : " &
+         Ada.Exceptions.Exception_Name (E) &
+         " message : " &
+         Ada.Exceptions.Exception_Message (E));
+   end Store_Packet_Task;
+
    task body Consumer_Task is
    begin
-      Buffer_Handler.Buffer.Initialise (10, Size => Buffers.Buffer_Size_Type
-         ((Base_Udp.Sequence_Size * System.Storage_Unit)));
+      accept Start;
       loop
          declare
             use Packet_Buffers;
          begin
-            Buffer_Handler.Buffer.Get_Full_Buffer (Buffer_Handler.Handle);
+
+            declare
+               Handler  : Buffers.Buffer_Handle_Type;
+            begin
+               Handler := Handle_Vector.Element (Buffer_Handler.Prod_Cursor);
+               Buffer_Handler.Buffer.Get_Full_Buffer (Handler);
+            end;
+
             declare
                type Data_Array is new Element_Array
                   (1 .. To_Word_Count
-                     (Buffers.Get_Used_Bytes (Buffer_Handler.Handle)));
+                     (Buffers.Get_Used_Bytes (Handle_Vector.Element (Buffer_Handler.Prod_Cursor))));
 
                Datas : Data_Array;
 
-               for Datas'Address use Buffers.Get_Address (Buffer_Handler.Handle);
+               for Datas'Address use Buffers.Get_Address (Handle_Vector.Element (Buffer_Handler.Prod_Cursor));
             begin
                Ada.Text_IO.Put_Line ("------  data (data'first) : ------" &
                Datas (Datas'First)'Img);
                Ada.Text_IO.Put_Line ("------  data (data'last) : ------" &
                Datas (Datas'Last)'Img);
             end;
-            --  Buffer_Handler.Buffer.Release_Full_Buffer (Buffer_Handler.Handle);
+
+            declare
+               Handler  : Buffers.Buffer_Handle_Type;
+            begin
+               Handler := Handle_Vector.Element (Buffer_Handler.Prod_Cursor);
+               Buffer_Handler.Buffer.Release_Full_Buffer (Handler);
+            end;
+
+            Handle_Vector.Delete_First (Buffer_Handler.Handle);
          exception
             when E : others =>
                Ada.Text_IO.Put_Line ("exception : " &
@@ -72,71 +182,6 @@ package body Packet_Mgr is
          end;
       end loop;
    end Consumer_Task;
-
-   task body Store_Packet_Task is
-      Pkt_Content    : Base_Udp.Packet_Stream;
-      Pkt_Nb         : Base_Udp.Header;
-      pragma Warnings (Off);
-      New_Seq, Ack   : Boolean;
-      pragma Warnings (On);
-      Pos            : Integer;
-      Buf_Per_Seq    : Integer := 1;
-
-      use Packet_Buffers;
-      for Pkt_Nb'Address use Pkt_Content'Address;
-   begin
-      --   if New_Seq then
-      --      Buffer_Handler.Buffer.Release_Free_Buffer (Buffer_Handler.Handle);
-      --      Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handle);
-      --   end if;
-      declare
-      begin
-         Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handle);
-         loop
-            accept Store (Data            : in Base_Udp.Packet_Stream;
-                        New_Sequence    : in Boolean;
-                        Is_Ack          : in Boolean) do
-               Pkt_Content := Data;
-               New_Seq     := New_Sequence;
-               Ack         := Is_Ack;
-            end Store;
-            declare
-               type Data_Array is new
-                  Packet_Buffers.Element_Array
-                     (1 .. Packet_Buffers.To_Word_Count
-                        (Buffers.Get_Available_Bytes (Buffer_Handler.Handle)));
-                  Datas : Data_Array;
-                  for Datas'Address use Buffers.Get_Address (Buffer_Handler.Handle);
-            begin
-               Pos := Integer (Pkt_Nb);
-               Ada.Text_IO.Put_Line ("Len : " & Datas'Length'Img);
-               Ada.Text_IO.Put_Line ("Seq : " & Base_Udp.Sequence_Size'Img);
-               --  Ada.Text_IO.Put_Line ("Bytes : " & Buffers.Get_Available_Bytes (Buffer_Handler.Handle)'Img);
-
-               if Pos >= Datas'Length then
-                  Pos := Pos mod Datas'Length;
-               end if;
-
-               Datas (Pos + 1) := Interfaces.Unsigned_64 (Pkt_Nb);
-
-               if Integer (Pkt_Nb) + 1 >= Datas'Length * Buf_Per_Seq then
-                  Buffers.Set_Used_Bytes (Buffer_Handler.Handle,
-                     Packet_Buffers.To_Bytes (Datas'Length));
-                  Buffer_Handler.Buffer.Release_Free_Buffer (Buffer_Handler.Handle);
-                  Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handle);
-                  Buf_Per_Seq := Buf_Per_Seq + 1;
-               end if;
-            end;
-         end loop;
-      end;
-
-   exception
-      when E : others =>
-         Ada.Text_IO.Put_Line ("exception : " &
-         Ada.Exceptions.Exception_Name (E) &
-         " message : " &
-         Ada.Exceptions.Exception_Message (E));
-   end Store_Packet_Task;
 
 
    --   protected body Buffer_Management is

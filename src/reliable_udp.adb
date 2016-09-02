@@ -84,7 +84,7 @@ package body Reliable_Udp is
       procedure Append (Packet_Lost : in Loss) is
       begin
          Losses_Container.Append (Container  => Losses,
-                                 New_Item    => Packet_Lost);
+                                  New_Item   => Packet_Lost);
       end Append;
 
 
