@@ -1,9 +1,15 @@
 with Base_Udp;
 
 with Interfaces;
-with Buffers;
+with Buffers.Local;
 
 package Packet_Mgr is
+
+   type Buf_Handler is
+      record
+         Buffer         : aliased Buffers.Local.Local_Buffer_Type;
+         Handle  : Buffers.Buffer_Handle_Type;
+      end record;
 
    package Packet_Buffers is new
       Buffers.Generic_Buffers
