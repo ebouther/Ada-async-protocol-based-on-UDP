@@ -1,6 +1,7 @@
 with Interfaces;
 with System;
 with Ada.Streams;
+with Ada.Unchecked_Deallocation;
 
 package Base_Udp is
 
@@ -24,5 +25,9 @@ package Base_Udp is
 
    subtype Packet_Stream is
       Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
+
+   procedure Free_Stream is
+      new Ada.Unchecked_Deallocation
+         (Base_Udp.Packet_Stream, Base_Udp.Packet_Stream_Ptr);
 
 end Base_Udp;

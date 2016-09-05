@@ -45,14 +45,17 @@ package Reliable_Udp is
    task type Ack_Task is
       pragma Priority (System.Priority'First);
       entry Start;
+      entry Stop;
    end Ack_Task;
 
    task type Append_Task is
+      entry Stop;
       entry Append (First_Dropped, Last_Dropped : Base_Udp.Header;
                    Client_Address               : GNAT.Sockets.Sock_Addr_Type);
    end Append_Task;
 
    task type Remove_Task is
+      entry Stop;
       entry Remove (Packet : in Base_Udp.Header);
    end Remove_Task;
 

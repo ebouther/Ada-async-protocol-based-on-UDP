@@ -11,40 +11,45 @@ package body Reliable_Udp is
 
    begin
       loop
-         accept Append (First_Dropped, Last_Dropped   : Base_Udp.Header;
-                        Client_Address                : GNAT.Sockets.Sock_Addr_Type) do
-            First_D        := First_Dropped;
-            Last_D         := Last_Dropped;
-            Client_Addr    := Client_Address;
-         end Append;
+         select
+            accept Stop;
+            exit;
+         or
+            accept Append (First_Dropped, Last_Dropped   : Base_Udp.Header;
+                           Client_Address                : GNAT.Sockets.Sock_Addr_Type) do
+               First_D        := First_Dropped;
+               Last_D         := Last_Dropped;
+               Client_Addr    := Client_Address;
+            end Append;
 
-         --  if First_D < Last_D then
-         for I in Base_Udp.Header range First_D .. Last_D loop
-            Packet_Lost := (Packet     => I,
-                            Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-                            Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-                            From       => Client_Addr);
-            Ack_Mgr.Append (Packet_Lost);
-         end loop;
-         --  else
-         --     for I in Base_Udp.Header range First_D .. Base_Udp.Pkt_Max loop
-         --        Packet_Lost := (Packet     => I,
-         --                        Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-         --                        Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-         --                        From       => Client_Addr);
+            --  if First_D < Last_D then
+            for I in Base_Udp.Header range First_D .. Last_D loop
+               Packet_Lost := (Packet     => I,
+                               Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                               Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+                               From       => Client_Addr);
+               Ack_Mgr.Append (Packet_Lost);
+            end loop;
+            --  else
+            --     for I in Base_Udp.Header range First_D .. Base_Udp.Pkt_Max loop
+            --        Packet_Lost := (Packet     => I,
+            --                        Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+            --                        Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+            --                        From       => Client_Addr);
 
-         --        Ack_Mgr.Append (Packet_Lost);
+            --        Ack_Mgr.Append (Packet_Lost);
 
-         --     end loop;
+            --     end loop;
 
-         --     for I in Base_Udp.Header range 0 .. Last_D loop
-         --        Packet_Lost := (Packet     => I,
-         --                        Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-         --                        Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-         --                        From       => Client_Addr);
-         --        Ack_Mgr.Append (Packet_Lost);
-         --     end loop;
-         --  end if;
+            --     for I in Base_Udp.Header range 0 .. Last_D loop
+            --        Packet_Lost := (Packet     => I,
+            --                        Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
+            --                        Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
+            --                        From       => Client_Addr);
+            --        Ack_Mgr.Append (Packet_Lost);
+            --     end loop;
+            --  end if;
+         end select;
       end loop;
    end Append_Task;
 
@@ -53,10 +58,15 @@ package body Reliable_Udp is
       Pkt   : Base_Udp.Header;
    begin
       loop
+         select
+            accept Stop;
+            exit;
+         or
             accept Remove (Packet : in Base_Udp.Header) do
                Pkt   := Packet;
             end Remove;
             Ack_Mgr.Remove (Pkt);
+         end select;
       end loop;
    end Remove_Task;
 
@@ -66,7 +76,12 @@ package body Reliable_Udp is
       Ack_Mgr.Init_Socket;
       accept Start;
       loop
-         Ack_Mgr.Ack;
+         select
+            accept Stop;
+            exit;
+         else
+            Ack_Mgr.Ack;
+         end select;
       end loop;
    end Ack_Task;
 

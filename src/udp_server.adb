@@ -5,7 +5,6 @@ with Ada.Unchecked_Conversion;
 with Ada.Calendar;
 with Interfaces.C;
 with System.Multiprocessors.Dispatching_Domains;
-with Ada.Unchecked_Deallocation;
 
 with GNAT.Traceback.Symbolic;
 with System;
@@ -26,16 +25,21 @@ procedure UDP_Server is
    use type Base_Udp.Header;
    use type Interfaces.Unsigned_64;
 
-   task Timer;
+   task type Timer is
+      entry Start;
+      entry Stop;
+   end Timer;
 
    task type Process_Packets is
       --  pragma Priority (System.Priority'Last - 1);
       entry Start;
+      entry Stop;
    end Process_Packets;
 
    task type Recv_Socket is
       --  pragma Priority (System.Priority'Last);
       entry Start;
+      entry Stop;
    end Recv_Socket;
 
 
@@ -47,9 +51,6 @@ procedure UDP_Server is
 
    Store_Packet_Task    : Packet_Mgr.Store_Packet_Task;
 
-   procedure Free_Stream is
-      new Ada.Unchecked_Deallocation
-         (Base_Udp.Packet_Stream, Base_Udp.Packet_Stream_Ptr);
 
    package Sync_Queue is new Queue (Base_Udp.Packet_Stream_Ptr);
    Buffer               : Sync_Queue.Synchronized_Queue;
@@ -58,6 +59,7 @@ procedure UDP_Server is
    Remove_Task          : Reliable_Udp.Remove_Task;
    Ack_Task             : Reliable_Udp.Ack_Task;
    Recv_Socket_Task     : Recv_Socket;
+   Log_Task             : Timer;
 
    Server               : Socket_Type;
    Address, From        : Sock_Addr_Type;
@@ -75,6 +77,18 @@ procedure UDP_Server is
 
    function To_Int is
       new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type, Interfaces.C.int);
+
+   procedure Stop_Server;
+   procedure Stop_Server is
+   begin
+      Log_Task.Stop;
+      Recv_Socket_Task.Stop;
+      Ack_Task.Stop;
+      Store_Packet_Task.Stop;
+      Remove_Task.Stop;
+      Append_Task.Stop;
+      Process_Pkt.Stop;
+   end Stop_Server;
 
    procedure Init_Udp;
    procedure Init_Udp is
@@ -104,19 +118,26 @@ procedure UDP_Server is
    task body Timer is
       use type Ada.Calendar.Time;
    begin
+      accept Start;
       loop
-         delay 1.0;
-         Elapsed_Time := Ada.Calendar.Clock - Start_Time;
-         Output_Data.Display
-            (True,
-            Elapsed_Time,
-            Interfaces.Unsigned_64 (Packet_Number),
-            Missed,
-            Nb_Packet_Received,
-            Last_Nb,
-            Nb_Output);
-            Last_Nb := Nb_Packet_Received;
-         Nb_Output := Nb_Output + 1;
+         select
+            accept Stop;
+            exit;
+         else
+            delay 1.0;
+            Ada.Text_IO.Put_Line ("Buf len : " & Buffer.Cur_Count'Img);
+            Elapsed_Time := Ada.Calendar.Clock - Start_Time;
+            Output_Data.Display
+               (True,
+               Elapsed_Time,
+               Interfaces.Unsigned_64 (Packet_Number),
+               Missed,
+               Nb_Packet_Received,
+               Last_Nb,
+               Nb_Output);
+               Last_Nb := Nb_Packet_Received;
+            Nb_Output := Nb_Output + 1;
+         end select;
       end loop;
    end Timer;
 
@@ -127,30 +148,26 @@ procedure UDP_Server is
    begin
       accept Start;
       loop
-         declare
-            Data     : constant Base_Udp.Packet_Stream_Ptr := new Base_Udp.Packet_Stream;
-         begin
-            GNAT.Sockets.Receive_Socket (Server, Data.all, Last, From);
-            Buffer.Append_Wait (Data);
-         exception
-            when Socket_Error =>
-               Watchdog := Watchdog + 1;
-               Ada.Text_IO.Put_Line ("Socket Error");
-               exit when Watchdog = 10;
+         select
+            accept Stop;
+            exit;
+         else
+            declare
+               Data     : constant Base_Udp.Packet_Stream_Ptr := new Base_Udp.Packet_Stream;
+            begin
+               GNAT.Sockets.Receive_Socket (Server, Data.all, Last, From);
+               Buffer.Append_Wait (Data);
+            exception
+               when Socket_Error =>
+                  Watchdog := Watchdog + 1;
+                  Ada.Text_IO.Put_Line ("Socket Error");
+                  exit when Watchdog = 10;
 
-         end;
+            end;
+         end select;
       end loop;
 
    end Recv_Socket;
-
-   task Dbg;
-   task body Dbg is
-   begin
-      loop
-         delay 1.0;
-         Ada.Text_IO.Put_Line ("Buf len : " & Buffer.Cur_Count'Img);
-      end loop;
-   end Dbg;
 
    task body Process_Packets is
       use type Ada.Calendar.Time;
@@ -159,7 +176,9 @@ procedure UDP_Server is
       Packet   : Base_Udp.Packet_Payload := (others => 0);
       Seq_Nb   : access Base_Udp.Header;
       Header   : access Reliable_Udp.Header;
+      pragma Warnings (Off);
       New_Seq  : Boolean := False;
+      pragma Warnings (On);
 
       for Data'Address use Packet'Address;
       pragma Import (Ada, Data);
@@ -172,6 +191,10 @@ procedure UDP_Server is
       accept Start;
       loop
          begin
+            select
+               accept Stop;
+               exit;
+            end select;
             Buffer.Remove_First_Wait (Data);
             if Header.all.Ack then
                Header.all.Ack := False;
@@ -214,11 +237,11 @@ procedure UDP_Server is
                   Packet_Number := Packet_Number + 1;
                end if;
             end if;
-            Store_Packet_Task.Store (Data        => Data.all,
-                                   New_Sequence  => New_Seq,
-                                   Is_Ack        => False);
+               Store_Packet_Task.Store (Data        => Data,
+                                        New_Sequence  => New_Seq,
+                                        Is_Ack        => False);
 
-            Free_Stream (Data);
+            --  Base_Udp.Free_Stream (Data);
          end;
       end loop;
    end Process_Packets;
@@ -235,9 +258,14 @@ begin
    end if;
 
    Init_Udp;
+   Log_Task.Start;
    Recv_Socket_Task.Start;
    Process_Pkt.Start;
    Ack_Task.Start;
+
+   delay 3.0;
+   Stop_Server;
+
 exception
    when E : others =>
       Ada.Text_IO.Put_Line (GNAT.Traceback.Symbolic.Symbolic_Traceback (E));
