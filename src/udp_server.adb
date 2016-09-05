@@ -149,7 +149,7 @@ procedure UDP_Server is
       Last        : Ada.Streams.Stream_Element_Offset;
       Watchdog    : Natural := 0;
       Data_Addr   : System.Address;
-      I           : Integer := 0;
+      I           : Integer := Base_Udp.Pkt_Max + 1;
       use type Interfaces.C.int;
       use System.Storage_Elements;
    begin
@@ -165,9 +165,9 @@ procedure UDP_Server is
             end if;
 
             declare
-               Data        : Base_Udp.Packet_Stream;
+               Data  : Base_Udp.Packet_Stream;
                for Data'Address use Data_Addr + Storage_Offset
-                                                   (I * Base_Udp.Packet_Stream'Size);
+                                                   (I * Base_Udp.Load_Size);
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
                Buffer.Append_Wait (Data'Address);
