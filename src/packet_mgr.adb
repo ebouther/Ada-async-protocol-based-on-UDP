@@ -1,7 +1,6 @@
 with Ada.Text_IO;
 with Interfaces;
 with Ada.Exceptions;
---  with System;
 
 package body Packet_Mgr is
 
@@ -90,32 +89,20 @@ package body Packet_Mgr is
    -------------------------
 
    task body Store_Packet_Task is
-      ---  Pkt_Content    : Base_Udp.Packet_Stream_Ptr;
-      ---  Pkt_Nb         : access Base_Udp.Header;
-
-      New_Seq        : Boolean := False;
-
-      ---  use Packet_Buffers;
-      ---  pragma Import (Ada, Pkt_Nb);
-      ---  for Pkt_Nb'Address use Pkt_Content'Address;
 
    begin
       Init_Buffer;
       loop
-         if New_Seq then
+         Set_Used_Bytes_At (Buffer_Handler.Prod_Cursor, Integer (Base_Udp.Sequence_Size));
 
-            Set_Used_Bytes_At (Buffer_Handler.Prod_Cursor, Integer (Base_Udp.Sequence_Size));
+         Ada.Text_IO.Put_Line ("*** Release Buffer ***");
+         Release_Free_Buffer_At (Buffer_Handler.Prod_Cursor);
+         Buffer_Handler.Handle.Delete (Buffer_Handler.Prod_Cursor);
 
-            Ada.Text_IO.Put_Line ("*** Release Buffer ***");
-            Release_Free_Buffer_At (Buffer_Handler.Prod_Cursor);
-            Buffer_Handler.Handle.Delete (Buffer_Handler.Prod_Cursor);
+         --  Get_Filled_Buf;
 
-            --  Get_Filled_Buf;
-
-            Ada.Text_IO.Put_Line ("*** Create a New Handler with New Buffer ***");
-            Append_New_Buffer;
-            New_Seq := False;
-         end if;
+         Ada.Text_IO.Put_Line ("*** Create a New Handler with New Buffer ***");
+         Append_New_Buffer;
 
          declare -- Should redeclare Data_Array only on new sequence
             type Data_Array is new
@@ -138,22 +125,9 @@ package body Packet_Mgr is
                Buffer_Handler.Handle.Delete (Buffer_Handler.Prod_Cursor);
                exit;
             or
-               accept Store (Packet_Ptr   : in out System.Address) do
-                  ---  Pkt_Content := Data;
-                  ---  New_Seq     := New_Sequence;
-                  ---  Ack         := Is_Ack;
-                  Packet_Ptr := Datas (Integer (Packet_Nb + 1))'Address;
-
-                  --  Dummy algorithm to test access
-                  Packet_Nb := Packet_Nb + 1;
-                  if Packet_Nb = Base_Udp.Header (Base_Udp.Sequence_Size) then
-                     New_Seq := True;
-                     Packet_Nb := 0;
-                  end if;
-
-                  ---  Datas (Integer (Pkt_Nb.all) + 1) := Interfaces.Unsigned_64 (Pkt_Nb.all);
-                  ---  Base_Udp.Free_Stream (Pkt_Content);
-               end Store;
+               accept New_Buffer_Addr (Buffer_Ptr   : in out System.Address) do
+                  Buffer_Ptr := Datas (Datas'First)'Address;
+               end New_Buffer_Addr;
             end select;
          end;
       end loop;

@@ -5,6 +5,7 @@ with Ada.Unchecked_Conversion;
 with Ada.Calendar;
 with Interfaces.C;
 with System.Multiprocessors.Dispatching_Domains;
+with System.Storage_Elements;
 
 with GNAT.Traceback.Symbolic;
 with System;
@@ -147,8 +148,10 @@ procedure UDP_Server is
    task body Recv_Socket is
       Last        : Ada.Streams.Stream_Element_Offset;
       Watchdog    : Natural := 0;
-      use type Interfaces.C.int;
       Data_Addr   : System.Address;
+      I           : Integer := 0;
+      use type Interfaces.C.int;
+      use System.Storage_Elements;
    begin
       accept Start;
       loop
@@ -156,14 +159,19 @@ procedure UDP_Server is
             accept Stop;
             exit;
          else
-            Store_Packet_Task.Store (Packet_Ptr => Data_Addr);
+            if I > Base_Udp.Pkt_Max then
+               Store_Packet_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
+               I := 0;
+            end if;
+
             declare
-               --  Data     : constant Base_Udp.Packet_Stream_Ptr := new Base_Udp.Packet_Stream;
                Data        : Base_Udp.Packet_Stream;
-               for Data'Address use Data_Addr;
+               for Data'Address use Data_Addr + Storage_Offset
+                                                   (I * Base_Udp.Packet_Stream'Size);
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
                Buffer.Append_Wait (Data'Address);
+               I := I + 1;
             exception
                when Socket_Error =>
                   Watchdog := Watchdog + 1;

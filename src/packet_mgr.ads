@@ -38,7 +38,7 @@ package Packet_Mgr is
 
    task type Store_Packet_Task is
       entry Stop;
-      entry Store (Packet_Ptr : in out System.Address);
+      entry New_Buffer_Addr (Buffer_Ptr : in out System.Address);
    end Store_Packet_Task;
 
 end Packet_Mgr;
