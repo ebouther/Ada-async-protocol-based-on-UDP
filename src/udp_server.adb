@@ -82,12 +82,13 @@ procedure UDP_Server is
    procedure Stop_Server is
    begin
       Log_Task.Stop;
-      Recv_Socket_Task.Stop;
       Ack_Task.Stop;
+      Process_Pkt.Stop;
       Store_Packet_Task.Stop;
       Remove_Task.Stop;
       Append_Task.Stop;
-      Process_Pkt.Stop;
+      delay 0.1;
+      Recv_Socket_Task.Stop;
    end Stop_Server;
 
    procedure Init_Udp;
@@ -190,11 +191,10 @@ procedure UDP_Server is
    begin
       accept Start;
       loop
-         begin
-            select
-               accept Stop;
-               exit;
-            end select;
+         select
+            accept Stop;
+            exit;
+         else
             Buffer.Remove_First_Wait (Data);
             if Header.all.Ack then
                Header.all.Ack := False;
@@ -242,7 +242,7 @@ procedure UDP_Server is
                                         Is_Ack        => False);
 
             --  Base_Udp.Free_Stream (Data);
-         end;
+         end select;
       end loop;
    end Process_Packets;
 
