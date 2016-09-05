@@ -1,8 +1,7 @@
 with Ada.Text_IO;
---  with Interfaces;
+with Interfaces;
 with Ada.Exceptions;
 --  with System;
-with System;
 
 package body Packet_Mgr is
 
@@ -23,7 +22,7 @@ package body Packet_Mgr is
    begin
 
       Buffer_Handler.Buffer.Initialise (10, Size => Buffers.Buffer_Size_Type
-         (Base_Udp.Sequence_Size * System.Storage_Unit));
+         (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
 
       Append_New_Buffer;
 
@@ -86,75 +85,77 @@ package body Packet_Mgr is
                                      New_Item   => Handler);
    end Set_Used_Bytes_At;
 
-
    -------------------------
    --  Store_Packet_Task  --
    -------------------------
 
    task body Store_Packet_Task is
-      Pkt_Content    : Base_Udp.Packet_Stream_Ptr;
-      Pkt_Nb         : access Base_Udp.Header;
+      ---  Pkt_Content    : Base_Udp.Packet_Stream_Ptr;
+      ---  Pkt_Nb         : access Base_Udp.Header;
 
-      pragma Warnings (Off);
-      New_Seq, Ack   : Boolean;
-      pragma Warnings (On);
+      New_Seq        : Boolean := False;
 
-      use Packet_Buffers;
-      pragma Import (Ada, Pkt_Nb);
-      for Pkt_Nb'Address use Pkt_Content'Address;
+      ---  use Packet_Buffers;
+      ---  pragma Import (Ada, Pkt_Nb);
+      ---  for Pkt_Nb'Address use Pkt_Content'Address;
 
    begin
       Init_Buffer;
       loop
-         select
-            accept Stop;
+         if New_Seq then
+
             Set_Used_Bytes_At (Buffer_Handler.Prod_Cursor, Integer (Base_Udp.Sequence_Size));
 
-            Ada.Text_IO.Put_Line ("*** Released Buffer before Quitting Task ***");
+            Ada.Text_IO.Put_Line ("*** Release Buffer ***");
             Release_Free_Buffer_At (Buffer_Handler.Prod_Cursor);
             Buffer_Handler.Handle.Delete (Buffer_Handler.Prod_Cursor);
-            exit;
-         or
-            accept Store (Data            : in Base_Udp.Packet_Stream_Ptr;
-                          New_Sequence    : in Boolean;
-                          Is_Ack          : in Boolean) do
-               Pkt_Content := Data;
-               New_Seq     := New_Sequence;
-               Ack         := Is_Ack;
-            end Store;
 
-            if New_Seq then
+            --  Get_Filled_Buf;
 
+            Ada.Text_IO.Put_Line ("*** Create a New Handler with New Buffer ***");
+            Append_New_Buffer;
+            New_Seq := False;
+         end if;
+
+         declare -- Should redeclare Data_Array only on new sequence
+            type Data_Array is new
+               Packet_Buffers.Element_Array
+                  (1 .. Packet_Buffers.To_Word_Count
+                     (Buffers.Get_Available_Bytes
+                        (Handle_Vector.Element (Buffer_Handler.Prod_Cursor).all)));
+
+               Datas : Data_Array;
+               for Datas'Address use Buffers.Get_Address
+                  (Handle_Vector.Element (Buffer_Handler.Prod_Cursor).all);
+         begin
+
+            select
+               accept Stop;
                Set_Used_Bytes_At (Buffer_Handler.Prod_Cursor, Integer (Base_Udp.Sequence_Size));
 
-               Ada.Text_IO.Put_Line ("*** Release Buffer ***");
+               Ada.Text_IO.Put_Line ("*** Released Buffer before Quitting Task ***");
                Release_Free_Buffer_At (Buffer_Handler.Prod_Cursor);
                Buffer_Handler.Handle.Delete (Buffer_Handler.Prod_Cursor);
+               exit;
+            or
+               accept Store (Packet_Ptr   : in out System.Address) do
+                  ---  Pkt_Content := Data;
+                  ---  New_Seq     := New_Sequence;
+                  ---  Ack         := Is_Ack;
+                  Packet_Ptr := Datas (Integer (Packet_Nb + 1))'Address;
 
-               Get_Filled_Buf;
+                  --  Dummy algorithm to test access
+                  Packet_Nb := Packet_Nb + 1;
+                  if Packet_Nb = Base_Udp.Header (Base_Udp.Sequence_Size) then
+                     New_Seq := True;
+                     Packet_Nb := 0;
+                  end if;
 
-               Ada.Text_IO.Put_Line ("*** Create a New Handler with New Buffer ***");
-               Append_New_Buffer;
-
-            end if;
-
-            declare
-               type Data_Array is new
-                  Packet_Buffers.Element_Array
-                     (1 .. Packet_Buffers.To_Word_Count
-                        (Buffers.Get_Available_Bytes
-                           (Handle_Vector.Element (Buffer_Handler.Prod_Cursor).all)));
-
-                  Datas : Data_Array;
-                  for Datas'Address use Buffers.Get_Address
-                     (Handle_Vector.Element (Buffer_Handler.Prod_Cursor).all);
-            begin
-
-               Datas (Integer (Pkt_Nb.all) + 1) := Interfaces.Unsigned_64 (Pkt_Nb.all);
-
-               Base_Udp.Free_Stream (Pkt_Content);
-            end;
-         end select;
+                  ---  Datas (Integer (Pkt_Nb.all) + 1) := Interfaces.Unsigned_64 (Pkt_Nb.all);
+                  ---  Base_Udp.Free_Stream (Pkt_Content);
+               end Store;
+            end select;
+         end;
       end loop;
    exception
       when E : others =>
@@ -183,13 +184,18 @@ package body Packet_Mgr is
                (1 .. To_Word_Count
                   (Buffers.Get_Used_Bytes (Handler)));
 
-            Datas : Data_Array;
+            Datas    : Data_Array;
 
             for Datas'Address use Buffers.Get_Address (Handler);
          begin
             for I in Datas'Range loop
-               Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) :" &
-                  Datas (I)'Img);
+               declare
+                  Pkt_Nb   : Base_Udp.Header;
+                  for Pkt_Nb'Address use Datas (I)'Address;
+               begin
+                  Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) :" &
+                     Pkt_Nb'Img);
+               end;
             end loop;
          end;
 

@@ -1,12 +1,14 @@
-with Interfaces;
 with Ada.Containers.Vectors;
 with Ada.Unchecked_Deallocation;
+with System;
 
 with Base_Udp;
 with Buffers.Local;
 
 
 package Packet_Mgr is
+
+   Packet_Nb  : Base_Udp.Header := 0;
 
    package Handle_Vector is
       new Ada.Containers.Vectors (Natural,
@@ -21,7 +23,7 @@ package Packet_Mgr is
 
    package Packet_Buffers is new
       Buffers.Generic_Buffers
-         (Element_Type => Interfaces.Unsigned_64);
+         (Element_Type => Base_Udp.Packet_Stream);
 
    procedure Free_Buffer_Handle is
       new Ada.Unchecked_Deallocation
@@ -36,9 +38,7 @@ package Packet_Mgr is
 
    task type Store_Packet_Task is
       entry Stop;
-      entry Store (Data          : Base_Udp.Packet_Stream_Ptr;
-                   New_Sequence  : Boolean;
-                   Is_Ack        : Boolean);
+      entry Store (Packet_Ptr : in out System.Address);
    end Store_Packet_Task;
 
 end Packet_Mgr;
