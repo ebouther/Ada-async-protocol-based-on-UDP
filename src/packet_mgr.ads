@@ -5,7 +5,10 @@ with Buffers.Local;
 
 package Packet_Mgr is
 
-   type Handle_Index is mod Base_Udp.PMH_Buf_Nb;
+   --  Number of pmh buffers initialized
+   PMH_Buf_Nb     : constant := 256;
+
+   type Handle_Index is mod PMH_Buf_Nb;
 
    type State_Enum is (Empty, Near_Full, Full);
 
@@ -17,7 +20,7 @@ package Packet_Mgr is
 
    --  Do not forget to check if current = first after a complete cycle
    --  as Index_Handle is used in a circular way. Must not happen.
-   type Handle_Array is array (1 .. Base_Udp.PMH_Buf_Nb) of Handler;
+   type Handle_Array is array (Handle_Index'First .. Handle_Index'Last) of Handler;
 
    package Packet_Buffers is new
       Buffers.Generic_Buffers

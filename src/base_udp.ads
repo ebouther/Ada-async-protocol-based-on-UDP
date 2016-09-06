@@ -26,9 +26,6 @@ package Base_Udp is
    --  Packet max nb in sequence (0 - Pkt_Max)
    Pkt_Max        : constant := Sequence_Size - 1;
 
-   --  Number of pmh buffers initialized
-   PMH_Buf_Nb     : constant := 256;
-
    type Packet_Payload is
       array (1 .. Base_Udp.Load_Size) of Interfaces.Unsigned_8;
 

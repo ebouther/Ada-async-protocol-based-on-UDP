@@ -152,12 +152,7 @@ procedure UDP_Server is
                exit;
          else
             if I > Base_Udp.Pkt_Max then
-               select
-                  PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
-               or
-                  delay 0.1;
-                  Ada.Text_IO.Put_Line ("New_Buffer_Addr Takes too much time");
-               end select;
+               PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
                I := 0;
             end if;
 
@@ -259,6 +254,7 @@ begin
    end if;
 
    Init_Udp;
+   Packet_Mgr.Init_Handle_Array;
    Log_Task.Start;
    Recv_Socket_Task.Start;
    Process_Pkt.Start;

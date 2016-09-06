@@ -20,11 +20,11 @@ package body Packet_Mgr is
    procedure Init_Handle_Array is
    begin
 
-      Buffer_Handler.Buffer.Initialise (Base_Udp.PMH_Buf_Nb, Size => Buffers.Buffer_Size_Type
+      Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb, Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
 
-      Buffer_Handler.First := Handle_Index (Buffer_Handler.Handlers'First);
-      Buffer_Handler.Current := Handle_Index (Buffer_Handler.Handlers'First);
+      Buffer_Handler.First := Buffer_Handler.Handlers'First;
+      Buffer_Handler.Current := Buffer_Handler.Handlers'First;
 
       for I in Buffer_Handler.Handlers'Range loop
          Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (I).Handle);
@@ -42,11 +42,11 @@ package body Packet_Mgr is
 
       --  Provoke a GNAT Bug Detected
 
-      --  Buffer_Handler.Buffer.Release_Free_Buffer
-      --                    (Buffer_Handler.Handlers
-      --                       (Integer (Index)).Handle);
+      Buffer_Handler.Buffer.Release_Free_Buffer
+                        (Buffer_Handler.Handlers
+                           (Index).Handle);
 
-      Buffer_Handler.Handlers (Integer (Index)).State := Empty;
+      Buffer_Handler.Handlers (Index).State := Empty;
 
    end Release_Free_Buffer_At;
 
@@ -77,7 +77,6 @@ package body Packet_Mgr is
 
    task body PMH_Buffer_Addr is
    begin
-      Init_Handle_Array;
       loop
          select
             accept Stop;
@@ -88,13 +87,12 @@ package body Packet_Mgr is
                exit;
          or
             accept New_Buffer_Addr (Buffer_Ptr   : in out System.Address) do
-               Buffer_Handler.Handlers (Integer (Buffer_Handler.Current)).State := Full;
-
-               Buffer_Handler.Current := Buffer_Handler.Current + 1;
 
                Buffer_Ptr := Buffer_Handler.Handlers
-                                (Integer (Buffer_Handler.Current)).Handle.Get_Address;
+                                (Buffer_Handler.Current + 1).Handle.Get_Address;
             end New_Buffer_Addr;
+               Buffer_Handler.Handlers (Buffer_Handler.Current).State := Full;
+               Buffer_Handler.Current := Buffer_Handler.Current + 1;
          end select;
       end loop;
    exception
