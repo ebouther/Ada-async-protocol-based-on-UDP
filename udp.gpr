@@ -8,20 +8,20 @@ project udp is
   for Object_Dir use "obj";
   for Exec_Dir use "bin";
 
-  package Binder is
-   for Default_Switches ("ada") use ("-E");
-  end Binder;
+  --  package Binder is
+  --   for Default_Switches ("ada") use ("-E");
+  --  end Binder;
 
-  package Compiler is
-    for Default_Switches ("ada") use ("-g",
-                                      "-O2",
-                                      "-gnatf",
-                                      "-gnaty",
-                                      "-gnatyM122",
-                                      "-gnatwaehl",
-                                      "-gnat12",
-                                      "-gnata");
-  end Compiler;
+  --  package Compiler is
+  --    for Default_Switches ("ada") use ("-g",
+  --                                      "-O2",
+  --                                      "-gnatf",
+  --                                      "-gnaty",
+  --                                      "-gnatyM122",
+  --                                      "-gnatwaehl",
+  --                                      "-gnat12",
+  --                                      "-gnata");
+  --  end Compiler;
 
   for main use ("udp_server.adb", "udp_client.adb");
 

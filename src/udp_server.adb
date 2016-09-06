@@ -1,3 +1,4 @@
+with Ada.Task_Identification;
 with Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Streams;
@@ -77,12 +78,12 @@ procedure UDP_Server is
    begin
       Log_Task.Stop;
       Ack_Task.Stop;
-      Process_Pkt.Stop;
-      PMH_Buffer_Task.Stop;
       Remove_Task.Stop;
       Append_Task.Stop;
-      delay 0.1;
+      PMH_Buffer_Task.Stop;
       Recv_Socket_Task.Stop;
+      Process_Pkt.Stop;
+
    end Stop_Server;
 
    procedure Init_Udp;
@@ -185,9 +186,16 @@ procedure UDP_Server is
       loop
          select
             accept Stop;
-            exit;
+               Ada.Task_Identification.Abort_Task (Ada.Task_Identification.Current_Task);
+               exit;
          else
-            Buffer.Remove_First_Wait (Data_Addr);
+            select
+               Buffer.Remove_First_Wait (Data_Addr);
+            or
+               delay 5.0;
+               Ada.Text_IO.Put_Line ("Aborting Process_Packets.");
+               exit;
+            end select;
             declare
                Data     : Base_Udp.Packet_Stream;
                Seq_Nb   : Base_Udp.Header;
@@ -260,8 +268,8 @@ begin
    Process_Pkt.Start;
    Ack_Task.Start;
 
-   --  delay 20.0;
-   --  Stop_Server;
+   delay 40.0;
+   Stop_Server;
 
 exception
    when E : others =>
