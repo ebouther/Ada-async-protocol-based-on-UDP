@@ -3,17 +3,16 @@ with System;
 with Base_Udp;
 with Buffers.Local;
 
-
 package Packet_Mgr is
 
    type Handle_Index is mod Base_Udp.PMH_Buf_Nb;
 
    type State_Enum is (Empty, Near_Full, Full);
 
-   type Handler is
+   type Handler is limited
       record
-         Handle   : Buffers.Buffer_Handle_Type;
-         State    : State_Enum := Empty;
+         Handle    : Buffers.Buffer_Handle_Type;
+         State     : State_Enum := Empty;
       end record;
 
    --  Do not forget to check if current = first after a complete cycle
@@ -27,13 +26,13 @@ package Packet_Mgr is
    type Buf_Handler is
       record
          Buffer      : aliased Buffers.Local.Local_Buffer_Type;
-         Handle      : Handle_Array;
+         Handlers    : Handle_Array;
          First       : Handle_Index;
          Current     : Handle_Index;
       end record;
 
    procedure Init_Handle_Array;
-   procedure Release_Free_Buffer_At (Index : Handle_Index);
+   procedure Release_Free_Buffer_At (Index : in Handle_Index);
    procedure Get_Filled_Buf;
 
    --  task Release_Full_Buf;
