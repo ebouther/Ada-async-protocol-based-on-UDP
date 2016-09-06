@@ -96,7 +96,8 @@ begin
    if Ada.Command_Line.Argument_Count = 0 then
       Address.Addr := GNAT.Sockets.Inet_Addr ("127.0.0.1");
    else
-      Address.Addr := GNAT.Sockets.Inet_Addr (Ada.Command_Line.Argument (1));
+      Address.Addr := GNAT.Sockets.Inet_Addr
+                                 (Ada.Command_Line.Argument (1));
    end if;
    GNAT.Sockets.Create_Socket (Socket,
                                GNAT.Sockets.Family_Inet,

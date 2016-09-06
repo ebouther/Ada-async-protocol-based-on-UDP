@@ -52,7 +52,6 @@ procedure UDP_Server is
    Log_Task             : Timer;
 
    PMH_Buffer_Task      : Packet_Mgr.PMH_Buffer_Addr;
-   Release_Buf_Task     : Packet_Mgr.Release_First_Buf;
 
    Server               : Socket_Type;
    Address, From        : Sock_Addr_Type;
@@ -142,6 +141,7 @@ procedure UDP_Server is
       Watchdog    : Natural := 0;
       Data_Addr   : System.Address;
       I           : Integer := Base_Udp.Pkt_Max + 1;
+
       use type Interfaces.C.int;
       use System.Storage_Elements;
    begin
@@ -149,10 +149,15 @@ procedure UDP_Server is
       loop
          select
             accept Stop;
-            exit;
+               exit;
          else
             if I > Base_Udp.Pkt_Max then
-               PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
+               select
+                  PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
+               or
+                  delay 0.1;
+                  Ada.Text_IO.Put_Line ("New_Buffer_Addr Takes too much time");
+               end select;
                I := 0;
             end if;
 
@@ -172,8 +177,8 @@ procedure UDP_Server is
             end;
          end select;
       end loop;
-
    end Recv_Socket;
+
 
    task body Process_Packets is
       use type Ada.Calendar.Time;
@@ -222,22 +227,20 @@ procedure UDP_Server is
                         --  New_Seq := True;
                      end if;
 
-                        Append_Task.Append (Packet_Number,
-                                             Seq_Nb,
-                                             From);
+                        --  Append_Task.Append (Packet_Number,
+                        --                       Seq_Nb,
+                        --                       From);
                         Packet_Number := Seq_Nb;
                   end if;
 
                   if Seq_Nb >= Base_Udp.Pkt_Max then
                      Packet_Number := 0;
 
-                     Ada.Text_IO.Put_Line ("---  Release  ---");
-                     Release_Buf_Task.Release;
-
                      ---  New_Seq := True;
                   else
                      Packet_Number := Packet_Number + 1;
                   end if;
+
                end if;
             end;
          end select;
