@@ -35,6 +35,9 @@ package Packet_Mgr is
                                 Length : Integer);
    procedure Get_Filled_Buf;
 
+   task type Release_First_Buf is
+      entry Release;
+   end Release_First_Buf;
 
    task type Store_Packet_Task is
       entry Stop;

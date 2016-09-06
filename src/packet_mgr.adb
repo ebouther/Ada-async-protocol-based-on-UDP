@@ -58,8 +58,10 @@ package body Packet_Mgr is
    begin
       Handler := Handle_Vector.Element (Cursor);
 
+      Ada.Text_IO.Put_Line ("Release Free Buffer");
       Buffer_Handler.Buffer.Release_Free_Buffer (Handler.all);
 
+      Ada.Text_IO.Put_Line ("Free Handler");
       Free_Buffer_Handle (Handler);
 
    end Release_Free_Buffer_At;
@@ -79,10 +81,29 @@ package body Packet_Mgr is
       Buffers.Set_Used_Bytes (Handler.all,
                               Packet_Buffers.To_Bytes (Length));
 
-      Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
-                                     Position   => Cursor,
-                                     New_Item   => Handler);
+      --  Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
+      --                                 Position   => Cursor,
+      --                                 New_Item   => Handler);
    end Set_Used_Bytes_At;
+
+   -------------------------
+   --  Release_First_Buf  --
+   -------------------------
+
+   task body Release_First_Buf is
+
+   begin
+      loop
+         accept Release;
+            Set_Used_Bytes_At (Handle_Vector.First (Buffer_Handler.Handle), Integer (Base_Udp.Sequence_Size));
+
+            Release_Free_Buffer_At (Handle_Vector.First (Buffer_Handler.Handle));
+            Buffer_Handler.Handle.Delete_First;
+
+            Get_Filled_Buf;
+      end loop;
+   end Release_First_Buf;
+
 
    -------------------------
    --  Store_Packet_Task  --
@@ -93,43 +114,20 @@ package body Packet_Mgr is
    begin
       Init_Buffer;
       loop
-         Set_Used_Bytes_At (Buffer_Handler.Prod_Cursor, Integer (Base_Udp.Sequence_Size));
-
-         Ada.Text_IO.Put_Line ("*** Release Buffer ***");
-         Release_Free_Buffer_At (Buffer_Handler.Prod_Cursor);
-         Buffer_Handler.Handle.Delete (Buffer_Handler.Prod_Cursor);
-
-         --  Get_Filled_Buf;
-
-         Ada.Text_IO.Put_Line ("*** Create a New Handler with New Buffer ***");
-         Append_New_Buffer;
-
-         declare -- Should redeclare Data_Array only on new sequence
-            type Data_Array is new
-               Packet_Buffers.Element_Array
-                  (1 .. Packet_Buffers.To_Word_Count
-                     (Buffers.Get_Available_Bytes
-                        (Handle_Vector.Element (Buffer_Handler.Prod_Cursor).all)));
-
-               Datas : Data_Array;
-               for Datas'Address use Buffers.Get_Address
-                  (Handle_Vector.Element (Buffer_Handler.Prod_Cursor).all);
-         begin
-
-            select
-               accept Stop;
+         select
+            accept Stop;
                Set_Used_Bytes_At (Buffer_Handler.Prod_Cursor, Integer (Base_Udp.Sequence_Size));
-
                Ada.Text_IO.Put_Line ("*** Released Buffer before Quitting Task ***");
                Release_Free_Buffer_At (Buffer_Handler.Prod_Cursor);
                Buffer_Handler.Handle.Delete (Buffer_Handler.Prod_Cursor);
                exit;
-            or
-               accept New_Buffer_Addr (Buffer_Ptr   : in out System.Address) do
-                  Buffer_Ptr := Datas (Datas'First)'Address;
-               end New_Buffer_Addr;
-            end select;
-         end;
+         or
+            accept New_Buffer_Addr (Buffer_Ptr   : in out System.Address) do
+               Buffer_Ptr := Handle_Vector.Element (Buffer_Handler.Prod_Cursor).Get_Address;
+            end New_Buffer_Addr;
+               Ada.Text_IO.Put_Line ("*** Create a New Handler with New Buffer ***");
+               Append_New_Buffer;
+         end select;
       end loop;
    exception
       when E : others =>
@@ -150,9 +148,14 @@ package body Packet_Mgr is
          use Packet_Buffers;
          Handler  : Buffers.Buffer_Handle_Type;
       begin
-
-         Buffer_Handler.Buffer.Get_Full_Buffer (Handler);
-
+         select
+            Buffer_Handler.Buffer.Get_Full_Buffer (Handler);
+            Ada.Text_IO.Put_Line ("---  Got Filled Buffer ---");
+         or
+            delay 1.0;
+            Ada.Text_IO.Put_Line ("-x-  No Buf -x-");
+            return;
+         end select;
          declare
             type Data_Array is new Element_Array
                (1 .. To_Word_Count

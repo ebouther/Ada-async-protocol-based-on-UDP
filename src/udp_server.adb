@@ -32,25 +32,14 @@ procedure UDP_Server is
    end Timer;
 
    task type Process_Packets is
-      --  pragma Priority (System.Priority'Last - 1);
       entry Start;
       entry Stop;
    end Process_Packets;
 
    task type Recv_Socket is
-      --  pragma Priority (System.Priority'Last);
       entry Start;
       entry Stop;
    end Recv_Socket;
-
-
-   --  type Socket_Data is
-   --     record
-   --        Data  : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
-   --        From  : Sock_Addr_Type;
-   --     end record;
-
-   Store_Packet_Task    : Packet_Mgr.Store_Packet_Task;
 
 
    package Sync_Queue is new Queue (System.Address);
@@ -61,6 +50,9 @@ procedure UDP_Server is
    Ack_Task             : Reliable_Udp.Ack_Task;
    Recv_Socket_Task     : Recv_Socket;
    Log_Task             : Timer;
+
+   Store_Packet_Task    : Packet_Mgr.Store_Packet_Task;
+   Release_Buf_Task     : Packet_Mgr.Release_First_Buf;
 
    Server               : Socket_Type;
    Address, From        : Sock_Addr_Type;
@@ -237,18 +229,17 @@ procedure UDP_Server is
                         Packet_Number := Seq_Nb;
                   end if;
 
-                  if Seq_Nb = Base_Udp.Pkt_Max then
+                  if Seq_Nb >= Base_Udp.Pkt_Max then
                      Packet_Number := 0;
+
+                     Ada.Text_IO.Put_Line ("---  Release  ---");
+                     Release_Buf_Task.Release;
+
                      ---  New_Seq := True;
                   else
                      Packet_Number := Packet_Number + 1;
                   end if;
                end if;
-                 ---   Store_Packet_Task.Store (Data        => Data,
-                 ---                            New_Sequence  => New_Seq,
-                 ---                            Is_Ack        => False);
-
-               --  Base_Udp.Free_Stream (Data);
             end;
          end select;
       end loop;
