@@ -11,7 +11,7 @@ package body Packet_Mgr is
 
 
    Buffer_Handler : Buf_Handler;
-
+   Packet_Nb  : Base_Udp.Header := 0;
 
    -------------------
    --  Init_Buffer  --
@@ -20,7 +20,7 @@ package body Packet_Mgr is
    procedure Init_Buffer is
    begin
 
-      Buffer_Handler.Buffer.Initialise (10, Size => Buffers.Buffer_Size_Type
+      Buffer_Handler.Buffer.Initialise (Base_Udp.PMH_Buf_Nb, Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
 
       Append_New_Buffer;
@@ -58,10 +58,8 @@ package body Packet_Mgr is
    begin
       Handler := Handle_Vector.Element (Cursor);
 
-      Ada.Text_IO.Put_Line ("Release Free Buffer");
       Buffer_Handler.Buffer.Release_Free_Buffer (Handler.all);
 
-      Ada.Text_IO.Put_Line ("Free Handler");
       Free_Buffer_Handle (Handler);
 
    end Release_Free_Buffer_At;
@@ -81,9 +79,6 @@ package body Packet_Mgr is
       Buffers.Set_Used_Bytes (Handler.all,
                               Packet_Buffers.To_Bytes (Length));
 
-      --  Handle_Vector.Replace_Element (Container  => Buffer_Handler.Handle,
-      --                                 Position   => Cursor,
-      --                                 New_Item   => Handler);
    end Set_Used_Bytes_At;
 
    -------------------------
@@ -100,16 +95,16 @@ package body Packet_Mgr is
             Release_Free_Buffer_At (Handle_Vector.First (Buffer_Handler.Handle));
             Buffer_Handler.Handle.Delete_First;
 
-            Get_Filled_Buf;
+            --  Get_Filled_Buf;
       end loop;
    end Release_First_Buf;
 
 
-   -------------------------
-   --  Store_Packet_Task  --
-   -------------------------
+   -----------------------
+   --  PMH_Buffer_Addr  --
+   -----------------------
 
-   task body Store_Packet_Task is
+   task body PMH_Buffer_Addr is
 
    begin
       Init_Buffer;
@@ -135,7 +130,7 @@ package body Packet_Mgr is
             Ada.Exceptions.Exception_Name (E) &
             " message : " &
             Ada.Exceptions.Exception_Message (E));
-   end Store_Packet_Task;
+   end PMH_Buffer_Addr;
 
 
    ----------------------

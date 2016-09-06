@@ -51,7 +51,7 @@ procedure UDP_Server is
    Recv_Socket_Task     : Recv_Socket;
    Log_Task             : Timer;
 
-   Store_Packet_Task    : Packet_Mgr.Store_Packet_Task;
+   PMH_Buffer_Task      : Packet_Mgr.PMH_Buffer_Addr;
    Release_Buf_Task     : Packet_Mgr.Release_First_Buf;
 
    Server               : Socket_Type;
@@ -79,7 +79,7 @@ procedure UDP_Server is
       Log_Task.Stop;
       Ack_Task.Stop;
       Process_Pkt.Stop;
-      Store_Packet_Task.Stop;
+      PMH_Buffer_Task.Stop;
       Remove_Task.Stop;
       Append_Task.Stop;
       delay 0.1;
@@ -152,7 +152,7 @@ procedure UDP_Server is
             exit;
          else
             if I > Base_Udp.Pkt_Max then
-               Store_Packet_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
+               PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
                I := 0;
             end if;
 
@@ -169,7 +169,6 @@ procedure UDP_Server is
                   Watchdog := Watchdog + 1;
                   Ada.Text_IO.Put_Line ("Socket Error");
                   exit when Watchdog = 10;
-
             end;
          end select;
       end loop;
