@@ -1,4 +1,3 @@
-with Ada.Task_Identification;
 with Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Streams;
@@ -140,6 +139,59 @@ procedure UDP_Server is
       end loop;
    end Timer;
 
+
+
+   procedure Manage_Loss (I         : in Integer;
+                          Data_Addr : in out System.Address;
+                          Data      : in Base_Udp.Packet_Stream;
+                          Nb_Missed : in Interfaces.Unsigned_64);
+
+   procedure Manage_Loss (I         : in Integer;
+                          Data_Addr : in out System.Address;
+                          Data      : in Base_Udp.Packet_Stream;
+                          Nb_Missed : in Interfaces.Unsigned_64) is
+      Last_Addr   :  constant System.Address := Data_Addr;
+      Addr        :  System.Address;
+      Pos               :  Integer;
+
+      use System.Storage_Elements;
+   begin
+      loop
+         if Interfaces.Unsigned_64 (I) + Nb_Missed >= Base_Udp.Sequence_Size then
+            PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
+         end if;
+
+         --  Memcpy Addr I to I + NB_Missed
+         declare
+            Good_Loc_Index :  constant Integer := (I + Integer (Nb_Missed)) mod Integer (Base_Udp.Sequence_Size);
+            Good_Location  :  Base_Udp.Packet_Stream;
+            for Good_Location'Address use Data_Addr + Storage_Offset
+                                                   (Good_Loc_Index * Base_Udp.Load_Size);
+         begin
+            Good_Location := Data;
+         end;
+
+         for N in I .. I + Integer (Nb_Missed) - 1 loop
+            Pos := N;
+            if N >= Integer (Base_Udp.Sequence_Size) and I < Integer (Base_Udp.Sequence_Size) then
+               Addr  := Data_Addr;
+               Pos   := N mod Integer (Base_Udp.Sequence_Size);
+            else
+               Addr  := Last_Addr;
+            end if;
+
+            declare
+               Data_Missed  :  Interfaces.Unsigned_32;
+               for Data_Missed'Address use Addr + Storage_Offset
+                                                   (Pos * Base_Udp.Load_Size);
+            begin
+               Data_Missed := 16#DEAD_BEEF#;
+            end;
+         end loop;
+      end loop;
+   end Manage_Loss;
+
+
    task body Recv_Socket is
       Last        : Ada.Streams.Stream_Element_Offset;
       Watchdog    : Natural := 0;
@@ -152,6 +204,9 @@ procedure UDP_Server is
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (16));
+
+      Packet_Mgr.Init_Handle_Array;
+
       accept Start;
       loop
          select
@@ -175,7 +230,7 @@ procedure UDP_Server is
                for Seq_Nb'Address use Header'Address;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-                  
+
                if Header.Ack then
                   Header.Ack := False;
 
@@ -198,52 +253,19 @@ procedure UDP_Server is
 
                         --  Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb
                         --     + (Base_Udp.Pkt_Max - Packet_Number));
+
                         Ada.Text_IO.Put_Line ("BAD ORDER");
 
                         --  New_Seq := True;
+
                      end if;
+                     Manage_Loss (I, Data_Addr, Data, Nb_Missed);
 
-                     declare
-                        Last_Addr, Addr   :  System.Address := Data_Addr;
-                        Pos               :  Integer;
-                     begin
-                        if Interfaces.Unsigned_64 (I) + Nb_Missed >= Base_Udp.Sequence_Size then
-                           PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
-                        end if;
-
-                        -- Memcpy Addr I to I + NB_Missed
-                        declare
-                           Good_Loc_Index :  Integer := (I + Integer (Nb_Missed)) mod Integer (Base_Udp.Sequence_Size);
-                           Good_Location  :  Base_Udp.Packet_Stream;
-                           for Good_Location'Address use Data_Addr + Storage_Offset
-                                                                  (Good_Loc_Index * Base_Udp.Load_Size);
-                        begin
-                           Good_Location := Data;
-                        end;
-
-                        for N in I .. I + Integer (Nb_Missed) - 1 loop
-                           Pos := N;
-                           if N >= Integer (Base_Udp.Sequence_Size) and I < Integer (Base_Udp.Sequence_Size) then
-                              Addr  := Data_Addr;
-                              Pos   := N mod Integer (Base_Udp.Sequence_Size);
-                           else
-                              Addr  := Last_Addr;
-                           end if;
-
-                           declare
-                              Data_Missed  :  Interfaces.Unsigned_32;
-                              for Data_Missed'Address use Addr + Storage_Offset
-                                                                  (Pos * Base_Udp.Load_Size);
-                           begin
-                              Data_Missed := 16#DEAD_BEEF#;
-                           end;
-                        end loop;
-                     end;
                      I := I + Integer (Nb_Missed);
 
-                     Append_Task.Append (Packet_Number,
-                                          Seq_Nb,
-                                          From);
+                     --  Append_Task.Append (Packet_Number,
+                     --                       Seq_Nb,
+                     --                       From);
                      Packet_Number := Seq_Nb;
                   end if;
 
@@ -269,33 +291,6 @@ procedure UDP_Server is
       end loop;
    end Recv_Socket;
 
-
-   --  task body Process_Packets is
-   --     use type Ada.Calendar.Time;
-
-   --     Data_Addr   : System.Address;
-
-   --  begin
-   --     System.Multiprocessors.Dispatching_Domains.Set_CPU
-   --        (System.Multiprocessors.CPU_Range (15));
-   --     accept Start;
-   --     loop
-   --        select
-   --           accept Stop;
-   --              Ada.Task_Identification.Abort_Task (Ada.Task_Identification.Current_Task);
-   --              exit;
-   --        else
-   --           select
-   --              Buffer.Remove_First_Wait (Data_Addr);
-   --           or
-   --              delay 20.0;
-   --              Ada.Text_IO.Put_Line ("Aborting Process_Packets.");
-   --              exit;
-   --           end select;
-   --                    end select;
-   --     end loop;
-   --  end Process_Packets;
-
 begin
 
    Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "log.csv");
@@ -308,8 +303,6 @@ begin
    end if;
 
    Init_Udp;
-
-   Packet_Mgr.Init_Handle_Array;
 
    Log_Task.Start;
    Recv_Socket_Task.Start;

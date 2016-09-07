@@ -21,23 +21,25 @@ package body Packet_Mgr is
    procedure Init_Handle_Array is
    begin
 
-      Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb + 1, Size => Buffers.Buffer_Size_Type
+      Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb, Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
 
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
 
-      -- Is incremented to First when Recv_Packets asks for new Buf
+      --  Is incremented to First when Recv_Packets asks for new Buf
       Buffer_Handler.Current := Buffer_Handler.Handlers'Last;
 
       for I in Buffer_Handler.Handlers'Range loop
          Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (I).Handle);
          declare
-            Message : Interfaces.Unsigned_32;
+            Message : Base_Udp.Packet_Payload;
             for Message'Address use Buffer_Handler.Handlers (I).Handle.Get_Address;
          begin
-            Message := 16#FADA_DADA#;
+            Message (Message'First) := 16#FA#;
+            Message (Message'Last) := 16#DA#;
          end;
       end loop;
+      Ada.Text_IO.Put_Line ("_Initialization Finished_");
 
    end Init_Handle_Array;
 
@@ -84,7 +86,7 @@ package body Packet_Mgr is
 
             Buffer_Handler.First := Buffer_Handler.First + 1;
 
-            Get_Filled_Buf;
+            --  Get_Filled_Buf;
 
          end if;
       end loop;
@@ -116,8 +118,6 @@ package body Packet_Mgr is
                Buffer_Handler.Handlers (Buffer_Handler.Current).State := Full;
 
                Buffer_Handler.Current := Buffer_Handler.Current + 1;
-               Ada.Text_IO.Put_Line ("New Current : " & Buffer_Handler.Current'Img);
-               
          end select;
       end loop;
    exception

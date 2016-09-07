@@ -13,15 +13,14 @@ project udp is
   --  end Binder;
 
   package Compiler is
-      for Default_Switches ("ada") use ("-O2");
-  --    for Default_Switches ("ada") use ("-g",
-  --                                      "-O2",
-  --                                      "-gnatf",
-  --                                      "-gnaty",
-  --                                      "-gnatyM122",
-  --                                      "-gnatwaehl",
-  --                                      "-gnat12",
-  --                                      "-gnata");
+   for Default_Switches ("ada") use ("-g",
+                                    "-O2",
+                                    "-gnatf",
+                                    "-gnaty",
+                                    "-gnatyM122",
+                                    "-gnatwaehl",
+                                    "-gnat12",
+                                    "-gnata");
   end Compiler;
 
   for main use ("udp_server.adb", "udp_client.adb");
