@@ -6,7 +6,7 @@ with Buffers.Local;
 package Packet_Mgr is
 
    --  Number of pmh buffers initialized
-   PMH_Buf_Nb     : constant := 256;
+   PMH_Buf_Nb     : constant := 8;
 
    type Handle_Index is mod PMH_Buf_Nb;
 
@@ -38,7 +38,7 @@ package Packet_Mgr is
    procedure Release_Free_Buffer_At (Index : in Handle_Index);
    procedure Get_Filled_Buf;
 
-   --  task Release_Full_Buf;
+   task Release_Full_Buf;
 
    task type PMH_Buffer_Addr is
       entry Stop;

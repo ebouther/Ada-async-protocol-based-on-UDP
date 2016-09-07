@@ -114,6 +114,8 @@ procedure UDP_Server is
    task body Timer is
       use type Ada.Calendar.Time;
    begin
+      System.Multiprocessors.Dispatching_Domains.Set_CPU
+         (System.Multiprocessors.CPU_Range (14));
       accept Start;
       loop
          select
@@ -146,6 +148,8 @@ procedure UDP_Server is
       use type Interfaces.C.int;
       use System.Storage_Elements;
    begin
+      System.Multiprocessors.Dispatching_Domains.Set_CPU
+         (System.Multiprocessors.CPU_Range (16));
       accept Start;
       loop
          select
@@ -182,6 +186,8 @@ procedure UDP_Server is
       Data_Addr   : System.Address;
 
    begin
+      System.Multiprocessors.Dispatching_Domains.Set_CPU
+         (System.Multiprocessors.CPU_Range (15));
       accept Start;
       loop
          select
@@ -258,7 +264,7 @@ begin
 
    if Ada.Command_Line.Argument_Count = 1 then
       System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range'Value (Ada.Command_Line.Argument (1)));
+         (System.Multiprocessors.CPU_Range (2));
    end if;
 
    Init_Udp;
@@ -268,8 +274,8 @@ begin
    Process_Pkt.Start;
    Ack_Task.Start;
 
-   delay 40.0;
-   Stop_Server;
+   --  delay 40.0;
+   --  Stop_Server;
 
 exception
    when E : others =>

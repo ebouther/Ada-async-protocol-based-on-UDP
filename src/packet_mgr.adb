@@ -1,6 +1,7 @@
 with Ada.Text_IO;
 with Interfaces;
 with Ada.Exceptions;
+with System.Multiprocessors.Dispatching_Domains;
 
 package body Packet_Mgr is
 
@@ -22,7 +23,6 @@ package body Packet_Mgr is
 
       Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb, Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
-
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
       Buffer_Handler.Current := Buffer_Handler.Handlers'First;
 
@@ -40,8 +40,6 @@ package body Packet_Mgr is
    procedure Release_Free_Buffer_At (Index : in Handle_Index) is
    begin
 
-      --  Provoke a GNAT Bug Detected
-
       Buffer_Handler.Buffer.Release_Free_Buffer
                         (Buffer_Handler.Handlers
                            (Index).Handle);
@@ -51,24 +49,31 @@ package body Packet_Mgr is
    end Release_Free_Buffer_At;
 
 
-   --     -----------------------
-   --     --  Release_Full_Buf  --
-   --     -----------------------
+   -----------------------
+   --  Release_Full_Buf  --
+   -----------------------
 
-   --     task body Release_Full_Buf is
+   task body Release_Full_Buf is
 
-   --     begin
-   --        loop
+   begin
+      System.Multiprocessors.Dispatching_Domains.Set_CPU
+         (System.Multiprocessors.CPU_Range (11));
+      loop
+            
+            if Buffer_Handler.Handlers (Buffer_Handler.First).State = Full then
+               Buffers.Set_Used_Bytes (Buffer_Handler.Handlers (Buffer_Handler.First).Handle,
+                                 Packet_Buffers.To_Bytes (Integer (Base_Udp.Sequence_Size)));
 
-   --              Buffers.Set_Used_Bytes (Buffer_Handler.Handlers (Integer (Index)).Handle,
-   --                                Packet_Buffers.To_Bytes (Length));
+               Release_Free_Buffer_At (Buffer_Handler.First);
+               Buffer_Handler.First := Buffer_Handler.First + 1;
+                  
+               Get_Filled_Buf;
 
-   --              Release_Free_Buffer_At (Buffer_Handler.Handlers));
-   --              Buffer_Handler.Handlers.Delete_First;
-
-   --              --  Get_Filled_Buf;
-   --        end loop;
-   --     end Release_Full_Buf;
+               --  Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (I).Handle);
+               
+            end if;
+      end loop;
+   end Release_Full_Buf;
 
 
    -----------------------
@@ -77,6 +82,8 @@ package body Packet_Mgr is
 
    task body PMH_Buffer_Addr is
    begin
+      System.Multiprocessors.Dispatching_Domains.Set_CPU
+         (System.Multiprocessors.CPU_Range (12));
       loop
          select
             accept Stop;
