@@ -38,7 +38,9 @@ package Packet_Mgr is
    procedure Release_Free_Buffer_At (Index : in Handle_Index);
    procedure Get_Filled_Buf;
 
-   task Release_Full_Buf;
+   task type Release_Full_Buf is
+      entry Start;
+   end Release_Full_Buf;
 
    task type PMH_Buffer_Addr is
       entry Stop;

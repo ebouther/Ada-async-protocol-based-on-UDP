@@ -32,10 +32,10 @@ procedure UDP_Server is
       entry Stop;
    end Timer;
 
-   task type Process_Packets is
-      entry Start;
-      entry Stop;
-   end Process_Packets;
+   --  task type Process_Packets is
+   --     entry Start;
+   --     entry Stop;
+   --  end Process_Packets;
 
    task type Recv_Socket is
       entry Start;
@@ -53,6 +53,7 @@ procedure UDP_Server is
    Log_Task             : Timer;
 
    PMH_Buffer_Task      : Packet_Mgr.PMH_Buffer_Addr;
+   Release_Buf_Task     : Packet_Mgr.Release_Full_Buf;
 
    Server               : Socket_Type;
    Address, From        : Sock_Addr_Type;
@@ -64,7 +65,7 @@ procedure UDP_Server is
    Last_Nb              : Interfaces.Unsigned_64 := 0;
    Nb_Output            : Natural := 0;
    Log_File             : Ada.Text_IO.File_Type;
-   Process_Pkt          : Process_Packets;
+   --  Process_Pkt          : Process_Packets;
    Busy                 : Interfaces.C.int := 50;
    Opt_Return           : Interfaces.C.int;
 
@@ -82,7 +83,7 @@ procedure UDP_Server is
       Append_Task.Stop;
       PMH_Buffer_Task.Stop;
       Recv_Socket_Task.Stop;
-      Process_Pkt.Stop;
+      --  Process_Pkt.Stop;
 
    end Stop_Server;
 
@@ -144,6 +145,7 @@ procedure UDP_Server is
       Watchdog    : Natural := 0;
       Data_Addr   : System.Address;
       I           : Integer := Base_Udp.Pkt_Max + 1;
+      Nb_Missed   : Interfaces.Unsigned_64;
 
       use type Interfaces.C.int;
       use System.Storage_Elements;
@@ -158,16 +160,78 @@ procedure UDP_Server is
          else
             if I > Base_Udp.Pkt_Max then
                PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
-               I := 0;
+               I := I mod Base_Udp.Pkt_Max;
             end if;
 
             declare
-               Data  : Base_Udp.Packet_Stream;
+               Data     : Base_Udp.Packet_Stream;
+
+               Seq_Nb   : Base_Udp.Header;
+               Header   : Reliable_Udp.Header;
+
                for Data'Address use Data_Addr + Storage_Offset
                                                    (I * Base_Udp.Load_Size);
+               for Header'Address use Data'Address;
+               for Seq_Nb'Address use Header'Address;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-               Buffer.Append_Wait (Data'Address);
+                  
+               if Header.Ack then
+                  Header.Ack := False;
+
+                  Remove_Task.Remove (Seq_Nb);
+                  I := I - 1;
+               else
+                  ---  New_Seq := False;
+                  Nb_Packet_Received := Nb_Packet_Received + 1;
+                  if Nb_Packet_Received = 1 then
+                     Start_Time := Ada.Calendar.Clock;
+                  end if;
+
+                  if Seq_Nb /= Packet_Number then
+                     if Seq_Nb > Packet_Number then
+                        Nb_Missed := Interfaces.Unsigned_64 (Seq_Nb - Packet_Number);
+                        Missed := Missed + Nb_Missed;
+                     else
+                        --  Doesn't manage disordered packets
+                        --  if a packet is received before the previous sent.
+
+                        --  Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb
+                        --     + (Base_Udp.Pkt_Max - Packet_Number));
+                        Ada.Text_IO.Put_Line ("BAD ORDER");
+
+                        --  New_Seq := True;
+                     end if;
+
+                     -- memcpy Addr I to I + NB_Missed and then :
+                     --  for N in I .. I + Integer (Nb_Missed) - 1 loop
+                     --     declare
+                     --        Data_Missed  :  Base_Udp.Packet_Stream;
+                     --        for Data_Missed'Address use Data_Addr + Storage_Offset
+                     --                                            (N * Base_Udp.Load_Size);
+                     --     begin
+                     --        Data_Missed (1) := 16#BA#;
+                     --     end;
+                     --  end loop;
+
+                     --  I := I + Integer (Nb_Missed);
+                     --  Append_Task.Append (Packet_Number,
+                     --                       Seq_Nb,
+                     --                       From);
+                     Packet_Number := Seq_Nb;
+                  end if;
+
+                  if Seq_Nb >= Base_Udp.Pkt_Max then
+                     Packet_Number := 0;
+
+                     ---  New_Seq := True;
+                  else
+                     Packet_Number := Packet_Number + 1;
+                  end if;
+
+               end if;
+
+               --  Buffer.Append_Wait (Data'Address);
                I := I + 1;
             exception
                when Socket_Error =>
@@ -180,81 +244,31 @@ procedure UDP_Server is
    end Recv_Socket;
 
 
-   task body Process_Packets is
-      use type Ada.Calendar.Time;
+   --  task body Process_Packets is
+   --     use type Ada.Calendar.Time;
 
-      Data_Addr   : System.Address;
+   --     Data_Addr   : System.Address;
 
-   begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (15));
-      accept Start;
-      loop
-         select
-            accept Stop;
-               Ada.Task_Identification.Abort_Task (Ada.Task_Identification.Current_Task);
-               exit;
-         else
-            select
-               Buffer.Remove_First_Wait (Data_Addr);
-            or
-               delay 5.0;
-               Ada.Text_IO.Put_Line ("Aborting Process_Packets.");
-               exit;
-            end select;
-            declare
-               Data     : Base_Udp.Packet_Stream;
-               Seq_Nb   : Base_Udp.Header;
-               Header   : Reliable_Udp.Header;
-
-               for Data'Address use Data_Addr;
-               for Header'Address use Data'Address;
-               for Seq_Nb'Address use Header'Address;
-            begin
-               if Header.Ack then
-                  Header.Ack := False;
-
-                  Remove_Task.Remove (Seq_Nb);
-               else
-                  ---  New_Seq := False;
-                  Nb_Packet_Received := Nb_Packet_Received + 1;
-                  if Nb_Packet_Received = 1 then
-                     Start_Time := Ada.Calendar.Clock;
-                  end if;
-
-                  if Seq_Nb /= Packet_Number then
-                     if Seq_Nb > Packet_Number then
-                        Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb - Packet_Number);
-                     else
-                        --  Doesn't manage disordered packets
-                        --  if a packet is received before the previous sent.
-
-                        --  Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb
-                        --     + (Base_Udp.Pkt_Max - Packet_Number));
-                        Ada.Text_IO.Put_Line ("BAD ORDER");
-
-                        --  New_Seq := True;
-                     end if;
-
-                        --  Append_Task.Append (Packet_Number,
-                        --                       Seq_Nb,
-                        --                       From);
-                        Packet_Number := Seq_Nb;
-                  end if;
-
-                  if Seq_Nb >= Base_Udp.Pkt_Max then
-                     Packet_Number := 0;
-
-                     ---  New_Seq := True;
-                  else
-                     Packet_Number := Packet_Number + 1;
-                  end if;
-
-               end if;
-            end;
-         end select;
-      end loop;
-   end Process_Packets;
+   --  begin
+   --     System.Multiprocessors.Dispatching_Domains.Set_CPU
+   --        (System.Multiprocessors.CPU_Range (15));
+   --     accept Start;
+   --     loop
+   --        select
+   --           accept Stop;
+   --              Ada.Task_Identification.Abort_Task (Ada.Task_Identification.Current_Task);
+   --              exit;
+   --        else
+   --           select
+   --              Buffer.Remove_First_Wait (Data_Addr);
+   --           or
+   --              delay 20.0;
+   --              Ada.Text_IO.Put_Line ("Aborting Process_Packets.");
+   --              exit;
+   --           end select;
+   --                    end select;
+   --     end loop;
+   --  end Process_Packets;
 
 begin
 
@@ -268,10 +282,13 @@ begin
    end if;
 
    Init_Udp;
+
    Packet_Mgr.Init_Handle_Array;
+
    Log_Task.Start;
    Recv_Socket_Task.Start;
-   Process_Pkt.Start;
+   Release_Buf_Task.Start;
+   --  Process_Pkt.Start;
    Ack_Task.Start;
 
    --  delay 40.0;

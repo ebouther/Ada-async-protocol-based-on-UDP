@@ -21,13 +21,22 @@ package body Packet_Mgr is
    procedure Init_Handle_Array is
    begin
 
-      Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb, Size => Buffers.Buffer_Size_Type
+      Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb + 1, Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
+
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
-      Buffer_Handler.Current := Buffer_Handler.Handlers'First;
+
+      -- Is incremented to First when Recv_Packets asks for new Buf
+      Buffer_Handler.Current := Buffer_Handler.Handlers'Last;
 
       for I in Buffer_Handler.Handlers'Range loop
          Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (I).Handle);
+         declare
+            Message : Interfaces.Unsigned_32;
+            for Message'Address use Buffer_Handler.Handlers (I).Handle.Get_Address;
+         begin
+            Message := 16#FADA_DADA#;
+         end;
       end loop;
 
    end Init_Handle_Array;
@@ -40,6 +49,9 @@ package body Packet_Mgr is
    procedure Release_Free_Buffer_At (Index : in Handle_Index) is
    begin
 
+      Buffers.Set_Used_Bytes (Buffer_Handler.Handlers (Index).Handle,
+               Packet_Buffers.To_Bytes (Integer (Base_Udp.Sequence_Size)));
+
       Buffer_Handler.Buffer.Release_Free_Buffer
                         (Buffer_Handler.Handlers
                            (Index).Handle);
@@ -49,29 +61,34 @@ package body Packet_Mgr is
    end Release_Free_Buffer_At;
 
 
-   -----------------------
-   --  Release_Full_Buf  --
-   -----------------------
+  -----------------------
+  --  Release_Full_Buf  --
+  -----------------------
 
    task body Release_Full_Buf is
 
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (11));
+      accept Start;
       loop
-            
-            if Buffer_Handler.Handlers (Buffer_Handler.First).State = Full then
-               Buffers.Set_Used_Bytes (Buffer_Handler.Handlers (Buffer_Handler.First).Handle,
-                                 Packet_Buffers.To_Bytes (Integer (Base_Udp.Sequence_Size)));
+         delay 0.000001;
+         if Buffer_Handler.Handlers (Buffer_Handler.First).State = Full then
+            Ada.Text_IO.Put_Line (" *** Release first Buf *** ");
+--              Buffers.Set_Used_Bytes (Buffer_Handler.Handlers (Buffer_Handler.First).Handle,
+--                                Packet_Buffers.To_Bytes (Integer (Base_Udp.Sequence_Size)));
 
-               Release_Free_Buffer_At (Buffer_Handler.First);
-               Buffer_Handler.First := Buffer_Handler.First + 1;
-                  
-               Get_Filled_Buf;
+            Release_Free_Buffer_At (Buffer_Handler.First);
 
-               --  Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (I).Handle);
-               
-            end if;
+            Buffer_Handler.Handlers (Buffer_Handler.First).Handle.Reuse;
+
+            Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (Buffer_Handler.First).Handle);
+
+            Buffer_Handler.First := Buffer_Handler.First + 1;
+
+            Get_Filled_Buf;
+
+         end if;
       end loop;
    end Release_Full_Buf;
 
@@ -99,7 +116,13 @@ package body Packet_Mgr is
                                 (Buffer_Handler.Current + 1).Handle.Get_Address;
             end New_Buffer_Addr;
                Buffer_Handler.Handlers (Buffer_Handler.Current).State := Full;
+
+               --  Buffers.Set_Used_Bytes (Buffer_Handler.Handlers (Buffer_Handler.Current).Handle,
+               --           Packet_Buffers.To_Bytes (Integer (Base_Udp.Sequence_Size)));
+
                Buffer_Handler.Current := Buffer_Handler.Current + 1;
+               Ada.Text_IO.Put_Line ("New Current : " & Buffer_Handler.Current'Img);
+               
          end select;
       end loop;
    exception
@@ -138,20 +161,22 @@ package body Packet_Mgr is
 
             for Datas'Address use Buffers.Get_Address (Handle);
          begin
-            for I in Datas'Range loop
-               declare
-                  Pkt_Nb   : Base_Udp.Header;
-                  for Pkt_Nb'Address use Datas (I)'Address;
-               begin
-                  Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) :" &
-                     Pkt_Nb'Img);
-               end;
-            end loop;
+            --  for I in Datas'Range loop
+            declare
+               First_Pkt_Nb   : Base_Udp.Header;
+               Last_Pkt_Nb   : Base_Udp.Header;
+               for First_Pkt_Nb'Address use Datas (Datas'First)'Address;
+               for Last_Pkt_Nb'Address use Datas (Datas'Last)'Address;
+            begin
+               Ada.Text_IO.Put_Line ("Buffer (" & Datas'First'Img & " ) :" &
+                  First_Pkt_Nb'Img);
+               Ada.Text_IO.Put_Line ("Buffer (" & Datas'Last'Img & " ) :" &
+                  Last_Pkt_Nb'Img);
+            end;
+            --  end loop;
          end;
 
          Buffer_Handler.Buffer.Release_Full_Buffer (Handle);
-
-         Buffers.Reuse (Handle);
 
       exception
          when E : others =>
