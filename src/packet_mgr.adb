@@ -75,8 +75,6 @@ package body Packet_Mgr is
          delay 0.000001;
          if Buffer_Handler.Handlers (Buffer_Handler.First).State = Full then
             Ada.Text_IO.Put_Line (" *** Release first Buf *** ");
---              Buffers.Set_Used_Bytes (Buffer_Handler.Handlers (Buffer_Handler.First).Handle,
---                                Packet_Buffers.To_Bytes (Integer (Base_Udp.Sequence_Size)));
 
             Release_Free_Buffer_At (Buffer_Handler.First);
 
@@ -116,9 +114,6 @@ package body Packet_Mgr is
                                 (Buffer_Handler.Current + 1).Handle.Get_Address;
             end New_Buffer_Addr;
                Buffer_Handler.Handlers (Buffer_Handler.Current).State := Full;
-
-               --  Buffers.Set_Used_Bytes (Buffer_Handler.Handlers (Buffer_Handler.Current).Handle,
-               --           Packet_Buffers.To_Bytes (Integer (Base_Udp.Sequence_Size)));
 
                Buffer_Handler.Current := Buffer_Handler.Current + 1;
                Ada.Text_IO.Put_Line ("New Current : " & Buffer_Handler.Current'Img);
@@ -161,19 +156,25 @@ package body Packet_Mgr is
 
             for Datas'Address use Buffers.Get_Address (Handle);
          begin
-            --  for I in Datas'Range loop
-            declare
-               First_Pkt_Nb   : Base_Udp.Header;
-               Last_Pkt_Nb   : Base_Udp.Header;
-               for First_Pkt_Nb'Address use Datas (Datas'First)'Address;
-               for Last_Pkt_Nb'Address use Datas (Datas'Last)'Address;
-            begin
-               Ada.Text_IO.Put_Line ("Buffer (" & Datas'First'Img & " ) :" &
-                  First_Pkt_Nb'Img);
-               Ada.Text_IO.Put_Line ("Buffer (" & Datas'Last'Img & " ) :" &
-                  Last_Pkt_Nb'Img);
-            end;
-            --  end loop;
+            for I in Datas'Range loop
+               declare
+                  First_Pkt_Nb   : Base_Udp.Header;
+                  Dead_Beef      : Interfaces.Unsigned_32;
+                  --  Last_Pkt_Nb   : Base_Udp.Header;
+                  for First_Pkt_Nb'Address use Datas (I)'Address;
+                  for Dead_Beef'Address use Datas (I)'Address;
+                  --  for Last_Pkt_Nb'Address use Datas (Datas'Last)'Address;
+               begin
+                  if Dead_Beef = 16#DEAD_BEEF# then
+                     Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) : ** DEADBEEF **");
+                  else
+                     Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) :" &
+                        First_Pkt_Nb'Img);
+                  end if;
+                  --  Ada.Text_IO.Put_Line ("Buffer (" & Datas'Last'Img & " ) :" &
+                  --     Last_Pkt_Nb'Img);
+               end;
+            end loop;
          end;
 
          Buffer_Handler.Buffer.Release_Full_Buffer (Handle);
