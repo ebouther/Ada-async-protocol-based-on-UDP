@@ -160,7 +160,7 @@ procedure UDP_Server is
          else
             if I > Base_Udp.Pkt_Max then
                PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
-               I := I mod Base_Udp.Pkt_Max;
+               I := I mod Integer (Base_Udp.Sequence_Size);
             end if;
 
             declare
