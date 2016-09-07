@@ -31,11 +31,6 @@ procedure UDP_Server is
       entry Stop;
    end Timer;
 
-   --  task type Process_Packets is
-   --     entry Start;
-   --     entry Stop;
-   --  end Process_Packets;
-
    task type Recv_Socket is
       entry Start;
       entry Stop;
@@ -64,7 +59,6 @@ procedure UDP_Server is
    Last_Nb              : Interfaces.Unsigned_64 := 0;
    Nb_Output            : Natural := 0;
    Log_File             : Ada.Text_IO.File_Type;
-   --  Process_Pkt          : Process_Packets;
    Busy                 : Interfaces.C.int := 50;
    Opt_Return           : Interfaces.C.int;
 
@@ -82,7 +76,6 @@ procedure UDP_Server is
       Append_Task.Stop;
       PMH_Buffer_Task.Stop;
       Recv_Socket_Task.Stop;
-      --  Process_Pkt.Stop;
 
    end Stop_Server;
 
@@ -140,11 +133,12 @@ procedure UDP_Server is
    end Timer;
 
 
-
+   pragma Warnings (Off);
    procedure Manage_Loss (I         : in Integer;
                           Data_Addr : in out System.Address;
                           Data      : in Base_Udp.Packet_Stream;
                           Nb_Missed : in Interfaces.Unsigned_64);
+   pragma Warnings (On);
 
    procedure Manage_Loss (I         : in Integer;
                           Data_Addr : in out System.Address;
@@ -259,7 +253,8 @@ procedure UDP_Server is
                         --  New_Seq := True;
 
                      end if;
-                     Manage_Loss (I, Data_Addr, Data, Nb_Missed);
+
+                     --  Manage_Loss (I, Data_Addr, Data, Nb_Missed);
 
                      I := I + Integer (Nb_Missed);
 

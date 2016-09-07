@@ -24,9 +24,6 @@ procedure UDP_Client is
    type Jumbo_U8 is
       array (1 .. Base_Udp.Load_Size) of Interfaces.Unsigned_8;
 
-   --  type Jumbo_U64 is
-   --     array (1 .. Base_Udp.Array_Size) of Interfaces.Unsigned_64;
-
       Address  : GNAT.Sockets.Sock_Addr_Type;
       Socket   : GNAT.Sockets.Socket_Type;
 
