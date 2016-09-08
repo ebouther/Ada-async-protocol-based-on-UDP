@@ -277,7 +277,7 @@ procedure UDP_Server is
                         for Clear_Bad_Loc'Address use Data'Address;
                      begin
                         Good_Location := Data;
-                        Clear_Bad_Loc := 16#DEAD_BEEF#; -- Not necessary if Manage_Loss_Task work
+                        Clear_Bad_Loc := 0; --  16#DEAD_BEEF#; -- Not necessary if Manage_Loss_Task work
                      end;
 
                      --  Takes too much time.. Might do a task vector.

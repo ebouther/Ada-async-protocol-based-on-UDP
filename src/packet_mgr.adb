@@ -30,6 +30,7 @@ package body Packet_Mgr is
       --  Is incremented to First when Recv_Packets asks for new Buf
       Buffer_Handler.Current := Buffer_Handler.Handlers'Last;
 
+      --  Please kernel give me some physical memory. Don't keep it as virtual.
       for I in Buffer_Handler.Handlers'Range loop
          Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (I).Handle);
          declare
@@ -37,7 +38,7 @@ package body Packet_Mgr is
             for Message'Address use Buffer_Handler.Handlers (I).Handle.Get_Address;
          begin
             for N in Message'Range loop
-               Message (N) := 16#DA#;
+               Message (N) := 0;
             end loop;
             Ada.Text_IO.Put_Line (Message (Message'Last)'Img);
          end;
@@ -146,6 +147,7 @@ package body Packet_Mgr is
                        Data            :  in Base_Udp.Packet_Stream) is
 
       use Packet_Buffers;
+      use type Reliable_Udp.Pkt_Nb;
    begin
       --  Ack belongs to a previous buffer.
       declare
@@ -154,21 +156,25 @@ package body Packet_Mgr is
 
          Datas    : Data_Array;
          Content  : Interfaces.Unsigned_32;
+         Header   : Reliable_Udp.Header;
 
          for Datas'Address use Buffer_Handler.Handlers
-            (if Integer (Seq_Nb) > Integer (Packet_Number) - 1 then
+            (if Seq_Nb > Packet_Number then
                Buffer_Handler.Current - 1
              else
                Buffer_Handler.Current
             ).Handle.Get_Address;
          for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
+         for Header'Address use Datas (Integer (Seq_Nb))'Address;
       begin
-         if Content = 0 then
+         if Content = 0 then --  #16DEAD_BEEF#
             Ada.Text_IO.Put_Line ("Found");
             Datas (Integer (Seq_Nb) + 1) := Data;
          else
             --  Not managed yet. Should check if every Near-Full buffer are complete before
             --  switching to Full State.
+            Ada.Text_IO.Put_Line ("Content : " & Content'Img);
+            Ada.Text_IO.Put_Line ("Prev Seq_Nb : " & Header.Seq_Nb'Img);
             Ada.Text_IO.Put_Line ("Might comes from an older buffer (< current - 1)");
          end if;
       end;
