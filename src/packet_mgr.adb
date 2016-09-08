@@ -21,7 +21,8 @@ package body Packet_Mgr is
    procedure Init_Handle_Array is
    begin
 
-      Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb, Size => Buffers.Buffer_Size_Type
+      --  Need a "+ 1" otherwise it cannot get a free buffer in Release_Full_Buf
+      Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb + 1, Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
 
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
@@ -86,10 +87,16 @@ package body Packet_Mgr is
 
             Buffer_Handler.First := Buffer_Handler.First + 1;
 
-            --  Get_Filled_Buf;
+            Get_Filled_Buf;
 
          end if;
       end loop;
+   exception
+      when E : others =>
+         Ada.Text_IO.Put_Line ("exception : " &
+            Ada.Exceptions.Exception_Name (E) &
+            " message : " &
+            Ada.Exceptions.Exception_Message (E));
    end Release_Full_Buf;
 
 
@@ -133,11 +140,13 @@ package body Packet_Mgr is
    --  Get_Filled_Buf  --
    ----------------------
 
-   procedure Get_Filled_Buf is
+   procedure Get_Filled_Buf (To_File   : in Boolean := True) is
+      Log_File : Ada.Text_IO.File_Type;
    begin
       declare
-         use Packet_Buffers;
          Handle  : Buffers.Buffer_Handle_Type;
+
+         use Packet_Buffers;
       begin
          select
             Buffer_Handler.Buffer.Get_Full_Buffer (Handle);
@@ -147,6 +156,11 @@ package body Packet_Mgr is
             Ada.Text_IO.Put_Line ("-x-  No Buf -x-");
             return;
          end select;
+
+         if To_File then
+            Ada.Text_IO.Open (Log_File, Ada.Text_IO.Append_File, "buffers.log");
+         end if;
+
          declare
             type Data_Array is new Element_Array
                (1 .. To_Word_Count
@@ -158,26 +172,36 @@ package body Packet_Mgr is
          begin
             for I in Datas'Range loop
                declare
-                  First_Pkt_Nb   : Base_Udp.Header;
+                  Pkt_Nb   : Base_Udp.Header;
                   Dead_Beef      : Interfaces.Unsigned_32;
-                  --  Last_Pkt_Nb   : Base_Udp.Header;
-                  for First_Pkt_Nb'Address use Datas (I)'Address;
+
+                  for Pkt_Nb'Address use Datas (I)'Address;
                   for Dead_Beef'Address use Datas (I)'Address;
-                  --  for Last_Pkt_Nb'Address use Datas (Datas'Last)'Address;
                begin
                   if Dead_Beef = 16#DEAD_BEEF# then
-                     Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) : ** DEADBEEF **");
+                     if To_File then
+                        Ada.Text_IO.Put_Line ("OK");
+                        Ada.Text_IO.Put_Line (Log_File, "Buffer (" & I'Img & " ) : ** DEADBEEF **");
+                     else
+                        Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) : ** DEADBEEF **");
+                     end if;
                   else
-                     Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) :" &
-                        First_Pkt_Nb'Img);
+                     if To_File then
+                        Ada.Text_IO.Put_Line (Log_File, "Buffer (" & I'Img & " ) :" &
+                           Pkt_Nb'Img);
+                     else
+                        Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) :" &
+                           Pkt_Nb'Img);
+                     end if;
                   end if;
-                  --  Ada.Text_IO.Put_Line ("Buffer (" & Datas'Last'Img & " ) :" &
-                  --     Last_Pkt_Nb'Img);
                end;
             end loop;
          end;
 
          Buffer_Handler.Buffer.Release_Full_Buffer (Handle);
+         if To_File then
+            Ada.Text_IO.Close (Log_File);
+         end if;
 
       exception
          when E : others =>

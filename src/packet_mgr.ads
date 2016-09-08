@@ -36,7 +36,7 @@ package Packet_Mgr is
 
    procedure Init_Handle_Array;
    procedure Release_Free_Buffer_At (Index : in Handle_Index);
-   procedure Get_Filled_Buf;
+   procedure Get_Filled_Buf (To_File   : in Boolean := True);
 
    task type Release_Full_Buf is
       entry Start;

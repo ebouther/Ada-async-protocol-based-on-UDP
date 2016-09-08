@@ -135,35 +135,21 @@ procedure UDP_Server is
 
    pragma Warnings (Off);
    procedure Manage_Loss (I         : in Integer;
-                          Data_Addr : in out System.Address;
-                          Data      : in Base_Udp.Packet_Stream;
+                          Data_Addr : in System.Address;
+                          Last_Addr : in System.Address;
                           Nb_Missed : in Interfaces.Unsigned_64);
    pragma Warnings (On);
 
    procedure Manage_Loss (I         : in Integer;
-                          Data_Addr : in out System.Address;
-                          Data      : in Base_Udp.Packet_Stream;
+                          Data_Addr : in System.Address;
+                          Last_Addr : in System.Address;
                           Nb_Missed : in Interfaces.Unsigned_64) is
-      Last_Addr   :  constant System.Address := Data_Addr;
       Addr        :  System.Address;
-      Pos               :  Integer;
+      Pos         :  Integer;
 
       use System.Storage_Elements;
    begin
       loop
-         if Interfaces.Unsigned_64 (I) + Nb_Missed >= Base_Udp.Sequence_Size then
-            PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
-         end if;
-
-         --  Memcpy Addr I to I + NB_Missed
-         declare
-            Good_Loc_Index :  constant Integer := (I + Integer (Nb_Missed)) mod Integer (Base_Udp.Sequence_Size);
-            Good_Location  :  Base_Udp.Packet_Stream;
-            for Good_Location'Address use Data_Addr + Storage_Offset
-                                                   (Good_Loc_Index * Base_Udp.Load_Size);
-         begin
-            Good_Location := Data;
-         end;
 
          for N in I .. I + Integer (Nb_Missed) - 1 loop
             Pos := N;
@@ -187,11 +173,13 @@ procedure UDP_Server is
 
 
    task body Recv_Socket is
-      Last        : Ada.Streams.Stream_Element_Offset;
-      Watchdog    : Natural := 0;
-      Data_Addr   : System.Address;
-      I           : Integer := Base_Udp.Pkt_Max + 1;
-      Nb_Missed   : Interfaces.Unsigned_64;
+      Last                 : Ada.Streams.Stream_Element_Offset;
+      Watchdog             : Natural := 0;
+      pragma Warnings (Off);
+      Data_Addr, Last_Addr : System.Address;
+      pragma Warnings (On);
+      I                    : Integer := Base_Udp.Pkt_Max + 1;
+      Nb_Missed            : Interfaces.Unsigned_64;
 
       use type Interfaces.C.int;
       use System.Storage_Elements;
@@ -254,7 +242,24 @@ procedure UDP_Server is
 
                      end if;
 
-                     --  Manage_Loss (I, Data_Addr, Data, Nb_Missed);
+                     Last_Addr := Data_Addr;
+
+                     if Interfaces.Unsigned_64 (I) + Nb_Missed >= Base_Udp.Sequence_Size then
+                        PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
+                     end if;
+
+                     --  Memcpy Addr I to I + NB_Missed
+                     declare
+                        Good_Loc_Index :  constant Integer := (I + Integer (Nb_Missed))
+                                             mod Integer (Base_Udp.Sequence_Size);
+                        Good_Location  :  Base_Udp.Packet_Stream;
+                        for Good_Location'Address use Data_Addr + Storage_Offset
+                                                               (Good_Loc_Index * Base_Udp.Load_Size);
+                     begin
+                        Good_Location := Data;
+                     end;
+
+                     --  Manage_Loss (I, Data_Addr, Last_Addr, Nb_Missed);
 
                      I := I + Integer (Nb_Missed);
 
@@ -290,6 +295,9 @@ begin
 
    Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "log.csv");
    Ada.Text_IO.Put_Line (Log_File, "Nb_Output;Nb_Received;Packet_Nb;Dropped;Elapsed_Time");
+   Ada.Text_IO.Close (Log_File);
+
+   Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "buffers.log");
    Ada.Text_IO.Close (Log_File);
 
    if Ada.Command_Line.Argument_Count = 1 then
