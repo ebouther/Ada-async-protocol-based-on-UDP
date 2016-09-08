@@ -18,7 +18,7 @@ with Base_Udp;
 with Output_Data;
 with Reliable_Udp;
 with Packet_Mgr;
-with Queue;
+--  with Queue;
 
 procedure UDP_Server is
    use GNAT.Sockets;
@@ -45,8 +45,8 @@ procedure UDP_Server is
    end Loss_Manager;
    pragma Warnings (On);
 
-   package Sync_Queue is new Queue (System.Address);
-   Buffer               : Sync_Queue.Synchronized_Queue;
+   --  package Sync_Queue is new Queue (System.Address);
+   --  Buffer               : Sync_Queue.Synchronized_Queue;
 
    Append_Task          : Reliable_Udp.Append_Task;
    Remove_Task          : Reliable_Udp.Remove_Task;
@@ -125,7 +125,7 @@ procedure UDP_Server is
             exit;
          else
             delay 1.0;
-            Ada.Text_IO.Put_Line ("Buf len : " & Buffer.Cur_Count'Img);
+            --  Ada.Text_IO.Put_Line ("Buf len : " & Buffer.Cur_Count'Img);
             Elapsed_Time := Ada.Calendar.Clock - Start_Time;
             Output_Data.Display
                (True,
@@ -222,7 +222,6 @@ procedure UDP_Server is
                for Header'Address use Data'Address;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-
                if Header.Ack then
 
                   Packet_Mgr.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
@@ -230,7 +229,8 @@ procedure UDP_Server is
                   Remove_Task.Remove (Header.Seq_Nb);
                   I := I - 1;
                else
-                  ---  New_Seq := False;
+                  Ada.Text_IO.Put_Line ("Received :" & Header.Seq_Nb'Img);
+                  --  New_Seq := False;
                   Nb_Packet_Received := Nb_Packet_Received + 1;
                   if Nb_Packet_Received = 1 then
                      Start_Time := Ada.Calendar.Clock;
@@ -254,7 +254,7 @@ procedure UDP_Server is
 
                      end if;
                      Append_Task.Append (Packet_Number,
-                                         Header.Seq_Nb,
+                                         Header.Seq_Nb - 1,
                                          From);
 
                      Packet_Number := Header.Seq_Nb;
