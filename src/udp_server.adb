@@ -63,7 +63,7 @@ procedure UDP_Server is
    Start_Time           : Ada.Calendar.Time;
    Elapsed_Time         : Duration;
    Nb_Packet_Received   : Interfaces.Unsigned_64 := 0;
-   Packet_Number        : Base_Udp.Header := 0;
+   Packet_Number        : Reliable_Udp.Pkt_Nb := 0;
    Missed               : Interfaces.Unsigned_64 := 0;
    Last_Nb              : Interfaces.Unsigned_64 := 0;
    Nb_Output            : Natural := 0;
@@ -130,7 +130,7 @@ procedure UDP_Server is
             Output_Data.Display
                (True,
                Elapsed_Time,
-               Interfaces.Unsigned_64 (Packet_Number),
+               Packet_Number,
                Missed,
                Nb_Packet_Received,
                Last_Nb,
@@ -183,6 +183,7 @@ procedure UDP_Server is
       end loop;
    end Loss_Manager;
 
+
    task body Recv_Socket is
       Last                 : Ada.Streams.Stream_Element_Offset;
       Watchdog             : Natural := 0;
@@ -193,6 +194,7 @@ procedure UDP_Server is
       Nb_Missed            : Interfaces.Unsigned_64;
 
       use type Interfaces.C.int;
+      use type Reliable_Udp.Pkt_Nb;
       use System.Storage_Elements;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
@@ -221,6 +223,7 @@ procedure UDP_Server is
                for Header'Address use Data'Address;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
+               Ada.Text_IO.Put_Line ("Received : " & Header.Seq_Nb'Img);
 
                if Header.Ack then
 
@@ -236,10 +239,10 @@ procedure UDP_Server is
                      Start_Time := Ada.Calendar.Clock;
                   end if;
 
-                  if Base_Udp.Header (Header.Seq_Nb) /= Packet_Number then
-                     if Base_Udp.Header (Header.Seq_Nb) > Packet_Number then
+                  if Header.Seq_Nb /= Packet_Number then
+                     if Header.Seq_Nb > Packet_Number then
                         Nb_Missed := Interfaces.Unsigned_64
-                           (Base_Udp.Header (Header.Seq_Nb) - Packet_Number);
+                           (Header.Seq_Nb - Packet_Number);
                         Missed := Missed + Nb_Missed;
                      else
                         --  Doesn't manage disordered packets
@@ -253,6 +256,7 @@ procedure UDP_Server is
                         --  New_Seq := True;
 
                      end if;
+                     Packet_Number := Header.Seq_Nb;
 
                      Last_Addr := Data_Addr;
 
@@ -268,7 +272,7 @@ procedure UDP_Server is
                         Good_Location  :  Base_Udp.Packet_Stream;
 
                         for Good_Location'Address use Data_Addr + Storage_Offset
-                                                               (Good_Loc_Index * Base_Udp.Load_Size);
+                                                   (Good_Loc_Index * Base_Udp.Load_Size);
                         for Clear_Bad_Loc'Address use Data'Address;
                      begin
                         Good_Location := Data;
@@ -280,13 +284,12 @@ procedure UDP_Server is
 
                      I := I + Integer (Nb_Missed);
 
-                     Append_Task.Append (Packet_Number,
-                                         Base_Udp.Header (Header.Seq_Nb),
-                                         From);
-                     Packet_Number := Base_Udp.Header (Header.Seq_Nb);
+                     --  Append_Task.Append (Packet_Number,
+                     --                      Base_Udp.Header (Header.Seq_Nb),
+                     --                      From);
                   end if;
 
-                  if Integer (Header.Seq_Nb) = Base_Udp.Pkt_Max then
+                  if Header.Seq_Nb = Base_Udp.Pkt_Max then
                      Packet_Number := 0;
 
                      ---  New_Seq := True;

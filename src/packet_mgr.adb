@@ -140,7 +140,7 @@ package body Packet_Mgr is
    ----------------
 
    procedure Save_Ack (Seq_Nb          :  in Reliable_Udp.Pkt_Nb;
-                       Packet_Number   :  in Base_Udp.Header;
+                       Packet_Number   :  in Reliable_Udp.Pkt_Nb;
                        Data            :  in Base_Udp.Packet_Stream) is
 
       use Packet_Buffers;
@@ -154,7 +154,7 @@ package body Packet_Mgr is
          Content  : Interfaces.Unsigned_32;
 
          for Datas'Address use Buffer_Handler.Handlers
-            (if Base_Udp.Header (Seq_Nb) > Packet_Number - 1 then
+            (if Integer (Seq_Nb) > Integer (Packet_Number) - 1 then
                Buffer_Handler.Current - 1
              else
                Buffer_Handler.Current

@@ -107,7 +107,7 @@ begin
       else
          Seq_Nb := Seq_Nb + 1;
          --  Simulate Drops
-         if Seq_Nb mod 100 = 0 then
+         if Seq_Nb mod 20 = 0 then
             Seq_Nb := Seq_Nb + 1;
          end if;
       end if;

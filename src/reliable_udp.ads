@@ -34,8 +34,8 @@ package Reliable_Udp is
 
    for Header use
       record
-         Seq_Nb   at 0 range 0 .. Base_Udp.Header'Size - 2;
-         Ack      at 0 range Base_Udp.Header'Size - 1 .. Base_Udp.Header'Size - 1;
+         Seq_Nb   at 0 range 0 .. Pkt_Nb'Size - 1;
+         Ack      at 0 range Pkt_Nb'Size .. Pkt_Nb'Size;
       end record;
 
    for Header'Alignment use Base_Udp.Header_Size;

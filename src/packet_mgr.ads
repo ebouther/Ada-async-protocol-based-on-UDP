@@ -22,7 +22,7 @@ package Packet_Mgr is
 
    --  Do not forget to check if current = first after a complete cycle
    --  as Index_Handle is used in a circular way. Must not happen.
-   type Handle_Array is array (Handle_Index'First .. Handle_Index'Last) of Handler;
+   type Handle_Array is array (Handle_Index) of Handler;
 
    package Packet_Buffers is new
       Buffers.Generic_Buffers
@@ -40,7 +40,7 @@ package Packet_Mgr is
    procedure Release_Free_Buffer_At (Index : in Handle_Index);
    procedure Get_Filled_Buf (To_File   : in Boolean := True);
    procedure Save_Ack (Seq_Nb          :  in Reliable_Udp.Pkt_Nb;
-                       Packet_Number   :  in Base_Udp.Header;
+                       Packet_Number   :  in Reliable_Udp.Pkt_Nb;
                        Data            :  in Base_Udp.Packet_Stream);
 
    task type Release_Full_Buf is
