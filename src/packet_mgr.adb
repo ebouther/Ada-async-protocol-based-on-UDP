@@ -36,8 +36,10 @@ package body Packet_Mgr is
             Message : Base_Udp.Packet_Payload;
             for Message'Address use Buffer_Handler.Handlers (I).Handle.Get_Address;
          begin
-            Message (Message'First) := 16#FA#;
-            Message (Message'Last) := 16#DA#;
+            for N in Message'Range loop
+               Message (N) := 16#DA#;
+            end loop;
+            Ada.Text_IO.Put_Line (Message (Message'Last)'Img);
          end;
       end loop;
       Ada.Text_IO.Put_Line ("_Initialization Finished_");

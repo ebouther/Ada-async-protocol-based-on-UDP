@@ -253,6 +253,10 @@ procedure UDP_Server is
                         --  New_Seq := True;
 
                      end if;
+                     Append_Task.Append (Packet_Number,
+                                         Header.Seq_Nb,
+                                         From);
+
                      Packet_Number := Header.Seq_Nb;
 
                      Last_Addr := Data_Addr;
@@ -281,9 +285,7 @@ procedure UDP_Server is
 
                      I := I + Integer (Nb_Missed);
 
-                     --  Append_Task.Append (Packet_Number,
-                     --                      Header.Seq_Nb,
-                     --                      From);
+
                   end if;
 
                   if Header.Seq_Nb = Base_Udp.Pkt_Max then

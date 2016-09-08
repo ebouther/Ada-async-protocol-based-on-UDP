@@ -8,7 +8,7 @@ with Buffers.Local;
 package Packet_Mgr is
 
    --  Number of pmh buffers initialized
-   PMH_Buf_Nb     : constant := 8;
+   PMH_Buf_Nb     : constant := 16;
 
    type Handle_Index is mod PMH_Buf_Nb;
 

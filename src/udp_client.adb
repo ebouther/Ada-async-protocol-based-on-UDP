@@ -106,14 +106,14 @@ begin
       else
          Header.Seq_Nb := Header.Seq_Nb + 1;
          --  Simulate Drops
-         --  if Seq_Nb mod 20 = 0 then
-         --     Seq_Nb := Seq_Nb + 1;
-         --  end if;
+         if Header.Seq_Nb mod 200 = 0 then
+            Header.Seq_Nb := Header.Seq_Nb + 1;
+         end if;
       end if;
       Pkt_Data := Pkt_Data + 1;
 
       --  DBG --
-      --  delay 0.1;
+      delay 0.01;
       ---------
    end loop;
 end UDP_Client;
