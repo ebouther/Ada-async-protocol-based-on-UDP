@@ -106,11 +106,15 @@ begin
          Seq_Nb := 0;
       else
          Seq_Nb := Seq_Nb + 1;
+         --  Simulate Drops
+         if Seq_Nb mod 100 = 0 then
+            Seq_Nb := Seq_Nb + 1;
+         end if;
       end if;
       Pkt_Data := Pkt_Data + 1;
 
       --  DBG --
-      --  delay 0.000000001;
+      delay 0.1;
       ---------
    end loop;
 end UDP_Client;

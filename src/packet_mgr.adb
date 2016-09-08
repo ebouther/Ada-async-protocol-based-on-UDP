@@ -77,7 +77,6 @@ package body Packet_Mgr is
       loop
          delay 0.000001;
          if Buffer_Handler.Handlers (Buffer_Handler.First).State = Full then
-            Ada.Text_IO.Put_Line (" *** Release first Buf *** ");
 
             Release_Free_Buffer_At (Buffer_Handler.First);
 
@@ -136,6 +135,44 @@ package body Packet_Mgr is
    end PMH_Buffer_Addr;
 
 
+   ----------------
+   --  Save_Ack  --
+   ----------------
+
+   procedure Save_Ack (Seq_Nb          :  in Base_Udp.Header;
+                       Packet_Number   :  in Base_Udp.Header;
+                       Data            :  in Base_Udp.Packet_Stream) is
+
+      use Packet_Buffers;
+   begin
+      --  Ack belongs to a previous buffer.
+      declare
+         type Data_Array is new Element_Array
+            (1 .. Integer (Base_Udp.Sequence_Size));
+
+         Datas    : Data_Array;
+         Content  : Interfaces.Unsigned_32;
+
+         for Datas'Address use Buffer_Handler.Handlers
+            (if Seq_Nb > Packet_Number - 1 then
+               Buffer_Handler.Current - 1
+             else
+               Buffer_Handler.Current
+            ).Handle.Get_Address;
+         for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
+      begin
+         if Content = 16#DEAD_BEEF# then
+            Ada.Text_IO.Put_Line ("Found");
+            Datas (Integer (Seq_Nb) + 1) := Data;
+         else
+            --  Not managed yet. Should check if every Near-Full buffer are complete before
+            --  switching to Full State.
+            Ada.Text_IO.Put_Line ("Might comes from an older buffer (< current - 1)");
+         end if;
+      end;
+   end Save_Ack;
+
+
    ----------------------
    --  Get_Filled_Buf  --
    ----------------------
@@ -150,10 +187,9 @@ package body Packet_Mgr is
       begin
          select
             Buffer_Handler.Buffer.Get_Full_Buffer (Handle);
-            Ada.Text_IO.Put_Line ("---  Got Filled Buffer  ---");
          or
             delay 1.0;
-            Ada.Text_IO.Put_Line ("-x-  No Buf -x-");
+            Ada.Text_IO.Put_Line ("/!\ Error : Cannot Get A Full Buffer /!\");
             return;
          end select;
 
@@ -180,10 +216,9 @@ package body Packet_Mgr is
                begin
                   if Dead_Beef = 16#DEAD_BEEF# then
                      if To_File then
-                        Ada.Text_IO.Put_Line ("OK");
-                        Ada.Text_IO.Put_Line (Log_File, "Buffer (" & I'Img & " ) : ** DEADBEEF **");
+                        Ada.Text_IO.Put_Line (Log_File, "Buffer (" & I'Img & " ) : ** DROPPED **");
                      else
-                        Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) : ** DEADBEEF **");
+                        Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) : ** DROPPED **");
                      end if;
                   else
                      if To_File then

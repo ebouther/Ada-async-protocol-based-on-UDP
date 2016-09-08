@@ -7,7 +7,7 @@ package Base_Udp is
 
    use type Interfaces.Unsigned_64;
 
-   subtype Header is Interfaces.Unsigned_16;
+   subtype Header is Interfaces.Unsigned_8;
 
    --  Packet Payload size in Bytes
    Load_Size      : constant := 8972;

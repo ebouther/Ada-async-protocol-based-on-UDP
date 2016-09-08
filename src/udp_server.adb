@@ -36,6 +36,14 @@ procedure UDP_Server is
       entry Stop;
    end Recv_Socket;
 
+   pragma Warnings (Off);
+   task type Loss_Manager is
+      entry Start (Count           : Integer;
+                   Data_Address    : System.Address;
+                   Last_Address    : System.Address;
+                   Number_Missed   : Interfaces.Unsigned_64);
+   end Loss_Manager;
+   pragma Warnings (On);
 
    package Sync_Queue is new Queue (System.Address);
    Buffer               : Sync_Queue.Synchronized_Queue;
@@ -45,6 +53,7 @@ procedure UDP_Server is
    Ack_Task             : Reliable_Udp.Ack_Task;
    Recv_Socket_Task     : Recv_Socket;
    Log_Task             : Timer;
+   Manage_Loss_Task     : Loss_Manager;
 
    PMH_Buffer_Task      : Packet_Mgr.PMH_Buffer_Addr;
    Release_Buf_Task     : Packet_Mgr.Release_Full_Buf;
@@ -133,23 +142,26 @@ procedure UDP_Server is
    end Timer;
 
 
-   pragma Warnings (Off);
-   procedure Manage_Loss (I         : in Integer;
-                          Data_Addr : in System.Address;
-                          Last_Addr : in System.Address;
-                          Nb_Missed : in Interfaces.Unsigned_64);
-   pragma Warnings (On);
-
-   procedure Manage_Loss (I         : in Integer;
-                          Data_Addr : in System.Address;
-                          Last_Addr : in System.Address;
-                          Nb_Missed : in Interfaces.Unsigned_64) is
+   task body Loss_Manager is
       Addr        :  System.Address;
       Pos         :  Integer;
+      I           :  Integer;
+      Data_Addr   :  System.Address;
+      Last_Addr   :  System.Address;
+      Nb_Missed   :  Interfaces.Unsigned_64;
 
       use System.Storage_Elements;
    begin
       loop
+         accept Start (Count           : Integer;
+                       Data_Address    : System.Address;
+                       Last_Address    : System.Address;
+                       Number_Missed   : Interfaces.Unsigned_64) do
+            I           := Count;
+            Data_Addr   := Data_Address;
+            Last_Addr   := Last_Address;
+            Nb_Missed   := Number_Missed;
+         end Start;
 
          for N in I .. I + Integer (Nb_Missed) - 1 loop
             Pos := N;
@@ -169,8 +181,7 @@ procedure UDP_Server is
             end;
          end loop;
       end loop;
-   end Manage_Loss;
-
+   end Loss_Manager;
 
    task body Recv_Socket is
       Last                 : Ada.Streams.Stream_Element_Offset;
@@ -214,7 +225,11 @@ procedure UDP_Server is
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
 
                if Header.Ack then
+                  --  Required to remove ack bit which would modify Seq_Nb value.
                   Header.Ack := False;
+
+                  Ada.Text_IO.Put_Line ("___ Save Ack ___");
+                  Packet_Mgr.Save_Ack (Seq_Nb, Packet_Number, Data);
 
                   Remove_Task.Remove (Seq_Nb);
                   I := I - 1;
@@ -252,20 +267,25 @@ procedure UDP_Server is
                      declare
                         Good_Loc_Index :  constant Integer := (I + Integer (Nb_Missed))
                                              mod Integer (Base_Udp.Sequence_Size);
+                        Clear_Bad_Loc  :  Interfaces.Unsigned_32;
                         Good_Location  :  Base_Udp.Packet_Stream;
+
                         for Good_Location'Address use Data_Addr + Storage_Offset
                                                                (Good_Loc_Index * Base_Udp.Load_Size);
+                        for Clear_Bad_Loc'Address use Data'Address;
                      begin
                         Good_Location := Data;
+                        Clear_Bad_Loc := 16#DEAD_BEEF#; -- Not necessary if Manage_Loss_Task work
                      end;
 
-                     --  Manage_Loss (I, Data_Addr, Last_Addr, Nb_Missed);
+                     --  Takes too much time.. Might do a task vector.
+                     --  Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
 
                      I := I + Integer (Nb_Missed);
 
-                     --  Append_Task.Append (Packet_Number,
-                     --                       Seq_Nb,
-                     --                       From);
+                     Append_Task.Append (Packet_Number,
+                                         Seq_Nb,
+                                         From);
                      Packet_Number := Seq_Nb;
                   end if;
 
