@@ -51,7 +51,7 @@ package Reliable_Udp is
 
    task type Append_Task is
       entry Stop;
-      entry Append (First_Dropped, Last_Dropped : Base_Udp.Header;
+      entry Append (First_Dropped, Last_Dropped : Reliable_Udp.Pkt_Nb;
                    Client_Address               : GNAT.Sockets.Sock_Addr_Type);
    end Append_Task;
 

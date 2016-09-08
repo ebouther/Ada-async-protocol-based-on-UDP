@@ -1,4 +1,5 @@
 with Ada.Streams;
+with System.Multiprocessors.Dispatching_Domains;
 
 package body Reliable_Udp is
 
@@ -7,15 +8,17 @@ package body Reliable_Udp is
    task body Append_Task is
       Packet_Lost      : Reliable_Udp.Loss;
       Client_Addr      : GNAT.Sockets.Sock_Addr_Type;
-      First_D, Last_D  : Base_Udp.Header;
+      First_D, Last_D  : Reliable_Udp.Pkt_Nb;
 
    begin
+      System.Multiprocessors.Dispatching_Domains.Set_CPU
+         (System.Multiprocessors.CPU_Range (6));
       loop
          select
             accept Stop;
             exit;
          or
-            accept Append (First_Dropped, Last_Dropped   : Base_Udp.Header;
+            accept Append (First_Dropped, Last_Dropped   : Reliable_Udp.Pkt_Nb;
                            Client_Address                : GNAT.Sockets.Sock_Addr_Type) do
                First_D        := First_Dropped;
                Last_D         := Last_Dropped;
@@ -23,8 +26,8 @@ package body Reliable_Udp is
             end Append;
 
             --  if First_D < Last_D then
-            for I in Base_Udp.Header range First_D .. Last_D loop
-               Packet_Lost := (Packet     => Pkt_Nb (I),
+            for I in Reliable_Udp.Pkt_Nb range First_D .. Last_D loop
+               Packet_Lost := (Packet     => I,
                                Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
                                Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
                                From       => Client_Addr);
@@ -57,6 +60,8 @@ package body Reliable_Udp is
    task body Remove_Task is
       Pkt   : Pkt_Nb;
    begin
+      System.Multiprocessors.Dispatching_Domains.Set_CPU
+         (System.Multiprocessors.CPU_Range (7));
       loop
          select
             accept Stop;
@@ -73,9 +78,12 @@ package body Reliable_Udp is
 
    task body Ack_Task is
    begin
+      System.Multiprocessors.Dispatching_Domains.Set_CPU
+         (System.Multiprocessors.CPU_Range (8));
       Ack_Mgr.Init_Socket;
       accept Start;
       loop
+         delay 0.0;
          select
             accept Stop;
             exit;

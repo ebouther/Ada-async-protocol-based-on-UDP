@@ -161,7 +161,7 @@ package body Packet_Mgr is
             ).Handle.Get_Address;
          for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
       begin
-         if Content = 16#DEAD_BEEF# then
+         if Content = 0 then
             Ada.Text_IO.Put_Line ("Found");
             Datas (Integer (Seq_Nb) + 1) := Data;
          else

@@ -215,7 +215,6 @@ procedure UDP_Server is
 
             declare
                Data     : Base_Udp.Packet_Stream;
-
                Header   : Reliable_Udp.Header;
 
                for Data'Address use Data_Addr + Storage_Offset
@@ -223,11 +222,9 @@ procedure UDP_Server is
                for Header'Address use Data'Address;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-               Ada.Text_IO.Put_Line ("Received : " & Header.Seq_Nb'Img);
 
                if Header.Ack then
 
-                  Ada.Text_IO.Put_Line ("___ Save Ack ___");
                   Packet_Mgr.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
 
                   Remove_Task.Remove (Header.Seq_Nb);
@@ -285,7 +282,7 @@ procedure UDP_Server is
                      I := I + Integer (Nb_Missed);
 
                      --  Append_Task.Append (Packet_Number,
-                     --                      Base_Udp.Header (Header.Seq_Nb),
+                     --                      Header.Seq_Nb,
                      --                      From);
                   end if;
 
