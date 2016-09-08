@@ -214,24 +214,20 @@ procedure UDP_Server is
             declare
                Data     : Base_Udp.Packet_Stream;
 
-               Seq_Nb   : Base_Udp.Header;
                Header   : Reliable_Udp.Header;
 
                for Data'Address use Data_Addr + Storage_Offset
                                                    (I * Base_Udp.Load_Size);
                for Header'Address use Data'Address;
-               for Seq_Nb'Address use Header'Address;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
 
                if Header.Ack then
-                  --  Required to remove ack bit which would modify Seq_Nb value.
-                  Header.Ack := False;
 
                   Ada.Text_IO.Put_Line ("___ Save Ack ___");
-                  Packet_Mgr.Save_Ack (Seq_Nb, Packet_Number, Data);
+                  Packet_Mgr.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
 
-                  Remove_Task.Remove (Seq_Nb);
+                  Remove_Task.Remove (Header.Seq_Nb);
                   I := I - 1;
                else
                   ---  New_Seq := False;
@@ -240,15 +236,16 @@ procedure UDP_Server is
                      Start_Time := Ada.Calendar.Clock;
                   end if;
 
-                  if Seq_Nb /= Packet_Number then
-                     if Seq_Nb > Packet_Number then
-                        Nb_Missed := Interfaces.Unsigned_64 (Seq_Nb - Packet_Number);
+                  if Base_Udp.Header (Header.Seq_Nb) /= Packet_Number then
+                     if Base_Udp.Header (Header.Seq_Nb) > Packet_Number then
+                        Nb_Missed := Interfaces.Unsigned_64
+                           (Base_Udp.Header (Header.Seq_Nb) - Packet_Number);
                         Missed := Missed + Nb_Missed;
                      else
                         --  Doesn't manage disordered packets
                         --  if a packet is received before the previous sent.
 
-                        --  Missed := Missed + Interfaces.Unsigned_64 (Seq_Nb
+                        --  Missed := Missed + Interfaces.Unsigned_64 (Header.Seq_Nb
                         --     + (Base_Udp.Pkt_Max - Packet_Number));
 
                         Ada.Text_IO.Put_Line ("BAD ORDER");
@@ -284,12 +281,12 @@ procedure UDP_Server is
                      I := I + Integer (Nb_Missed);
 
                      Append_Task.Append (Packet_Number,
-                                         Seq_Nb,
+                                         Base_Udp.Header (Header.Seq_Nb),
                                          From);
-                     Packet_Number := Seq_Nb;
+                     Packet_Number := Base_Udp.Header (Header.Seq_Nb);
                   end if;
 
-                  if Seq_Nb >= Base_Udp.Pkt_Max then
+                  if Integer (Header.Seq_Nb) = Base_Udp.Pkt_Max then
                      Packet_Number := 0;
 
                      ---  New_Seq := True;

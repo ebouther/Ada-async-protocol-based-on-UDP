@@ -1,5 +1,7 @@
 with System;
 
+with Reliable_Udp;
+
 with Base_Udp;
 with Buffers.Local;
 
@@ -37,7 +39,7 @@ package Packet_Mgr is
    procedure Init_Handle_Array;
    procedure Release_Free_Buffer_At (Index : in Handle_Index);
    procedure Get_Filled_Buf (To_File   : in Boolean := True);
-   procedure Save_Ack (Seq_Nb          :  in Base_Udp.Header;
+   procedure Save_Ack (Seq_Nb          :  in Reliable_Udp.Pkt_Nb;
                        Packet_Number   :  in Base_Udp.Header;
                        Data            :  in Base_Udp.Packet_Stream);
 

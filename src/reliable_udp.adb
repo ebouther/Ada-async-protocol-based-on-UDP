@@ -24,7 +24,7 @@ package body Reliable_Udp is
 
             --  if First_D < Last_D then
             for I in Base_Udp.Header range First_D .. Last_D loop
-               Packet_Lost := (Packet     => I,
+               Packet_Lost := (Packet     => Pkt_Nb (I),
                                Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
                                Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
                                From       => Client_Addr);
@@ -55,14 +55,14 @@ package body Reliable_Udp is
 
 
    task body Remove_Task is
-      Pkt   : Base_Udp.Header;
+      Pkt   : Pkt_Nb;
    begin
       loop
          select
             accept Stop;
             exit;
          or
-            accept Remove (Packet : in Base_Udp.Header) do
+            accept Remove (Packet : in Pkt_Nb) do
                Pkt   := Packet;
             end Remove;
             Ack_Mgr.Remove (Pkt);
@@ -113,14 +113,14 @@ package body Reliable_Udp is
       end Update_AckTime;
 
 
-      procedure Remove (Packet   : Base_Udp.Header) is
+      procedure Remove (Packet   : Pkt_Nb) is
          Cursor      : Losses_Container.Cursor := Losses.First;
       begin
 
          --  Ada.Text_IO.Put_Line ("Rm_container" & Rm_Container.Element (Rm_Cursor)'Img);
 
          while Losses_Container.Has_Element (Cursor) loop
-            if Interfaces."=" (Losses_Container.Element (Cursor).Packet, Packet) then
+            if Losses_Container.Element (Cursor).Packet = Packet then
                Losses_Container.Delete (Container => Losses,
                                         Position  => Cursor);
             end if;
@@ -135,7 +135,6 @@ package body Reliable_Udp is
 
       procedure Ack is
          Ack_Array   : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
-         Seq_Nb      : Base_Udp.Header;
          Head        : Reliable_Udp.Header;
          Data        : Ada.Streams.Stream_Element_Array (1 .. 64);
          Offset      : Ada.Streams.Stream_Element_Offset;
@@ -145,7 +144,6 @@ package body Reliable_Udp is
          --  First       : Boolean := True;
 
          for Data'Address use Ack_Array'Address;
-         for Seq_Nb'Address use Ack_Array'Address;
          for Head'Address use Ack_Array'Address;
          use type Ada.Real_Time.Time;
          use type Ada.Real_Time.Time_Span;
@@ -159,7 +157,7 @@ package body Reliable_Udp is
                then
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Losses_Container.Replace_Element (Losses, Cursor, Element);
-                  Seq_Nb := Element.Packet;
+                  Head.Seq_Nb := Element.Packet;
                   --  Ada.Text_IO.Put_Line ("Send Ack : " & Seq_Nb'Img);
                   GNAT.Sockets.Send_Socket (Socket, Data, Offset, Element.From);
                   Update_AckTime (Cursor, Ada.Real_Time.Clock);

@@ -17,24 +17,25 @@ package Reliable_Udp is
    use type Interfaces.Unsigned_32;
    use type Interfaces.Unsigned_64;
 
+   type Pkt_Nb is mod 2 ** (Base_Udp.Header'Size - 1);
+
    type Loss is
       record
-         Packet      : Base_Udp.Header;
+         Packet      : Pkt_Nb;
          Last_Ack    : Ada.Real_Time.Time;
          From        : GNAT.Sockets.Sock_Addr_Type;
       end record;
 
    type Header is
       record
+         Seq_Nb      : Pkt_Nb;
          Ack         : Boolean;
-         --  Packet      : Pkt_Nb;
       end record;
 
    for Header use
       record
-         Ack      at Base_Udp.Header_Size - 1
-                     range Base_Udp.Header'Size - 1 .. Base_Udp.Header'Size - 1;
-         --  Packet   at 0 range 0 .. Base_Udp.Header_Size * 8 - 2;
+         Seq_Nb   at 0 range 0 .. Base_Udp.Header'Size - 2;
+         Ack      at 0 range Base_Udp.Header'Size - 1 .. Base_Udp.Header'Size - 1;
       end record;
 
    for Header'Alignment use Base_Udp.Header_Size;
@@ -56,7 +57,7 @@ package Reliable_Udp is
 
    task type Remove_Task is
       entry Stop;
-      entry Remove (Packet : in Base_Udp.Header);
+      entry Remove (Packet : in Pkt_Nb);
    end Remove_Task;
 
    protected type Ack_Management is
@@ -64,7 +65,7 @@ package Reliable_Udp is
       procedure Append (Packet_Lost : in Loss);
       procedure Update_AckTime (Position  : in Losses_Container.Cursor;
                                Ack_Time   : in Ada.Real_Time.Time);
-      procedure Remove (Packet   : Base_Udp.Header);
+      procedure Remove (Packet   : Pkt_Nb);
       procedure Ack;
       function Length return Ada.Containers.Count_Type;
 

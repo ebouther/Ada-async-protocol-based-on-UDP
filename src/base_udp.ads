@@ -7,7 +7,7 @@ package Base_Udp is
 
    use type Interfaces.Unsigned_64;
 
-   subtype Header is Interfaces.Unsigned_8;
+   subtype Header is Interfaces.Unsigned_16;
 
    --  Packet Payload size in Bytes
    Load_Size      : constant := 8972;
@@ -19,9 +19,7 @@ package Base_Udp is
    Header_Size    : constant := Header'Size / System.Storage_Unit;
 
    --  Size of sequence (first bit used for Ack)
-   Sequence_Size  : constant Interfaces.Unsigned_64 :=
-                                             Interfaces.Unsigned_64
-                                                (Header'Last);
+   Sequence_Size  : constant Interfaces.Unsigned_64 := 2 ** (Header'Size - 1);
 
    --  Packet max nb in sequence (0 - Pkt_Max)
    Pkt_Max        : constant := Sequence_Size - 1;
