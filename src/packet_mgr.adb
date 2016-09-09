@@ -2,6 +2,7 @@ with Ada.Text_IO;
 with Interfaces;
 with Ada.Exceptions;
 with System.Multiprocessors.Dispatching_Domains;
+with System.Storage_Elements;
 
 package body Packet_Mgr is
 
@@ -67,9 +68,43 @@ package body Packet_Mgr is
    end Release_Free_Buffer_At;
 
 
-  -----------------------
+  ---------------------------
+  --  Check_Buf_Integrity  --
+  ---------------------------
+
+   task body Check_Buf_Integrity is
+      Index : Handle_Index := Handle_Index'First;
+      Addr  : System.Address;
+      N     : Integer;
+      use System.Storage_Elements;
+   begin
+      accept Start;
+      loop
+         if Buffer_Handler.Handlers (Index).State = Near_Full then
+            Addr := Buffer_Handler.Handlers (Index).Handle.Get_Address;
+            N := 0;
+            Parse_Buffer :
+               while N <= Base_Udp.Pkt_Max loop
+                  declare
+                     Data  :  Interfaces.Unsigned_32;
+                     for Data'Address use Addr + Storage_Offset
+                                                   (N * Base_Udp.Load_Size);
+                  begin
+                     exit Parse_Buffer when Data = 16#DEAD_BEEF#;
+                  end;
+                  N := N + 1;
+               end loop Parse_Buffer;
+            if N = Base_Udp.Pkt_Max then
+               Buffer_Handler.Handlers (Index).State := Full;
+            end if;
+         end if;
+         Index := Index + 1;
+      end loop;
+   end Check_Buf_Integrity;
+
+  ------------------------
   --  Release_Full_Buf  --
-  -----------------------
+  ------------------------
 
    task body Release_Full_Buf is
 
@@ -78,7 +113,7 @@ package body Packet_Mgr is
          (System.Multiprocessors.CPU_Range (11));
       accept Start;
       loop
-         delay 0.000001;
+         --  delay 0.000001;
          if Buffer_Handler.Handlers (Buffer_Handler.First).State = Full then
 
             Release_Free_Buffer_At (Buffer_Handler.First);
@@ -124,7 +159,7 @@ package body Packet_Mgr is
                Buffer_Ptr := Buffer_Handler.Handlers
                                 (Buffer_Handler.Current + 1).Handle.Get_Address;
             end New_Buffer_Addr;
-               Buffer_Handler.Handlers (Buffer_Handler.Current).State := Full;
+               Buffer_Handler.Handlers (Buffer_Handler.Current).State := Full; -- Near_Full
 
                Buffer_Handler.Current := Buffer_Handler.Current + 1;
          end select;
@@ -168,14 +203,15 @@ package body Packet_Mgr is
          for Header'Address use Datas (Integer (Seq_Nb))'Address;
       begin
          if Content = 0 then --  #16DEAD_BEEF#
-            Ada.Text_IO.Put_Line ("Found");
+         --     Ada.Text_IO.Put_Line ("Found");
             Datas (Integer (Seq_Nb) + 1) := Data;
-         else
-            --  Not managed yet. Should check if every Near-Full buffer are complete before
-            --  switching to Full State.
-            Ada.Text_IO.Put_Line ("Content : " & Content'Img);
-            Ada.Text_IO.Put_Line ("Prev Seq_Nb : " & Header.Seq_Nb'Img);
-            Ada.Text_IO.Put_Line ("Might comes from an older buffer (< current - 1)");
+         --  else
+         --     --  Not managed yet. Should check if every Near-Full buffer are complete before
+         --     --  switching to Full State.
+         --     Ada.Text_IO.Put_Line ("Content : " & Content'Img);
+         --     Ada.Text_IO.Put_Line ("Seq_Nb : " & Seq_Nb'Img);
+         --     Ada.Text_IO.Put_Line ("Prev Seq_Nb : " & Header.Seq_Nb'Img);
+         --     Ada.Text_IO.Put_Line ("Might comes from an older buffer (< current - 1)");
          end if;
       end;
    end Save_Ack;

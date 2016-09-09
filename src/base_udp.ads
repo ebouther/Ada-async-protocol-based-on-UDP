@@ -7,6 +7,7 @@ package Base_Udp is
 
    use type Interfaces.Unsigned_64;
 
+   --  8 or 16 otherwise it's too big for Set_Used_Bytes parameter (Integer)
    subtype Header is Interfaces.Unsigned_16;
 
    --  Packet Payload size in Bytes

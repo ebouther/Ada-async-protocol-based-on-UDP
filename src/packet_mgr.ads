@@ -18,6 +18,7 @@ package Packet_Mgr is
       record
          Handle    : Buffers.Buffer_Handle_Type;
          State     : State_Enum := Empty;
+         Missing   : Base_Udp.Header := 0;
       end record;
 
    --  Do not forget to check if current = first after a complete cycle
@@ -51,5 +52,9 @@ package Packet_Mgr is
       entry Stop;
       entry New_Buffer_Addr (Buffer_Ptr : in out System.Address);
    end PMH_Buffer_Addr;
+
+   task type Check_Buf_Integrity is
+      entry Start;
+   end Check_Buf_Integrity;
 
 end Packet_Mgr;

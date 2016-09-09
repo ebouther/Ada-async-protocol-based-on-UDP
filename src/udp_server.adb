@@ -1,6 +1,7 @@
 with Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Streams;
+with Ada.Exceptions;
 with Ada.Unchecked_Conversion;
 with Ada.Calendar;
 with Interfaces.C;
@@ -38,7 +39,7 @@ procedure UDP_Server is
 
    pragma Warnings (Off);
    task type Loss_Manager is
-      entry Start (Count           : Integer;
+      entry Start (Count           : Interfaces.Unsigned_64;
                    Data_Address    : System.Address;
                    Last_Address    : System.Address;
                    Number_Missed   : Interfaces.Unsigned_64);
@@ -144,16 +145,18 @@ procedure UDP_Server is
 
    task body Loss_Manager is
       Addr        :  System.Address;
-      Pos         :  Integer;
-      I           :  Integer;
+      Pos         :  Interfaces.Unsigned_64;
+      I           :  Interfaces.Unsigned_64;
       Data_Addr   :  System.Address;
       Last_Addr   :  System.Address;
       Nb_Missed   :  Interfaces.Unsigned_64;
 
       use System.Storage_Elements;
    begin
+      System.Multiprocessors.Dispatching_Domains.Set_CPU
+         (System.Multiprocessors.CPU_Range (3));
       loop
-         accept Start (Count           : Integer;
+         accept Start (Count           : Interfaces.Unsigned_64;
                        Data_Address    : System.Address;
                        Last_Address    : System.Address;
                        Number_Missed   : Interfaces.Unsigned_64) do
@@ -163,11 +166,13 @@ procedure UDP_Server is
             Nb_Missed   := Number_Missed;
          end Start;
 
-         for N in I .. I + Integer (Nb_Missed) - 1 loop
+         for N in I .. I + Nb_Missed - 1 loop
             Pos := N;
-            if N >= Integer (Base_Udp.Sequence_Size) and I < Integer (Base_Udp.Sequence_Size) then
+            if N >= Base_Udp.Sequence_Size
+               and I < Base_Udp.Sequence_Size
+            then
                Addr  := Data_Addr;
-               Pos   := N mod Integer (Base_Udp.Sequence_Size);
+               Pos   := N mod Base_Udp.Sequence_Size;
             else
                Addr  := Last_Addr;
             end if;
@@ -177,7 +182,7 @@ procedure UDP_Server is
                for Data_Missed'Address use Addr + Storage_Offset
                                                    (Pos * Base_Udp.Load_Size);
             begin
-               Data_Missed := 16#DEAD_BEEF#;
+               Data_Missed := 0; --  16#DEAD_BEEF#;
             end;
          end loop;
       end loop;
@@ -190,12 +195,12 @@ procedure UDP_Server is
       pragma Warnings (Off);
       Data_Addr, Last_Addr : System.Address;
       pragma Warnings (On);
-      I                    : Integer := Base_Udp.Pkt_Max + 1;
+      I                    : Interfaces.Unsigned_64 := Base_Udp.Pkt_Max + 1;
       Nb_Missed            : Interfaces.Unsigned_64;
 
+      use System.Storage_Elements;
       use type Interfaces.C.int;
       use type Reliable_Udp.Pkt_Nb;
-      use System.Storage_Elements;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (16));
@@ -210,7 +215,7 @@ procedure UDP_Server is
          else
             if I > Base_Udp.Pkt_Max then
                PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
-               I := I mod Integer (Base_Udp.Sequence_Size);
+               I := I mod Base_Udp.Sequence_Size;
             end if;
 
             declare
@@ -229,7 +234,6 @@ procedure UDP_Server is
                   Remove_Task.Remove (Header.Seq_Nb);
                   I := I - 1;
                else
-                  Ada.Text_IO.Put_Line ("Received :" & Header.Seq_Nb'Img);
                   --  New_Seq := False;
                   Nb_Packet_Received := Nb_Packet_Received + 1;
                   if Nb_Packet_Received = 1 then
@@ -253,22 +257,26 @@ procedure UDP_Server is
                         --  New_Seq := True;
 
                      end if;
-                     Append_Task.Append (Packet_Number,
-                                         Header.Seq_Nb - 1,
-                                         From);
+                     if Nb_Output > 20 then --  !! DBG !!  --
+                        Append_Task.Append (Packet_Number,
+                                            Header.Seq_Nb - 1,
+                                            From);
+                     else
+                        Missed := 0;
+                     end if;
 
                      Packet_Number := Header.Seq_Nb;
 
                      Last_Addr := Data_Addr;
 
-                     if Interfaces.Unsigned_64 (I) + Nb_Missed >= Base_Udp.Sequence_Size then
+                     if I + Nb_Missed >= Base_Udp.Sequence_Size then
                         PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
                      end if;
 
                      --  Memcpy Addr I to I + NB_Missed
                      declare
-                        Good_Loc_Index :  constant Integer := (I + Integer (Nb_Missed))
-                                             mod Integer (Base_Udp.Sequence_Size);
+                        Good_Loc_Index :  constant Interfaces.Unsigned_64 := I + Nb_Missed
+                                             mod Base_Udp.Sequence_Size;
                         Clear_Bad_Loc  :  Interfaces.Unsigned_32;
                         Good_Location  :  Base_Udp.Packet_Stream;
 
@@ -281,9 +289,9 @@ procedure UDP_Server is
                      end;
 
                      --  Takes too much time.. Might do a task vector.
-                     --  Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
+                     Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
 
-                     I := I + Integer (Nb_Missed);
+                     I := I + Nb_Missed;
 
 
                   end if;
@@ -305,6 +313,12 @@ procedure UDP_Server is
                   Watchdog := Watchdog + 1;
                   Ada.Text_IO.Put_Line ("Socket Error");
                   exit when Watchdog = 10;
+               when E : others =>
+                  Ada.Text_IO.Put_Line ("exception : " &
+                     Ada.Exceptions.Exception_Name (E) &
+                     " message : " &
+                     Ada.Exceptions.Exception_Message (E));
+
             end;
          end select;
       end loop;

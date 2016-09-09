@@ -83,7 +83,7 @@ package body Reliable_Udp is
       Ack_Mgr.Init_Socket;
       accept Start;
       loop
-         delay 0.0;
+         delay 0.1;
          select
             accept Stop;
             exit;
