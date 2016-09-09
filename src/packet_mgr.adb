@@ -99,7 +99,6 @@ package body Packet_Mgr is
                   N := N + 1;
                end loop Parse_Buffer;
             if N = Base_Udp.Pkt_Max + 1 then
-               Ada.Text_IO.Put_Line ("Full : " & Index'Img);
                Buffer_Handler.Handlers (Index).State := Full;
             end if;
          end if;
@@ -175,7 +174,6 @@ package body Packet_Mgr is
                                 (Buffer_Handler.Current + 1).Handle.Get_Address;
             end New_Buffer_Addr;
                if not Init then
-                  Ada.Text_IO.Put_Line ("Near_Full : " & Buffer_Handler.Current'Img);
                   Buffer_Handler.Handlers (Buffer_Handler.Current).State := Near_Full;
                end if;
                Buffer_Handler.Current := Buffer_Handler.Current + 1;
@@ -201,38 +199,101 @@ package body Packet_Mgr is
                        Data            :  in Base_Udp.Packet_Stream) is
 
       Location_Not_Found   : exception;
+      Goes_In_Loop         : Boolean := False;
 
       use Packet_Buffers;
+      use System.Storage_Elements;
       use type Reliable_Udp.Pkt_Nb;
+      use type Handle_Index;
    begin
-      for N in Buffer_Handler.First .. Buffer_Handler.Current loop
-         declare
-            type Data_Array is new Element_Array
-               (1 .. Integer (Base_Udp.Sequence_Size));
+      --  Parsing from Buffer_Handler.First to Last should be sufficient
+      --  but it raises Location_Not_Found at buffer 15
+      if Buffer_Handler.First > Buffer_Handler.Current then
+         for N in Buffer_Handler.First .. Handle_Index'Last loop
+            declare
+               type Data_Array is new Element_Array
+                  (1 .. Integer (Base_Udp.Sequence_Size));
 
-            Datas    : Data_Array;
-            Content  : Interfaces.Unsigned_32;
+               Datas    : Data_Array;
+               Content  : Interfaces.Unsigned_32;
 
-            for Datas'Address use Buffer_Handler.Handlers (N)
-               .Handle.Get_Address;
-            for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
-         begin
-            if Seq_Nb >= Packet_Number
-               and N = Buffer_Handler.Current
-            then
-               raise Location_Not_Found;
-            end if;
-            if Content = 16#DEAD_BEEF# then
-               Datas (Integer (Seq_Nb) + 1) := Data;
-               return;
-            else
-               raise Location_Not_Found;
-            --  Not managed yet. Should check if every Near-Full buffer are complete before
-            --  switching to Full State.
-            --  Ada.Text_IO.Put_Line ("Might comes from an older buffer (< current - 1)");
-            end if;
-         end;
-      end loop;
+               for Datas'Address use Buffer_Handler.Handlers (N)
+                  .Handle.Get_Address;
+               for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
+            begin
+               Ada.Text_IO.Put_Line ("N : " & N'Img & "Address : " & To_Integer (Content'Address)'Img);
+               if Seq_Nb >= Packet_Number
+                  and N = Buffer_Handler.Current
+               then
+                  raise Location_Not_Found;
+               end if;
+               if Content = 16#DEAD_BEEF# then
+                  Datas (Integer (Seq_Nb) + 1) := Data;
+                  return;
+               else
+                  Ada.Text_IO.Put_Line ("Content :" & Content'Img);
+               end if;
+            end;
+         end loop;
+
+         for N in Handle_Index'Last .. Buffer_Handler.Current loop
+            declare
+               type Data_Array is new Element_Array
+                  (1 .. Integer (Base_Udp.Sequence_Size));
+
+               Datas    : Data_Array;
+               Content  : Interfaces.Unsigned_32;
+
+               for Datas'Address use Buffer_Handler.Handlers (N)
+                  .Handle.Get_Address;
+               for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
+            begin
+               Ada.Text_IO.Put_Line ("N : " & N'Img & "Address : " & To_Integer (Content'Address)'Img);
+               if Seq_Nb >= Packet_Number
+                  and N = Buffer_Handler.Current
+               then
+                  raise Location_Not_Found;
+               end if;
+               if Content = 16#DEAD_BEEF# then
+                  Datas (Integer (Seq_Nb) + 1) := Data;
+                  return;
+               else
+                  Ada.Text_IO.Put_Line ("Content :" & Content'Img);
+               end if;
+            end;
+         end loop;
+      else
+         for N in Buffer_Handler.First .. Buffer_Handler.Current loop
+            declare
+               type Data_Array is new Element_Array
+                  (1 .. Integer (Base_Udp.Sequence_Size));
+
+               Datas    : Data_Array;
+               Content  : Interfaces.Unsigned_32;
+
+               for Datas'Address use Buffer_Handler.Handlers (N)
+                  .Handle.Get_Address;
+               for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
+            begin
+               Ada.Text_IO.Put_Line ("N : " & N'Img & "Address : " & To_Integer (Content'Address)'Img);
+               if Seq_Nb >= Packet_Number
+                  and N = Buffer_Handler.Current
+               then
+                  raise Location_Not_Found;
+               end if;
+               if Content = 16#DEAD_BEEF# then
+                  Datas (Integer (Seq_Nb) + 1) := Data;
+                  return;
+               else
+                  Ada.Text_IO.Put_Line ("Content :" & Content'Img);
+               end if;
+            end;
+            Goes_In_Loop := True;
+         end loop;
+      end if;
+      Ada.Text_IO.Put_Line ("Not Found : " & Seq_Nb'Img);
+      Ada.Text_IO.Put_Line ("Goes_In_Loop : " & Goes_In_Loop'Img);
+      raise Location_Not_Found;
    end Save_Ack;
 
 

@@ -165,28 +165,28 @@ procedure UDP_Server is
             Data_Addr   := Data_Address;
             Last_Addr   := Last_Address;
             Nb_Missed   := Number_Missed;
-         end Start;
 
-         for N in I .. I + Nb_Missed - 1 loop
-            Pos := N;
-            if N >= Base_Udp.Sequence_Size
-               and I < Base_Udp.Sequence_Size
-            then
-               Addr  := Data_Addr;
-               Pos   := N mod Base_Udp.Sequence_Size;
-            else
-               Addr  := Last_Addr;
-            end if;
+            for N in I .. I + Nb_Missed - 1 loop
+               Pos := N;
+               if N >= Base_Udp.Sequence_Size
+                  and I < Base_Udp.Sequence_Size
+               then
+                  Addr  := Data_Addr;
+                  Pos   := N mod Base_Udp.Sequence_Size;
+               else
+                  Addr  := Last_Addr;
+               end if;
 
-            declare
-               Data_Missed  :  Interfaces.Unsigned_32;
-               for Data_Missed'Address use Addr + Storage_Offset
-                                                   (Pos * Base_Udp.Load_Size);
-            begin
-               Ada.Text_IO.Put_Line ("Write DEAD_BEEF at " & Pos'Img);
-               Data_Missed := 16#DEAD_BEEF#;
-            end;
-         end loop;
+               declare
+                  Data_Missed  :  Interfaces.Unsigned_32;
+                  for Data_Missed'Address use Addr + Storage_Offset
+                                                      (Pos * Base_Udp.Load_Size);
+               begin
+                  Ada.Text_IO.Put_Line ("Write DEAD_BEEF at " & Pos'Img);
+                  Data_Missed := 16#DEAD_BEEF#;
+               end;
+            end loop;
+         end Start; -- DBG synchronous
       end loop;
       exception
          when E : others =>
@@ -264,13 +264,13 @@ procedure UDP_Server is
 
                      end if;
 
-                     --  if Nb_Output > 20 then --  !! DBG !!  --
-                     Append_Task.Append (Packet_Number,
+                     if Nb_Output > 20 then --  !! DBG !!  --
+                        Append_Task.Append (Packet_Number,
                                          Header.Seq_Nb - 1,
                                          From);
-                     --  else
-                     --     Missed := 0;
-                     --  end if;
+                     else
+                        Missed := 0;
+                     end if;
 
                      Packet_Number := Header.Seq_Nb;
 
@@ -283,7 +283,9 @@ procedure UDP_Server is
                      Packet_Mgr.Copy_To_Correct_Location (I, Nb_Missed, Data, Data_Addr);
 
                      --  Takes too much time.. Might do a task vector.
-                     Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
+                     if Nb_Output > 20 then --  !! DBG !!  --
+                        Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
+                     end if;
 
                      I := I + Nb_Missed;
 
