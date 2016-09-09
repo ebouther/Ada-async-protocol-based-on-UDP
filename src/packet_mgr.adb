@@ -113,7 +113,7 @@ package body Packet_Mgr is
          (System.Multiprocessors.CPU_Range (11));
       accept Start;
       loop
-         --  delay 0.000001;
+         delay 0.000001; -- Doesn't work without delay :/
          if Buffer_Handler.Handlers (Buffer_Handler.First).State = Full then
 
             Release_Free_Buffer_At (Buffer_Handler.First);
@@ -159,7 +159,7 @@ package body Packet_Mgr is
                Buffer_Ptr := Buffer_Handler.Handlers
                                 (Buffer_Handler.Current + 1).Handle.Get_Address;
             end New_Buffer_Addr;
-               Buffer_Handler.Handlers (Buffer_Handler.Current).State := Full; -- Near_Full
+               Buffer_Handler.Handlers (Buffer_Handler.Current).State := Near_Full;
 
                Buffer_Handler.Current := Buffer_Handler.Current + 1;
          end select;
@@ -202,8 +202,8 @@ package body Packet_Mgr is
          for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
          for Header'Address use Datas (Integer (Seq_Nb))'Address;
       begin
-         if Content = 0 then --  #16DEAD_BEEF#
-         --     Ada.Text_IO.Put_Line ("Found");
+         if Content = 16#DEAD_BEEF# then --  #16DEAD_BEEF#
+            --  Ada.Text_IO.Put_Line ("Found");
             Datas (Integer (Seq_Nb) + 1) := Data;
          --  else
          --     --  Not managed yet. Should check if every Near-Full buffer are complete before

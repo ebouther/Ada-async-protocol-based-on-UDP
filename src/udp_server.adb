@@ -55,6 +55,7 @@ procedure UDP_Server is
    Recv_Socket_Task     : Recv_Socket;
    Log_Task             : Timer;
    Manage_Loss_Task     : Loss_Manager;
+   Check_Integrity_Task : Packet_Mgr.Check_Buf_Integrity;
 
    PMH_Buffer_Task      : Packet_Mgr.PMH_Buffer_Addr;
    Release_Buf_Task     : Packet_Mgr.Release_Full_Buf;
@@ -182,7 +183,7 @@ procedure UDP_Server is
                for Data_Missed'Address use Addr + Storage_Offset
                                                    (Pos * Base_Udp.Load_Size);
             begin
-               Data_Missed := 0; --  16#DEAD_BEEF#;
+               Data_Missed := 16#DEAD_BEEF#;
             end;
          end loop;
       end loop;
@@ -277,15 +278,15 @@ procedure UDP_Server is
                      declare
                         Good_Loc_Index :  constant Interfaces.Unsigned_64 := I + Nb_Missed
                                              mod Base_Udp.Sequence_Size;
-                        Clear_Bad_Loc  :  Interfaces.Unsigned_32;
+                        --  Clear_Bad_Loc  :  Interfaces.Unsigned_32;
                         Good_Location  :  Base_Udp.Packet_Stream;
 
                         for Good_Location'Address use Data_Addr + Storage_Offset
                                                    (Good_Loc_Index * Base_Udp.Load_Size);
-                        for Clear_Bad_Loc'Address use Data'Address;
+                        --  for Clear_Bad_Loc'Address use Data'Address;
                      begin
                         Good_Location := Data;
-                        Clear_Bad_Loc := 0; --  16#DEAD_BEEF#; -- Not necessary if Manage_Loss_Task work
+                        --  Clear_Bad_Loc := 0; --  16#DEAD_BEEF#; -- Not necessary if Manage_Loss_Task work
                      end;
 
                      --  Takes too much time.. Might do a task vector.
@@ -345,6 +346,7 @@ begin
    Release_Buf_Task.Start;
    --  Process_Pkt.Start;
    Ack_Task.Start;
+   Check_Integrity_Task.Start;
 
    --  delay 40.0;
    --  Stop_Server;
