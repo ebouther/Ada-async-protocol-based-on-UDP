@@ -75,7 +75,8 @@ package body Reliable_Udp is
       end loop;
    end Remove_Task;
 
-
+   --  Issue: Prevent from receiving packets when two much aks
+   --  which create even more acks...
    task body Ack_Task is
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU

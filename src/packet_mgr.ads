@@ -1,4 +1,5 @@
 with System;
+with Interfaces;
 
 with Reliable_Udp;
 
@@ -21,8 +22,6 @@ package Packet_Mgr is
          Missing   : Base_Udp.Header := 0;
       end record;
 
-   --  Do not forget to check if current = first after a complete cycle
-   --  as Index_Handle is used in a circular way. Must not happen.
    type Handle_Array is array (Handle_Index) of Handler;
 
    package Packet_Buffers is new
@@ -39,20 +38,35 @@ package Packet_Mgr is
 
    procedure Init_Handle_Array;
    procedure Release_Free_Buffer_At (Index : in Handle_Index);
+
+   --  Get Content of Released Buffers and Log it to File (buffers.log)
+   --  or Display it. Depends on To_File Boolean.
    procedure Get_Filled_Buf (To_File   : in Boolean := True);
+
+   --  Search position of ack received in current and previous buffers
+   --  and then store content in it.
    procedure Save_Ack (Seq_Nb          :  in Reliable_Udp.Pkt_Nb;
                        Packet_Number   :  in Reliable_Udp.Pkt_Nb;
                        Data            :  in Base_Udp.Packet_Stream);
 
+   --  Memcpy Addr I to I + NB_Missed
+   procedure Copy_To_Correct_Location (I, Nb_Missed   : Interfaces.Unsigned_64;
+                                       Data           : Base_Udp.Packet_Stream;
+                                       Data_Addr      : System.Address);
+
+   --  Release Buffer and Reuse Handler only if Buffer State is "Full"
    task type Release_Full_Buf is
       entry Start;
    end Release_Full_Buf;
 
+   --  Get the address of a New Buffer
    task type PMH_Buffer_Addr is
       entry Stop;
       entry New_Buffer_Addr (Buffer_Ptr : in out System.Address);
    end PMH_Buffer_Addr;
 
+   --  Change Buffer State from "Near_Full" to "Full" only if it contains
+   --  all Packets
    task type Check_Buf_Integrity is
       entry Start;
    end Check_Buf_Integrity;

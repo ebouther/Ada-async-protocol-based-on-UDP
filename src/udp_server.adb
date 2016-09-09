@@ -183,6 +183,7 @@ procedure UDP_Server is
                for Data_Missed'Address use Addr + Storage_Offset
                                                    (Pos * Base_Udp.Load_Size);
             begin
+               Ada.Text_IO.Put_Line ("Write DEAD_BEEF at " & Pos'Img);
                Data_Missed := 16#DEAD_BEEF#;
             end;
          end loop;
@@ -242,7 +243,6 @@ procedure UDP_Server is
                   Remove_Task.Remove (Header.Seq_Nb);
                   I := I - 1;
                else
-                  --  New_Seq := False;
                   Nb_Packet_Received := Nb_Packet_Received + 1;
                   if Nb_Packet_Received = 1 then
                      Start_Time := Ada.Calendar.Clock;
@@ -262,13 +262,12 @@ procedure UDP_Server is
 
                         Ada.Text_IO.Put_Line ("BAD ORDER");
 
-                        --  New_Seq := True;
-
                      end if;
+
                      --  if Nb_Output > 20 then --  !! DBG !!  --
-                        Append_Task.Append (Packet_Number,
-                                            Header.Seq_Nb - 1,
-                                            From);
+                     Append_Task.Append (Packet_Number,
+                                         Header.Seq_Nb - 1,
+                                         From);
                      --  else
                      --     Missed := 0;
                      --  end if;
@@ -281,26 +280,12 @@ procedure UDP_Server is
                         PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
                      end if;
 
-                     --  Memcpy Addr I to I + NB_Missed
-                     declare
-                        Good_Loc_Index :  constant Interfaces.Unsigned_64 := I + Nb_Missed
-                                             mod Base_Udp.Sequence_Size;
-                        --  Clear_Bad_Loc  :  Interfaces.Unsigned_32;
-                        Good_Location  :  Base_Udp.Packet_Stream;
-
-                        for Good_Location'Address use Data_Addr + Storage_Offset
-                                                   (Good_Loc_Index * Base_Udp.Load_Size);
-                        --  for Clear_Bad_Loc'Address use Data'Address;
-                     begin
-                        Good_Location := Data;
-                        --  Clear_Bad_Loc := 0; --  16#DEAD_BEEF#; -- Not necessary if Manage_Loss_Task work
-                     end;
+                     Packet_Mgr.Copy_To_Correct_Location (I, Nb_Missed, Data, Data_Addr);
 
                      --  Takes too much time.. Might do a task vector.
                      Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
 
                      I := I + Nb_Missed;
-
 
                   end if;
 

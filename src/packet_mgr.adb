@@ -1,5 +1,4 @@
 with Ada.Text_IO;
-with Interfaces;
 with Ada.Exceptions;
 with System.Multiprocessors.Dispatching_Domains;
 with System.Storage_Elements;
@@ -28,10 +27,11 @@ package body Packet_Mgr is
 
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
 
-      --  Is incremented to First when Recv_Packets asks for new Buf
+      --  Current is incremented to First when Recv_Packets asks for new Buf
       Buffer_Handler.Current := Buffer_Handler.Handlers'Last;
 
-      --  Please kernel give me some physical memory. Don't keep it as virtual.
+      --  Please kernel give me some physical memory.
+      --  Don't keep it as virtual till I write inside.
       for I in Buffer_Handler.Handlers'Range loop
          Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (I).Handle);
          declare
@@ -54,6 +54,7 @@ package body Packet_Mgr is
    ------------------------------
 
    procedure Release_Free_Buffer_At (Index : in Handle_Index) is
+
    begin
 
       Buffers.Set_Used_Bytes (Buffer_Handler.Handlers (Index).Handle,
@@ -92,6 +93,7 @@ package body Packet_Mgr is
                      for Data'Address use Addr + Storage_Offset
                                                    (N * Base_Udp.Load_Size);
                   begin
+                     --  Ada.Text_IO.Put_Line ("DEAD_BEEF at : " & N'Img);
                      exit Parse_Buffer when Data = 16#DEAD_BEEF#;
                   end;
                   N := N + 1;
@@ -104,6 +106,7 @@ package body Packet_Mgr is
          Index := Index + 1;
       end loop;
    end Check_Buf_Integrity;
+
 
   ------------------------
   --  Release_Full_Buf  --
@@ -123,12 +126,14 @@ package body Packet_Mgr is
 
             Buffer_Handler.Handlers (Buffer_Handler.First).Handle.Reuse;
 
-            Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (Buffer_Handler.First).Handle);
+            Buffer_Handler.Buffer.Get_Free_Buffer
+               (Buffer_Handler.Handlers
+                  (Buffer_Handler.First).Handle);
 
             Buffer_Handler.First := Buffer_Handler.First + 1;
+            Ada.Text_IO.Put_Line ("First : " & Buffer_Handler.First'Img);
 
             Get_Filled_Buf;
-
          end if;
       end loop;
    exception
@@ -145,6 +150,8 @@ package body Packet_Mgr is
    -----------------------
 
    task body PMH_Buffer_Addr is
+      Not_Released_Fast_Enough   : exception;
+      Init                       : Boolean := True;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (12));
@@ -159,12 +166,21 @@ package body Packet_Mgr is
          or
             accept New_Buffer_Addr (Buffer_Ptr   : in out System.Address) do
 
+               if Buffer_Handler.Current + 1 = Buffer_Handler.First
+                  and not Init
+               then
+                  raise Not_Released_Fast_Enough;
+               end if;
                Buffer_Ptr := Buffer_Handler.Handlers
                                 (Buffer_Handler.Current + 1).Handle.Get_Address;
             end New_Buffer_Addr;
-               Buffer_Handler.Handlers (Buffer_Handler.Current).State := Near_Full;
-
+               if not Init then
+                  Ada.Text_IO.Put_Line ("Near_Full : " & Buffer_Handler.Current'Img);
+                  Buffer_Handler.Handlers (Buffer_Handler.Current).State := Near_Full;
+               end if;
                Buffer_Handler.Current := Buffer_Handler.Current + 1;
+               Ada.Text_IO.Put_Line ("Current : " & Buffer_Handler.Current'Img);
+               Init := False;
          end select;
       end loop;
    exception
@@ -184,39 +200,39 @@ package body Packet_Mgr is
                        Packet_Number   :  in Reliable_Udp.Pkt_Nb;
                        Data            :  in Base_Udp.Packet_Stream) is
 
+      Location_Not_Found   : exception;
+
       use Packet_Buffers;
       use type Reliable_Udp.Pkt_Nb;
    begin
-      --  Ack belongs to a previous buffer.
-      declare
-         type Data_Array is new Element_Array
-            (1 .. Integer (Base_Udp.Sequence_Size));
+      for N in Buffer_Handler.First .. Buffer_Handler.Current loop
+         declare
+            type Data_Array is new Element_Array
+               (1 .. Integer (Base_Udp.Sequence_Size));
 
-         Datas    : Data_Array;
-         Content  : Interfaces.Unsigned_32;
-         Header   : Reliable_Udp.Header;
+            Datas    : Data_Array;
+            Content  : Interfaces.Unsigned_32;
 
-         for Datas'Address use Buffer_Handler.Handlers
-            (if Seq_Nb > Packet_Number then
-               Buffer_Handler.Current - 1
-             else
-               Buffer_Handler.Current
-            ).Handle.Get_Address;
-         for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
-         for Header'Address use Datas (Integer (Seq_Nb))'Address;
-      begin
-         if Content = 16#DEAD_BEEF# then --  #16DEAD_BEEF#
-            --  Ada.Text_IO.Put_Line ("Found");
-            Datas (Integer (Seq_Nb) + 1) := Data;
-         --  else
-         --     --  Not managed yet. Should check if every Near-Full buffer are complete before
-         --     --  switching to Full State.
-         --     Ada.Text_IO.Put_Line ("Content : " & Content'Img);
-         --     Ada.Text_IO.Put_Line ("Seq_Nb : " & Seq_Nb'Img);
-         --     Ada.Text_IO.Put_Line ("Prev Seq_Nb : " & Header.Seq_Nb'Img);
-         --     Ada.Text_IO.Put_Line ("Might comes from an older buffer (< current - 1)");
-         end if;
-      end;
+            for Datas'Address use Buffer_Handler.Handlers (N)
+               .Handle.Get_Address;
+            for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
+         begin
+            if Seq_Nb >= Packet_Number
+               and N = Buffer_Handler.Current
+            then
+               raise Location_Not_Found;
+            end if;
+            if Content = 16#DEAD_BEEF# then
+               Datas (Integer (Seq_Nb) + 1) := Data;
+               return;
+            else
+               raise Location_Not_Found;
+            --  Not managed yet. Should check if every Near-Full buffer are complete before
+            --  switching to Full State.
+            --  Ada.Text_IO.Put_Line ("Might comes from an older buffer (< current - 1)");
+            end if;
+         end;
+      end loop;
    end Save_Ack;
 
 
@@ -293,5 +309,25 @@ package body Packet_Mgr is
                Ada.Exceptions.Exception_Message (E));
       end;
    end Get_Filled_Buf;
+
+
+   --------------------------------
+   --  Copy_To_Correct_Location  --
+   --------------------------------
+
+   procedure Copy_To_Correct_Location (I, Nb_Missed   : Interfaces.Unsigned_64;
+                                       Data           : Base_Udp.Packet_Stream;
+                                       Data_Addr      : System.Address) is
+
+      Good_Loc_Index :  constant Interfaces.Unsigned_64 := I + Nb_Missed
+                           mod Base_Udp.Sequence_Size;
+      Good_Location  :  Base_Udp.Packet_Stream;
+
+      use System.Storage_Elements;
+      for Good_Location'Address use Data_Addr + Storage_Offset
+                                 (Good_Loc_Index * Base_Udp.Load_Size);
+   begin
+            Good_Location := Data;
+   end Copy_To_Correct_Location;
 
 end Packet_Mgr;
