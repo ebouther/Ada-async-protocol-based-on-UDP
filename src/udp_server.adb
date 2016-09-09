@@ -187,6 +187,13 @@ procedure UDP_Server is
             end;
          end loop;
       end loop;
+      exception
+         when E : others =>
+            Ada.Text_IO.Put_Line ("exception : " &
+               Ada.Exceptions.Exception_Name (E) &
+               " message : " &
+               Ada.Exceptions.Exception_Message (E));
+
    end Loss_Manager;
 
 
@@ -258,13 +265,13 @@ procedure UDP_Server is
                         --  New_Seq := True;
 
                      end if;
-                     if Nb_Output > 20 then --  !! DBG !!  --
+                     --  if Nb_Output > 20 then --  !! DBG !!  --
                         Append_Task.Append (Packet_Number,
                                             Header.Seq_Nb - 1,
                                             From);
-                     else
-                        Missed := 0;
-                     end if;
+                     --  else
+                     --     Missed := 0;
+                     --  end if;
 
                      Packet_Number := Header.Seq_Nb;
 

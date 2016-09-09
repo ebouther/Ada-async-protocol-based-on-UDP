@@ -78,6 +78,8 @@ package body Packet_Mgr is
       N     : Integer;
       use System.Storage_Elements;
    begin
+      System.Multiprocessors.Dispatching_Domains.Set_CPU
+         (System.Multiprocessors.CPU_Range (4));
       accept Start;
       loop
          if Buffer_Handler.Handlers (Index).State = Near_Full then
@@ -94,7 +96,8 @@ package body Packet_Mgr is
                   end;
                   N := N + 1;
                end loop Parse_Buffer;
-            if N = Base_Udp.Pkt_Max then
+            if N = Base_Udp.Pkt_Max + 1 then
+               Ada.Text_IO.Put_Line ("Full : " & Index'Img);
                Buffer_Handler.Handlers (Index).State := Full;
             end if;
          end if;
