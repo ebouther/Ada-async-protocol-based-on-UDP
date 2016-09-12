@@ -124,7 +124,8 @@ procedure UDP_Server is
       loop
          select
             accept Stop;
-            exit;
+            terminate;
+            --  exit;
          else
             delay 1.0;
             --  Ada.Text_IO.Put_Line ("Buf len : " & Buffer.Cur_Count'Img);
@@ -182,7 +183,6 @@ procedure UDP_Server is
                   for Data_Missed'Address use Addr + Storage_Offset
                                                       (Pos * Base_Udp.Load_Size);
                begin
-                  --  Ada.Text_IO.Put_Line ("Write DEAD_BEEF at " & Pos'Img);
                   Data_Missed := 16#DEAD_BEEF#;
                end;
             end loop;
@@ -293,8 +293,6 @@ procedure UDP_Server is
 
                   if Header.Seq_Nb = Base_Udp.Pkt_Max then
                      Packet_Number := 0;
-
-                     ---  New_Seq := True;
                   else
                      Packet_Number := Packet_Number + 1;
                   end if;

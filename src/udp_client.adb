@@ -39,7 +39,8 @@ procedure UDP_Client is
       procedure Rcv_Ack;
 
       function To_Int is
-         new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type, Interfaces.C.int);
+         new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type,
+            Interfaces.C.int);
 
       procedure Send_Packet (Packet_Nb : Jumbo_U8;
                              Ack : Boolean) is

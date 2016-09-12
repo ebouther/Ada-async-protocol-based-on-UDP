@@ -5,6 +5,11 @@ package body Reliable_Udp is
 
    Ack_Mgr      : Ack_Management;
 
+
+   -------------------
+   --  Append_Task  --
+   -------------------
+
    task body Append_Task is
       Packet_Lost      : Reliable_Udp.Loss;
       Client_Addr      : GNAT.Sockets.Sock_Addr_Type;
@@ -57,6 +62,10 @@ package body Reliable_Udp is
    end Append_Task;
 
 
+   -------------------
+   --  Remove_Task  --
+   -------------------
+
    task body Remove_Task is
       Pkt   : Pkt_Nb;
    begin
@@ -74,6 +83,10 @@ package body Reliable_Udp is
          end select;
       end loop;
    end Remove_Task;
+
+   ----------------
+   --  Ack_Task  --
+   ----------------
 
    --  Issue: Prevent from receiving packets when two much aks
    --  which create even more acks...
@@ -97,6 +110,11 @@ package body Reliable_Udp is
 
    protected body Ack_Management is
 
+
+      -------------------
+      --  Init_Socket  --
+      -------------------
+
       procedure Init_Socket is
       begin
          GNAT.Sockets.Create_Socket (Socket,
@@ -105,12 +123,20 @@ package body Reliable_Udp is
       end Init_Socket;
 
 
+      --------------
+      --  Append  --
+      --------------
+
       procedure Append (Packet_Lost : in Loss) is
       begin
          Losses_Container.Append (Container  => Losses,
                                   New_Item   => Packet_Lost);
       end Append;
 
+
+      ----------------------
+      --  Update_AckTime  --
+      ----------------------
 
       procedure Update_AckTime (Position   : in Losses_Container.Cursor;
          Ack_Time    :  in Ada.Real_Time.Time) is
@@ -121,6 +147,10 @@ package body Reliable_Udp is
          Losses_Container.Replace_Element (Losses, Position, Element);
       end Update_AckTime;
 
+
+      --------------
+      --  Remove  --
+      --------------
 
       procedure Remove (Packet   : Pkt_Nb) is
          Cursor      : Losses_Container.Cursor := Losses.First;
@@ -137,10 +167,20 @@ package body Reliable_Udp is
          end loop;
       end Remove;
 
+
+      --------------
+      --  Length  --
+      --------------
+
       function Length return Ada.Containers.Count_Type is
       begin
          return Losses.Length;
       end Length;
+
+
+      -----------
+      --  Ack  --
+      -----------
 
       procedure Ack is
          Ack_Array   : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
@@ -150,7 +190,6 @@ package body Reliable_Udp is
          Cur_Time    : constant Ada.Real_Time.Time := Ada.Real_Time.Clock;
          Cursor      : Losses_Container.Cursor := Losses.First;
          Element     : Loss;
-         --  First       : Boolean := True;
 
          for Data'Address use Ack_Array'Address;
          for Head'Address use Ack_Array'Address;
@@ -167,7 +206,6 @@ package body Reliable_Udp is
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Losses_Container.Replace_Element (Losses, Cursor, Element);
                   Head.Seq_Nb := Element.Packet;
-                  --  Ada.Text_IO.Put_Line ("Send Ack : " & Seq_Nb'Img);
                   GNAT.Sockets.Send_Socket (Socket, Data, Offset, Element.From);
                   Update_AckTime (Cursor, Ada.Real_Time.Clock);
                end if;

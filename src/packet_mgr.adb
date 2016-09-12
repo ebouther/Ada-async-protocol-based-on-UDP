@@ -22,7 +22,7 @@ package body Packet_Mgr is
    begin
 
       --  Need a "+ 1" otherwise it cannot get a free buffer in Release_Full_Buf
-      Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb + 1, Size => Buffers.Buffer_Size_Type
+      Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb, Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
 
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
@@ -30,17 +30,14 @@ package body Packet_Mgr is
       --  Current is incremented to First when Recv_Packets asks for new Buf
       Buffer_Handler.Current := Buffer_Handler.Handlers'Last;
 
-      --  Please kernel give me some physical memory.
-      --  Don't keep it as virtual till I write inside.
+      --  Kernel keeps memory as virtual till I write inside.
       for I in Buffer_Handler.Handlers'Range loop
          Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (I).Handle);
          declare
             Message : Base_Udp.Packet_Payload;
             for Message'Address use Buffer_Handler.Handlers (I).Handle.Get_Address;
          begin
-            for N in Message'Range loop
-               Message (N) := 0;
-            end loop;
+            Message := (others => 16#FA#);
             Ada.Text_IO.Put_Line (Message (Message'Last)'Img);
          end;
       end loop;
@@ -169,6 +166,8 @@ package body Packet_Mgr is
                   and not Init
                then
                   raise Not_Released_Fast_Enough;
+                  --  Release Buffer even if it is not full
+                  --  Buffer_Handler.Handlers (Buffer_Handler.First).State := Full;
                end if;
                Buffer_Ptr := Buffer_Handler.Handlers
                                 (Buffer_Handler.Current + 1).Handle.Get_Address;
@@ -199,7 +198,6 @@ package body Packet_Mgr is
                        Data            :  in Base_Udp.Packet_Stream) is
 
       Location_Not_Found   : exception;
-      Goes_In_Loop         : Boolean := False;
 
       use Packet_Buffers;
       use System.Storage_Elements;
@@ -221,7 +219,6 @@ package body Packet_Mgr is
                   .Handle.Get_Address;
                for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
             begin
-               --  Ada.Text_IO.Put_Line ("N : " & N'Img & "Address : " & To_Integer (Content'Address)'Img);
                if Seq_Nb >= Packet_Number
                   and N = Buffer_Handler.Current
                then
@@ -230,11 +227,8 @@ package body Packet_Mgr is
                if Content = 16#DEAD_BEEF# then
                   Datas (Integer (Seq_Nb) + 1) := Data;
                   return;
-               --  else
-               --     Ada.Text_IO.Put_Line ("Content :" & Content'Img);
                end if;
             end;
-            Goes_In_Loop := True;
          end loop;
 
          for N in Handle_Index'First .. Buffer_Handler.Current loop
@@ -249,7 +243,6 @@ package body Packet_Mgr is
                   .Handle.Get_Address;
                for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
             begin
-               --  Ada.Text_IO.Put_Line ("N : " & N'Img & "Address : " & To_Integer (Content'Address)'Img);
                if Seq_Nb >= Packet_Number
                   and N = Buffer_Handler.Current
                then
@@ -258,11 +251,8 @@ package body Packet_Mgr is
                if Content = 16#DEAD_BEEF# then
                   Datas (Integer (Seq_Nb) + 1) := Data;
                   return;
-               --  else
-               --     Ada.Text_IO.Put_Line ("Content :" & Content'Img);
                end if;
             end;
-            Goes_In_Loop := True;
          end loop;
       else
          for N in Buffer_Handler.First .. Buffer_Handler.Current loop
@@ -277,7 +267,6 @@ package body Packet_Mgr is
                   .Handle.Get_Address;
                for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
             begin
-               --  Ada.Text_IO.Put_Line ("N : " & N'Img & "Address : " & To_Integer (Content'Address)'Img);
                if Seq_Nb >= Packet_Number
                   and N = Buffer_Handler.Current
                then
@@ -286,15 +275,11 @@ package body Packet_Mgr is
                if Content = 16#DEAD_BEEF# then
                   Datas (Integer (Seq_Nb) + 1) := Data;
                   return;
-               --  else
-               --     Ada.Text_IO.Put_Line ("Content :" & Content'Img);
                end if;
             end;
-            Goes_In_Loop := True;
          end loop;
       end if;
       Ada.Text_IO.Put_Line ("Not Found : " & Seq_Nb'Img);
-      Ada.Text_IO.Put_Line ("Goes_In_Loop : " & Goes_In_Loop'Img);
       raise Location_Not_Found;
    end Save_Ack;
 

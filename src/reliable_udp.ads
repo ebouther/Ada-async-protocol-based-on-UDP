@@ -17,8 +17,10 @@ package Reliable_Udp is
    use type Interfaces.Unsigned_32;
    use type Interfaces.Unsigned_64;
 
+   --  Stored in packet header to identify which packet was lost
    type Pkt_Nb is mod 2 ** (Base_Udp.Header'Size - 1);
 
+   --  Used to store lost packet and when it can be resend if needed
    type Loss is
       record
          Packet      : Pkt_Nb;
@@ -26,6 +28,7 @@ package Reliable_Udp is
          From        : GNAT.Sockets.Sock_Addr_Type;
       end record;
 
+   --  Header used at packet payload begin to manage drops
    type Header is
       record
          Seq_Nb      : Pkt_Nb;
@@ -40,33 +43,49 @@ package Reliable_Udp is
 
    for Header'Alignment use Base_Udp.Header_Size;
 
+   --  Vector of "Loss" Type which stores acks.
    package Losses_Container is
       new Ada.Containers.Vectors (Natural, Loss);
 
+   --  Send acks to client if it's necessary.
    task type Ack_Task is
       pragma Priority (System.Priority'First);
       entry Start;
       entry Stop;
    end Ack_Task;
 
+   --  Appends packets to Losses Container
    task type Append_Task is
       entry Stop;
       entry Append (First_Dropped, Last_Dropped : Reliable_Udp.Pkt_Nb;
                    Client_Address               : GNAT.Sockets.Sock_Addr_Type);
    end Append_Task;
 
+   --  Removes Pkt_Nb from Losses Container
    task type Remove_Task is
       entry Stop;
       entry Remove (Packet : in Pkt_Nb);
    end Remove_Task;
 
    protected type Ack_Management is
+      --  Creates a socket used to send Acks only
       procedure Init_Socket;
+
+      --  Adds to the Losses_Container missing packets
       procedure Append (Packet_Lost : in Loss);
+
+      --  Removes packet from losses container once it has been received
+      procedure Remove (Packet   : Pkt_Nb);
+
+      --  Renews Ack_Time stored in Loss record.
+      --  Used to resend ack after a timeout.
       procedure Update_AckTime (Position  : in Losses_Container.Cursor;
                                Ack_Time   : in Ada.Real_Time.Time);
-      procedure Remove (Packet   : Pkt_Nb);
+
+      --  Parses all Losses Container and sends acks if it's necessary.
       procedure Ack;
+
+      --  Get Length of the Container.
       function Length return Ada.Containers.Count_Type;
 
       private
