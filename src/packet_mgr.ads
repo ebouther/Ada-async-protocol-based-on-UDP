@@ -9,10 +9,16 @@ with Buffers.Local;
 package Packet_Mgr is
 
    --  Number of pmh buffers initialized
-   PMH_Buf_Nb     : constant := 16;
+   PMH_Buf_Nb     : constant := 32;
 
+   --  Index Type for "Handlers" array
+   --  "is mod type" enables a circular parsing
    type Handle_Index is mod PMH_Buf_Nb;
 
+   --  State of Buffer:
+   --  Empty =>  Buf is released
+   --  Near_Full => Buf is waiting for acks
+   --  Full => Ready to be Released
    type State_Enum is (Empty, Near_Full, Full);
 
    type Handler is limited
@@ -22,6 +28,7 @@ package Packet_Mgr is
          Missing   : Base_Udp.Header := 0;
       end record;
 
+   --  Contains all the Handlers
    type Handle_Array is array (Handle_Index) of Handler;
 
    package Packet_Buffers is new
@@ -36,7 +43,11 @@ package Packet_Mgr is
          Current     : Handle_Index;
       end record;
 
+   --  Initialize "PMH_Buf_Nb" of Buffer and attach a buffer
+   --  to each Handler of Handle_Array
    procedure Init_Handle_Array;
+
+   --  Release Buffer at Handlers (Index) and change its State to Empty
    procedure Release_Free_Buffer_At (Index : in Handle_Index);
 
    --  Get Content of Released Buffers and Log it to File (buffers.log)
@@ -49,7 +60,8 @@ package Packet_Mgr is
                        Packet_Number   :  in Reliable_Udp.Pkt_Nb;
                        Data            :  in Base_Udp.Packet_Stream);
 
-   --  Memcpy Addr I to I + NB_Missed
+   --  Move Data Received to good location (Nb_Missed Offset) if packets
+   --  were dropped
    procedure Copy_To_Correct_Location (I, Nb_Missed   : Interfaces.Unsigned_64;
                                        Data           : Base_Udp.Packet_Stream;
                                        Data_Addr      : System.Address);

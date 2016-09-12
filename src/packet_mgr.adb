@@ -22,7 +22,8 @@ package body Packet_Mgr is
    begin
 
       --  Need a "+ 1" otherwise it cannot get a free buffer in Release_Full_Buf
-      Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb, Size => Buffers.Buffer_Size_Type
+      Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb + 1,
+         Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
 
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
@@ -154,10 +155,6 @@ package body Packet_Mgr is
       loop
          select
             accept Stop;
-               --  Set_Used_Bytes_At (Buffer_Handler.Prod_Cursor, Integer (Base_Udp.Sequence_Size));
-               --  Ada.Text_IO.Put_Line ("*** Released Buffer before Quitting Task ***");
-               --  Release_Free_Buffer_At (Buffer_Handler.Prod_Cursor);
-               --  Buffer_Handler.Handlers.Delete (Buffer_Handler.Prod_Cursor);
                exit;
          or
             accept New_Buffer_Addr (Buffer_Ptr   : in out System.Address) do

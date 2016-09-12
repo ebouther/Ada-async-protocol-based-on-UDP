@@ -43,11 +43,11 @@ package Reliable_Udp is
 
    for Header'Alignment use Base_Udp.Header_Size;
 
-   --  Vector of "Loss" Type which stores acks.
+   --  Vector of "Loss" Type which stores acks
    package Losses_Container is
       new Ada.Containers.Vectors (Natural, Loss);
 
-   --  Send acks to client if it's necessary.
+   --  Send acks to client if it's necessary
    task type Ack_Task is
       pragma Priority (System.Priority'First);
       entry Start;

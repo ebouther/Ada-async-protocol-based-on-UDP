@@ -124,8 +124,7 @@ procedure UDP_Server is
       loop
          select
             accept Stop;
-            terminate;
-            --  exit;
+            exit;
          else
             delay 1.0;
             --  Ada.Text_IO.Put_Line ("Buf len : " & Buffer.Cur_Count'Img);
@@ -198,18 +197,94 @@ procedure UDP_Server is
    end Loss_Manager;
 
 
+   procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
+                             Header    : in Reliable_Udp.Header;
+                             I         : in out Interfaces.Unsigned_64;
+                             Data_Addr : in out System.Address);
+
+   procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
+                             Header    : in Reliable_Udp.Header;
+                             I         : in out Interfaces.Unsigned_64;
+                             Data_Addr : in out System.Address)
+   is
+      Last_Addr            : System.Address;
+      Nb_Missed            : Interfaces.Unsigned_64;
+      Disordered_Packets   : exception;
+      use type Reliable_Udp.Pkt_Nb;
+   begin
+
+      if Header.Ack then
+         Packet_Mgr.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
+         Remove_Task.Remove (Header.Seq_Nb);
+         I := I - 1;
+      else
+         Nb_Packet_Received := Nb_Packet_Received + 1;
+         if Nb_Packet_Received = 1 then
+            Start_Time := Ada.Calendar.Clock;
+         end if;
+
+         if Header.Seq_Nb /= Packet_Number then
+            if Header.Seq_Nb > Packet_Number then
+               Nb_Missed := Interfaces.Unsigned_64
+                  (Header.Seq_Nb - Packet_Number);
+               Missed := Missed + Nb_Missed;
+            else
+               --  Doesn't manage disordered packets
+               --  if a packet is received before the previous sent.
+
+               --  Missed := Missed + Interfaces.Unsigned_64 (Header.Seq_Nb
+               --     + (Base_Udp.Pkt_Max - Packet_Number));
+
+               Ada.Text_IO.Put_Line ("/!\ BAD ORDER /!\");
+               raise Disordered_Packets;
+
+            end if;
+
+            if Nb_Output > 20 then --  !! DBG !!  --
+               Append_Task.Append (Packet_Number,
+                                Header.Seq_Nb - 1,
+                                From);
+            else
+               Missed := 0;
+            end if;
+
+            Packet_Number := Header.Seq_Nb;
+
+            Last_Addr := Data_Addr;
+
+            if I + Nb_Missed >= Base_Udp.Sequence_Size then
+               PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
+            end if;
+
+            Packet_Mgr.Copy_To_Correct_Location (I, Nb_Missed, Data, Data_Addr);
+
+            if Nb_Output > 20 then --  !! DBG !!  --
+               --  Takes too much time.. Might do a task vector.
+               Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
+            end if;
+
+            I := I + Nb_Missed;
+
+         end if;
+
+         if Header.Seq_Nb = Base_Udp.Pkt_Max then
+            Packet_Number := 0;
+         else
+            Packet_Number := Packet_Number + 1;
+         end if;
+
+      end if;
+   end Process_Packet;
+
+
    task body Recv_Socket is
       Last                 : Ada.Streams.Stream_Element_Offset;
       Watchdog             : Natural := 0;
-      pragma Warnings (Off);
-      Data_Addr, Last_Addr : System.Address;
-      pragma Warnings (On);
+      Data_Addr            : System.Address;
       I                    : Interfaces.Unsigned_64 := Base_Udp.Pkt_Max + 1;
-      Nb_Missed            : Interfaces.Unsigned_64;
 
       use System.Storage_Elements;
       use type Interfaces.C.int;
-      use type Reliable_Udp.Pkt_Nb;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (16));
@@ -236,69 +311,7 @@ procedure UDP_Server is
                for Header'Address use Data'Address;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-               if Header.Ack then
-
-                  Packet_Mgr.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
-
-                  Remove_Task.Remove (Header.Seq_Nb);
-                  I := I - 1;
-               else
-                  Nb_Packet_Received := Nb_Packet_Received + 1;
-                  if Nb_Packet_Received = 1 then
-                     Start_Time := Ada.Calendar.Clock;
-                  end if;
-
-                  if Header.Seq_Nb /= Packet_Number then
-                     if Header.Seq_Nb > Packet_Number then
-                        Nb_Missed := Interfaces.Unsigned_64
-                           (Header.Seq_Nb - Packet_Number);
-                        Missed := Missed + Nb_Missed;
-                     else
-                        --  Doesn't manage disordered packets
-                        --  if a packet is received before the previous sent.
-
-                        --  Missed := Missed + Interfaces.Unsigned_64 (Header.Seq_Nb
-                        --     + (Base_Udp.Pkt_Max - Packet_Number));
-
-                        Ada.Text_IO.Put_Line ("BAD ORDER");
-
-                     end if;
-
-                     if Nb_Output > 20 then --  !! DBG !!  --
-                        Append_Task.Append (Packet_Number,
-                                         Header.Seq_Nb - 1,
-                                         From);
-                     else
-                        Missed := 0;
-                     end if;
-
-                     Packet_Number := Header.Seq_Nb;
-
-                     Last_Addr := Data_Addr;
-
-                     if I + Nb_Missed >= Base_Udp.Sequence_Size then
-                        PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
-                     end if;
-
-                     Packet_Mgr.Copy_To_Correct_Location (I, Nb_Missed, Data, Data_Addr);
-
-                     --  Takes too much time.. Might do a task vector.
-                     if Nb_Output > 20 then --  !! DBG !!  --
-                        Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
-                     end if;
-
-                     I := I + Nb_Missed;
-
-                  end if;
-
-                  if Header.Seq_Nb = Base_Udp.Pkt_Max then
-                     Packet_Number := 0;
-                  else
-                     Packet_Number := Packet_Number + 1;
-                  end if;
-
-               end if;
-
+               Process_Packet (Data, Header, I, Data_Addr);
                --  Buffer.Append_Wait (Data'Address);
                I := I + 1;
             exception
