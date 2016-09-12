@@ -182,7 +182,7 @@ procedure UDP_Server is
                   for Data_Missed'Address use Addr + Storage_Offset
                                                       (Pos * Base_Udp.Load_Size);
                begin
-                  Ada.Text_IO.Put_Line ("Write DEAD_BEEF at " & Pos'Img);
+                  --  Ada.Text_IO.Put_Line ("Write DEAD_BEEF at " & Pos'Img);
                   Data_Missed := 16#DEAD_BEEF#;
                end;
             end loop;

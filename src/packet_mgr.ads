@@ -54,6 +54,11 @@ package Packet_Mgr is
                                        Data           : Base_Udp.Packet_Stream;
                                        Data_Addr      : System.Address);
 
+   procedure Search_Location (N              : Handle_Index;
+                              Packet_Number  : Reliable_Udp.Pkt_Nb;
+                              Seq_Nb         : Reliable_Udp.Pkt_Nb;
+                              Data           : Base_Udp.Packet_Stream);
+
    --  Release Buffer and Reuse Handler only if Buffer State is "Full"
    task type Release_Full_Buf is
       entry Start;
