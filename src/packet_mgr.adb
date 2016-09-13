@@ -372,9 +372,7 @@ package body Packet_Mgr is
       for Good_Location'Address use Data_Addr + Storage_Offset
                                  (Good_Loc_Index * Base_Udp.Load_Size);
    begin
-      Ada.Text_IO.Put_Line ("Good Loc index : " & Good_Loc_Index'Img);
-      Ada.Text_IO.Put_Line ("Sequence_Size : " & Base_Udp.Sequence_Size'Img);
-      Ada.Text_IO.Put_Line ("Last Pkt : " & Reliable_Udp.Pkt_Nb'Last'Img);
+      --  Ada.Text_IO.Put_Line ("Good Loc index : " & Good_Loc_Index'Img);
       Good_Location := Data;
    end Copy_To_Correct_Location;
 

@@ -7,6 +7,7 @@ with Ada.Calendar;
 with Interfaces.C;
 with System.Multiprocessors.Dispatching_Domains;
 with System.Storage_Elements;
+with Ada.Real_Time;
 
 with GNAT.Traceback.Symbolic;
 with System;
@@ -173,9 +174,6 @@ procedure UDP_Server is
             Last_Addr   := Last_Address;
             Nb_Missed   := Number_Missed;
 
-            if I + Nb_Missed > Base_Udp.Pkt_Max then
-               Ada.Text_IO.Put_Line ("**** Error !!");
-            end if;
             for N in I .. I + Nb_Missed - 1 loop
                Pos := N;
                if N >= Base_Udp.Sequence_Size
@@ -183,10 +181,10 @@ procedure UDP_Server is
                then
                   Addr  := Data_Addr;
                   Pos   := N mod Base_Udp.Sequence_Size;
-                  Ada.Text_IO.Put_Line ("** NEW ADDR: " & N'Img & I'Img);
+                  --  Ada.Text_IO.Put_Line ("** NEW ADDR: " & N'Img & I'Img);
                else
                   Addr  := Last_Addr;
-                  Ada.Text_IO.Put_Line ("** LAST ADDR: " & N'Img & I'Img);
+                  --  Ada.Text_IO.Put_Line ("** LAST ADDR: " & N'Img & I'Img);
                end if;
 
                declare
@@ -194,11 +192,11 @@ procedure UDP_Server is
                   for Data_Missed'Address use Addr + Storage_Offset
                                                       (Pos * Base_Udp.Load_Size);
                begin
-                  if Addr = Data_Addr then
-                     Ada.Text_IO.Put_Line ("-- Write in NEW to pos : " & Pos'Img);
-                  else
-                     Ada.Text_IO.Put_Line ("-- Write in LAST to pos : " & Pos'Img);
-                  end if;
+                  --  if Addr = Data_Addr then
+                  --     Ada.Text_IO.Put_Line ("-- Write in NEW to pos : " & Pos'Img);
+                  --  else
+                  --     Ada.Text_IO.Put_Line ("-- Write in LAST to pos : " & Pos'Img);
+                  --  end if;
                   Data_Missed := 16#DEAD_BEEF#;
                end;
             end loop;
@@ -221,11 +219,14 @@ procedure UDP_Server is
    is
       Last_Addr            : System.Address;
       Nb_Missed            : Interfaces.Unsigned_64;
-      --  Disordered_Packets   : exception;
+      Strt_Time            : Ada.Real_Time.Time;
+      Elapsed              : Ada.Real_Time.Time_Span;
       use type Reliable_Udp.Pkt_Nb;
+      use type Ada.Real_Time.Time;
    begin
 
       if Header.Ack then
+
          Packet_Mgr.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
 
          select
@@ -234,6 +235,7 @@ procedure UDP_Server is
             Ada.Text_IO.Put_Line ("_/!\ __Remove_Busy__ /!\ _");
             Remove_Task.Remove (Header.Seq_Nb);
          end select;
+
          I := I - 1;
       else
          Nb_Packet_Received := Nb_Packet_Received + 1;
@@ -247,21 +249,17 @@ procedure UDP_Server is
                   (Header.Seq_Nb - Packet_Number);
                Missed := Missed + Nb_Missed;
             else
-
                Nb_Missed := Interfaces.Unsigned_64 (Header.Seq_Nb
                   + (Base_Udp.Pkt_Max - Packet_Number)) + 1;
                Missed := Missed + Nb_Missed;
 
-               Ada.Text_IO.Put_Line ("/!\ BAD ORDER /!\ -- "
-                  & Packet_Number'Img & Header.Seq_Nb'Img);
                Ada.Text_IO.Put_Line ("Append :  "
                   & Packet_Number'Img & Integer ((Header.Seq_Nb - 1))'Img);
-               --  raise Disordered_Packets;
             end if;
 
             if Nb_Output > 12 then --  !! DBG !!  --
+               Strt_Time := Ada.Real_Time.Clock;
                select
-                  --  Block execution !
                   Append_Task.Append (Packet_Number,
                                    Header.Seq_Nb - 1,
                                    From);
@@ -271,6 +269,12 @@ procedure UDP_Server is
                                    Header.Seq_Nb - 1,
                                    From);
                end select;
+               Elapsed := Ada.Real_Time.Clock - Strt_Time;
+               if Ada.Real_Time.To_Duration (Elapsed) > 0.00001 then
+                  Ada.Text_IO.Put_Line ("Ack : " & Header.Ack'Img
+                     & " Missed : " & Nb_Missed'Img & " Elapsed : "
+                     & Duration'Image (Ada.Real_Time.To_Duration (Elapsed)));
+               end if;
             else
                Missed := 0;
             end if;
@@ -287,10 +291,12 @@ procedure UDP_Server is
 
             if Nb_Output > 12 then --  !! DBG !!  --
                --  Takes too much time.. Might do a task vector.
-               Ada.Text_IO.Put_Line ("** Manage Loss I: " & I'Img);
+               Ada.Text_IO.Put_Line ("** Manage Loss I: " & I'Img
+                  & " Missed :" & Nb_Missed'Img);
                Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
             end if;
 
+            --  Ada.Text_IO.Put_Line ("Nb_Missed : " & Nb_Missed'Img);
             I := I + Nb_Missed;
 
          end if;
@@ -300,8 +306,8 @@ procedure UDP_Server is
          else
             Packet_Number := Packet_Number + 1;
          end if;
-
       end if;
+
    end Process_Packet;
 
 

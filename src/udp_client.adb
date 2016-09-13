@@ -107,14 +107,14 @@ begin
       else
          Header.Seq_Nb := Header.Seq_Nb + 1;
          --  Stress test (Simulate Drops)
-         if Header.Seq_Nb mod 32766 = 0 then
+         if Pkt_Data mod 100_000 = 0 then
             Header.Seq_Nb := Header.Seq_Nb + 4;
          end if;
       end if;
       Pkt_Data := Pkt_Data + 1;
 
-      --  DBG --
-      delay 0.000000001;
+      --  DBG  --
+      --  delay 0.000000001;
       ---------
    end loop;
 end UDP_Client;
