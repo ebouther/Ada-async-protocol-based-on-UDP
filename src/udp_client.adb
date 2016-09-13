@@ -107,7 +107,7 @@ begin
       else
          Header.Seq_Nb := Header.Seq_Nb + 1;
          --  Stress test (Simulate Drops)
-         if Pkt_Data mod 10_000 = 0 then
+         if Header.Seq_Nb mod 10_000 = 0 then
             Header.Seq_Nb := Header.Seq_Nb + 1;
          end if;
       end if;

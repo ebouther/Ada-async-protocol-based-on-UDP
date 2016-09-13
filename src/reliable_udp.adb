@@ -31,32 +31,40 @@ package body Reliable_Udp is
                Client_Addr    := Client_Address;
             end Append;
 
-            --  if First_D < Last_D then
-            for I in Reliable_Udp.Pkt_Nb range First_D .. Last_D loop
-               Packet_Lost.Last_Ack := Ada.Real_Time."-"(Ada.Real_Time.Clock,
-                                 Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max));
-               Packet_Lost.From := Client_Addr;
-               Ack_Mgr.Set (Loss_Index (I), Packet_Lost);
-            end loop;
-            --  else
-            --     for I in Base_Udp.Header range First_D .. Base_Udp.Pkt_Max loop
-            --        Packet_Lost := (Packet     => I,
-            --                        Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-            --                        Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-            --                        From       => Client_Addr);
+            if First_D <= Last_D then
+               for I in Reliable_Udp.Pkt_Nb range First_D .. Last_D loop
+                  Packet_Lost.Last_Ack := Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                                    Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max));
+                  Packet_Lost.From := Client_Addr;
+                  if not Ack_Mgr.Is_Empty (Loss_Index (I)) then
+                     Ada.Text_IO.Put_Line
+                        ("/!\ Two packets with the same number were dropped /!\");
+                  end if;
+                  Ack_Mgr.Set (Loss_Index (I), Packet_Lost);
+               end loop;
+            else
+               for I in Reliable_Udp.Pkt_Nb range First_D .. Base_Udp.Pkt_Max loop
+                  Packet_Lost.Last_Ack := Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                                    Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max));
+                  Packet_Lost.From := Client_Addr;
+                  if not Ack_Mgr.Is_Empty (Loss_Index (I)) then
+                     Ada.Text_IO.Put_Line
+                        ("/!\ Two packets with the same number were dropped /!\");
+                  end if;
+                  Ack_Mgr.Set (Loss_Index (I), Packet_Lost);
+               end loop;
 
-            --        Ack_Mgr.Append (Packet_Lost);
-
-            --     end loop;
-
-            --     for I in Base_Udp.Header range 0 .. Last_D loop
-            --        Packet_Lost := (Packet     => I,
-            --                        Last_Ack   => Ada.Real_Time."-"(Ada.Real_Time.Clock,
-            --                        Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)),
-            --                        From       => Client_Addr);
-            --        Ack_Mgr.Append (Packet_Lost);
-            --     end loop;
-            --  end if;
+               for I in Reliable_Udp.Pkt_Nb range 0 .. Last_D loop
+                  Packet_Lost.Last_Ack := Ada.Real_Time."-"(Ada.Real_Time.Clock,
+                                    Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max));
+                  Packet_Lost.From := Client_Addr;
+                  if not Ack_Mgr.Is_Empty (Loss_Index (I)) then
+                     Ada.Text_IO.Put_Line
+                        ("/!\ Two packets with the same number were dropped /!\");
+                  end if;
+                  Ack_Mgr.Set (Loss_Index (I), Packet_Lost);
+               end loop;
+            end if;
          end select;
       end loop;
    end Append_Task;
@@ -117,12 +125,10 @@ package body Reliable_Udp is
                exit;
          else
             if not Ack_Mgr.Is_Empty (Index) then
-               Ada.Text_IO.Put_Line ("Got Ack");
                Element := Ack_Mgr.Get (Index);
                if Ada.Real_Time.Clock - Element.Last_Ack >
                   Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)
                then
-                  Ada.Text_IO.Put_Line ("Send Ack");
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Ack_Mgr.Set (Index, Element);
                   Head.Seq_Nb := Pkt_Nb (Index);

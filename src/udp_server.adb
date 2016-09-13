@@ -210,7 +210,7 @@ procedure UDP_Server is
    is
       Last_Addr            : System.Address;
       Nb_Missed            : Interfaces.Unsigned_64;
-      Disordered_Packets   : exception;
+      --  Disordered_Packets   : exception;
       use type Reliable_Udp.Pkt_Nb;
    begin
 
@@ -236,15 +236,13 @@ procedure UDP_Server is
                   (Header.Seq_Nb - Packet_Number);
                Missed := Missed + Nb_Missed;
             else
-               --  Doesn't manage disordered packets
-               --  if a packet is received before the previous sent.
 
-               --  Missed := Missed + Interfaces.Unsigned_64 (Header.Seq_Nb
-               --     + (Base_Udp.Pkt_Max - Packet_Number));
+               Missed := Missed + Interfaces.Unsigned_64 (Header.Seq_Nb
+                  + (Base_Udp.Pkt_Max - Packet_Number));
 
-               Ada.Text_IO.Put_Line ("/!\ BAD ORDER /!\");
-               raise Disordered_Packets;
-
+               Ada.Text_IO.Put_Line ("/!\ BAD ORDER /!\ -- "
+                  & Header.Seq_Nb'Img & Packet_Number'Img);
+               --  raise Disordered_Packets;
             end if;
 
             if Nb_Output > 12 then --  !! DBG !!  --

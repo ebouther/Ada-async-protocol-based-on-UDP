@@ -372,6 +372,9 @@ package body Packet_Mgr is
       for Good_Location'Address use Data_Addr + Storage_Offset
                                  (Good_Loc_Index * Base_Udp.Load_Size);
    begin
+            if I + Nb_Missed > Base_Udp.Pkt_Max then
+               Ada.Text_IO.Put_Line ("/!\ Should alloc new buffer /!\");
+            end if;
             Good_Location := Data;
    end Copy_To_Correct_Location;
 
