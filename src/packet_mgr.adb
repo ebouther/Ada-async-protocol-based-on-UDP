@@ -364,7 +364,7 @@ package body Packet_Mgr is
                                        Data           : Base_Udp.Packet_Stream;
                                        Data_Addr      : System.Address) is
 
-      Good_Loc_Index :  constant Interfaces.Unsigned_64 := I + Nb_Missed
+      Good_Loc_Index :  constant Interfaces.Unsigned_64 := (I + Nb_Missed)
                            mod Base_Udp.Sequence_Size;
       Good_Location  :  Base_Udp.Packet_Stream;
 
@@ -372,10 +372,10 @@ package body Packet_Mgr is
       for Good_Location'Address use Data_Addr + Storage_Offset
                                  (Good_Loc_Index * Base_Udp.Load_Size);
    begin
-            if I + Nb_Missed > Base_Udp.Pkt_Max then
-               Ada.Text_IO.Put_Line ("/!\ Should alloc new buffer /!\");
-            end if;
-            Good_Location := Data;
+      Ada.Text_IO.Put_Line ("Good Loc index : " & Good_Loc_Index'Img);
+      Ada.Text_IO.Put_Line ("Sequence_Size : " & Base_Udp.Sequence_Size'Img);
+      Ada.Text_IO.Put_Line ("Last Pkt : " & Reliable_Udp.Pkt_Nb'Last'Img);
+      Good_Location := Data;
    end Copy_To_Correct_Location;
 
 end Packet_Mgr;

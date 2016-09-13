@@ -40,6 +40,7 @@ package body Reliable_Udp is
                      Ada.Text_IO.Put_Line
                         ("/!\ Two packets with the same number were dropped /!\");
                   end if;
+                  Ada.Text_IO.Put_Line ("1. Set : " & I'Img);
                   Ack_Mgr.Set (Loss_Index (I), Packet_Lost);
                end loop;
             else
@@ -51,6 +52,7 @@ package body Reliable_Udp is
                      Ada.Text_IO.Put_Line
                         ("/!\ Two packets with the same number were dropped /!\");
                   end if;
+                  Ada.Text_IO.Put_Line ("2. Set : " & I'Img);
                   Ack_Mgr.Set (Loss_Index (I), Packet_Lost);
                end loop;
 
@@ -62,6 +64,7 @@ package body Reliable_Udp is
                      Ada.Text_IO.Put_Line
                         ("/!\ Two packets with the same number were dropped /!\");
                   end if;
+                  Ada.Text_IO.Put_Line ("3. Set : " & I'Img);
                   Ack_Mgr.Set (Loss_Index (I), Packet_Lost);
                end loop;
             end if;

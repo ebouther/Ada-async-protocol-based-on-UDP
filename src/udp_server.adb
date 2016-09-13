@@ -158,6 +158,7 @@ procedure UDP_Server is
       Nb_Missed   :  Interfaces.Unsigned_64;
 
       use System.Storage_Elements;
+      use type System.Address;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (3));
@@ -172,6 +173,9 @@ procedure UDP_Server is
             Last_Addr   := Last_Address;
             Nb_Missed   := Number_Missed;
 
+            if I + Nb_Missed > Base_Udp.Pkt_Max then
+               Ada.Text_IO.Put_Line ("**** Error !!");
+            end if;
             for N in I .. I + Nb_Missed - 1 loop
                Pos := N;
                if N >= Base_Udp.Sequence_Size
@@ -179,8 +183,10 @@ procedure UDP_Server is
                then
                   Addr  := Data_Addr;
                   Pos   := N mod Base_Udp.Sequence_Size;
+                  Ada.Text_IO.Put_Line ("** NEW ADDR: " & N'Img & I'Img);
                else
                   Addr  := Last_Addr;
+                  Ada.Text_IO.Put_Line ("** LAST ADDR: " & N'Img & I'Img);
                end if;
 
                declare
@@ -188,6 +194,11 @@ procedure UDP_Server is
                   for Data_Missed'Address use Addr + Storage_Offset
                                                       (Pos * Base_Udp.Load_Size);
                begin
+                  if Addr = Data_Addr then
+                     Ada.Text_IO.Put_Line ("-- Write in NEW to pos : " & Pos'Img);
+                  else
+                     Ada.Text_IO.Put_Line ("-- Write in LAST to pos : " & Pos'Img);
+                  end if;
                   Data_Missed := 16#DEAD_BEEF#;
                end;
             end loop;
@@ -237,11 +248,14 @@ procedure UDP_Server is
                Missed := Missed + Nb_Missed;
             else
 
-               Missed := Missed + Interfaces.Unsigned_64 (Header.Seq_Nb
-                  + (Base_Udp.Pkt_Max - Packet_Number));
+               Nb_Missed := Interfaces.Unsigned_64 (Header.Seq_Nb
+                  + (Base_Udp.Pkt_Max - Packet_Number)) + 1;
+               Missed := Missed + Nb_Missed;
 
                Ada.Text_IO.Put_Line ("/!\ BAD ORDER /!\ -- "
-                  & Header.Seq_Nb'Img & Packet_Number'Img);
+                  & Packet_Number'Img & Header.Seq_Nb'Img);
+               Ada.Text_IO.Put_Line ("Append :  "
+                  & Packet_Number'Img & Integer ((Header.Seq_Nb - 1))'Img);
                --  raise Disordered_Packets;
             end if;
 
@@ -273,6 +287,7 @@ procedure UDP_Server is
 
             if Nb_Output > 12 then --  !! DBG !!  --
                --  Takes too much time.. Might do a task vector.
+               Ada.Text_IO.Put_Line ("** Manage Loss I: " & I'Img);
                Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
             end if;
 
