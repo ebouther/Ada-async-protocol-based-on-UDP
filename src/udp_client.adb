@@ -90,7 +90,7 @@ begin
       Address.Addr := GNAT.Sockets.Inet_Addr ("127.0.0.1");
    else
       Address.Addr := GNAT.Sockets.Inet_Addr
-                                 (Ada.Command_Line.Argument (1));
+                        (Ada.Command_Line.Argument (1));
    end if;
 
    Address.Port := 50001;
@@ -107,9 +107,9 @@ begin
       else
          Header.Seq_Nb := Header.Seq_Nb + 1;
          --  Stress test (Simulate Drops)
-         --  if Header.Seq_Nb mod 1_000 = 0 then
-         --     Header.Seq_Nb := Header.Seq_Nb + 3;
-         --  end if;
+         if Pkt_Data mod 10_000 = 0 then
+            Header.Seq_Nb := Header.Seq_Nb + 1;
+         end if;
       end if;
       Pkt_Data := Pkt_Data + 1;
 

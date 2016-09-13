@@ -37,14 +37,18 @@ procedure UDP_Server is
       entry Stop;
    end Recv_Socket;
 
-   pragma Warnings (Off);
    task type Loss_Manager is
       entry Start (Count           : Interfaces.Unsigned_64;
                    Data_Address    : System.Address;
                    Last_Address    : System.Address;
                    Number_Missed   : Interfaces.Unsigned_64);
    end Loss_Manager;
-   pragma Warnings (On);
+
+   procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
+                             Header    : in Reliable_Udp.Header;
+                             I         : in out Interfaces.Unsigned_64;
+                             Data_Addr : in out System.Address);
+
 
    --  package Sync_Queue is new Queue (System.Address);
    --  Buffer               : Sync_Queue.Synchronized_Queue;
@@ -52,11 +56,12 @@ procedure UDP_Server is
    Append_Task          : Reliable_Udp.Append_Task;
    Remove_Task          : Reliable_Udp.Remove_Task;
    Ack_Task             : Reliable_Udp.Ack_Task;
+
    Recv_Socket_Task     : Recv_Socket;
    Log_Task             : Timer;
    Manage_Loss_Task     : Loss_Manager;
-   Check_Integrity_Task : Packet_Mgr.Check_Buf_Integrity;
 
+   Check_Integrity_Task : Packet_Mgr.Check_Buf_Integrity;
    PMH_Buffer_Task      : Packet_Mgr.PMH_Buffer_Addr;
    Release_Buf_Task     : Packet_Mgr.Release_Full_Buf;
 
@@ -160,7 +165,8 @@ procedure UDP_Server is
          accept Start (Count           : Interfaces.Unsigned_64;
                        Data_Address    : System.Address;
                        Last_Address    : System.Address;
-                       Number_Missed   : Interfaces.Unsigned_64) do
+                       Number_Missed   : Interfaces.Unsigned_64)
+         do
             I           := Count;
             Data_Addr   := Data_Address;
             Last_Addr   := Last_Address;
@@ -185,7 +191,7 @@ procedure UDP_Server is
                   Data_Missed := 16#DEAD_BEEF#;
                end;
             end loop;
-         end Start; -- DBG synchronous
+         end Start;
       end loop;
       exception
          when E : others =>
@@ -200,11 +206,6 @@ procedure UDP_Server is
    procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
                              Header    : in Reliable_Udp.Header;
                              I         : in out Interfaces.Unsigned_64;
-                             Data_Addr : in out System.Address);
-
-   procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
-                             Header    : in Reliable_Udp.Header;
-                             I         : in out Interfaces.Unsigned_64;
                              Data_Addr : in out System.Address)
    is
       Last_Addr            : System.Address;
@@ -215,7 +216,13 @@ procedure UDP_Server is
 
       if Header.Ack then
          Packet_Mgr.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
-         Remove_Task.Remove (Header.Seq_Nb);
+
+         select
+            Remove_Task.Remove (Header.Seq_Nb);
+         else
+            Ada.Text_IO.Put_Line ("_/!\ __Remove_Busy__ /!\ _");
+            Remove_Task.Remove (Header.Seq_Nb);
+         end select;
          I := I - 1;
       else
          Nb_Packet_Received := Nb_Packet_Received + 1;
@@ -240,10 +247,18 @@ procedure UDP_Server is
 
             end if;
 
-            if Nb_Output > 20 then --  !! DBG !!  --
-               Append_Task.Append (Packet_Number,
-                                Header.Seq_Nb - 1,
-                                From);
+            if Nb_Output > 12 then --  !! DBG !!  --
+               select
+                  --  Block execution !
+                  Append_Task.Append (Packet_Number,
+                                   Header.Seq_Nb - 1,
+                                   From);
+               else
+                  Ada.Text_IO.Put_Line ("_/!\ __Append_Busy__ /!\ _");
+                  Append_Task.Append (Packet_Number,
+                                   Header.Seq_Nb - 1,
+                                   From);
+               end select;
             else
                Missed := 0;
             end if;
@@ -258,7 +273,7 @@ procedure UDP_Server is
 
             Packet_Mgr.Copy_To_Correct_Location (I, Nb_Missed, Data, Data_Addr);
 
-            if Nb_Output > 20 then --  !! DBG !!  --
+            if Nb_Output > 12 then --  !! DBG !!  --
                --  Takes too much time.. Might do a task vector.
                Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
             end if;

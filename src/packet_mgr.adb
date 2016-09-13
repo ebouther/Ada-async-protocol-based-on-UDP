@@ -116,7 +116,7 @@ package body Packet_Mgr is
          (System.Multiprocessors.CPU_Range (11));
       accept Start;
       loop
-         delay 0.000001; -- Doesn't work without delay :/
+         delay 0.0; -- Doesn't work without rescheduling;
          if Buffer_Handler.Handlers (Buffer_Handler.First).State = Full then
 
             Release_Free_Buffer_At (Buffer_Handler.First);

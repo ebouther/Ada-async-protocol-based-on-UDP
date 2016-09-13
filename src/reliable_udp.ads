@@ -23,10 +23,15 @@ package Reliable_Udp is
    --  Used to store lost packet and when it can be resend if needed
    type Loss is
       record
-         Packet      : Pkt_Nb;
+         --  Packet      : Pkt_Nb;
+         Is_Empty    : Boolean := True;
          Last_Ack    : Ada.Real_Time.Time;
          From        : GNAT.Sockets.Sock_Addr_Type;
       end record;
+
+   type Loss_Index is mod Base_Udp.Sequence_Size;
+
+   type Losses_Array is array (Loss_Index) of Loss;
 
    --  Header used at packet payload begin to manage drops
    type Header is
@@ -68,29 +73,41 @@ package Reliable_Udp is
    end Remove_Task;
 
    protected type Ack_Management is
-      --  Creates a socket used to send Acks only
-      procedure Init_Socket;
+      --  --  Creates a socket used to send Acks only
+      --  procedure Init_Socket;
 
-      --  Adds to the Losses_Container missing packets
-      procedure Append (Packet_Lost : in Loss);
+      --  --  Adds to the Losses_Container missing packets
+      --  procedure Append (Packet_Lost : in Loss);
 
-      --  Removes packet from losses container once it has been received
-      procedure Remove (Packet   : Pkt_Nb);
+      --  --  Removes packet from losses container once it has been received
+      --  procedure Remove (Packet   : Pkt_Nb);
 
-      --  Renews Ack_Time stored in Loss record.
-      --  Used to resend ack after a timeout.
-      procedure Update_AckTime (Position  : in Losses_Container.Cursor;
-                               Ack_Time   : in Ada.Real_Time.Time);
+      --  --  Renews Ack_Time stored in Loss record.
+      --  --  Used to resend ack after a timeout.
+      --  procedure Update_AckTime (Position  : in Losses_Container.Cursor;
+      --                           Ack_Time   : in Ada.Real_Time.Time);
 
-      --  Parses all Losses Container and sends acks if it's necessary.
-      procedure Ack;
+      --  --  Parses all Losses Container and sends acks if it's necessary.
+      --  procedure Ack;
 
-      --  Get Length of the Container.
-      function Length return Ada.Containers.Count_Type;
+      --  --  Get Length of the Container.
+      --  function Length return Ada.Containers.Count_Type;
+
+      procedure Set (Index    : in Loss_Index;
+                     Data     : in Loss);
+
+      procedure Get (Index : in Loss_Index;
+                     Data  : in out Loss);
+
+      function Get (Index : in Loss_Index) return Loss;
+
+      procedure Clear (Index    : in Loss_Index);
+
+      function Is_Empty (Index    : in Loss_Index) return Boolean;
 
       private
-      Socket      : GNAT.Sockets.Socket_Type;
-      Losses      : Losses_Container.Vector;
+      --  Losses            : Losses_Container.Vector;
+      Losses            : Losses_Array;
    end Ack_Management;
 
 end Reliable_Udp;
