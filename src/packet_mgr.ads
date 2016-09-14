@@ -9,7 +9,7 @@ with Buffers.Local;
 package Packet_Mgr is
 
    --  Number of pmh buffers initialized
-   PMH_Buf_Nb     : constant := 32;
+   PMH_Buf_Nb     : constant := 15;
 
    --  Index Type for "Handlers" array
    --  "is mod type" enables a circular parsing
@@ -62,9 +62,10 @@ package Packet_Mgr is
 
    --  Move Data Received to good location (Nb_Missed Offset) if packets
    --  were dropped
-   procedure Copy_To_Correct_Location (I, Nb_Missed   : Interfaces.Unsigned_64;
-                                       Data           : Base_Udp.Packet_Stream;
-                                       Data_Addr      : System.Address);
+   procedure Copy_To_Correct_Location
+                      (I, Nb_Missed   : Interfaces.Unsigned_64;
+                       Data           : Base_Udp.Packet_Stream;
+                       Data_Addr      : System.Address);
 
    --  Release Buffer and Reuse Handler only if Buffer State is "Full"
    task type Release_Full_Buf is

@@ -48,7 +48,8 @@ procedure UDP_Server is
    procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
                              Header    : in Reliable_Udp.Header;
                              I         : in out Interfaces.Unsigned_64;
-                             Data_Addr : in out System.Address);
+                             Data_Addr : in out System.Address;
+                             From      : in Sock_Addr_Type);
 
 
    --  package Sync_Queue is new Queue (System.Address);
@@ -66,8 +67,6 @@ procedure UDP_Server is
    PMH_Buffer_Task      : Packet_Mgr.PMH_Buffer_Addr;
    Release_Buf_Task     : Packet_Mgr.Release_Full_Buf;
 
-   Server               : Socket_Type;
-   Address, From        : Sock_Addr_Type;
    Start_Time           : Ada.Calendar.Time;
    Elapsed_Time         : Duration;
    Nb_Packet_Received   : Interfaces.Unsigned_64 := 0;
@@ -80,7 +79,8 @@ procedure UDP_Server is
    Opt_Return           : Interfaces.C.int;
 
    function To_Int is
-      new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type, Interfaces.C.int);
+      new Ada.Unchecked_Conversion
+         (GNAT.Sockets.Socket_Type, Interfaces.C.int);
 
    pragma Warnings (Off);
    procedure Stop_Server;
@@ -96,8 +96,9 @@ procedure UDP_Server is
 
    end Stop_Server;
 
-   procedure Init_Udp;
-   procedure Init_Udp is
+   procedure Init_Udp (Server : in out Socket_Type);
+   procedure Init_Udp (Server : in out Socket_Type) is
+      Address  : Sock_Addr_Type;
    begin
       Create_Socket (Server, Family_Inet, Socket_Datagram);
       Set_Socket_Option
@@ -190,12 +191,14 @@ procedure UDP_Server is
                declare
                   Data_Missed  :  Interfaces.Unsigned_32;
                   for Data_Missed'Address use Addr + Storage_Offset
-                                                      (Pos * Base_Udp.Load_Size);
+                                                   (Pos * Base_Udp.Load_Size);
                begin
                   --  if Addr = Data_Addr then
-                  --     Ada.Text_IO.Put_Line ("-- Write in NEW to pos : " & Pos'Img);
+                  --     Ada.Text_IO.Put_Line ("-- Write in NEW to pos : "
+                  --       & Pos'Img);
                   --  else
-                  --     Ada.Text_IO.Put_Line ("-- Write in LAST to pos : " & Pos'Img);
+                  --     Ada.Text_IO.Put_Line ("-- Write in LAST to pos : "
+                  --       & Pos'Img);
                   --  end if;
                   Data_Missed := 16#DEAD_BEEF#;
                end;
@@ -215,7 +218,8 @@ procedure UDP_Server is
    procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
                              Header    : in Reliable_Udp.Header;
                              I         : in out Interfaces.Unsigned_64;
-                             Data_Addr : in out System.Address)
+                             Data_Addr : in out System.Address;
+                             From      : in Sock_Addr_Type)
    is
       Last_Addr            : System.Address;
       Nb_Missed            : Interfaces.Unsigned_64;
@@ -231,7 +235,8 @@ procedure UDP_Server is
 
          select
             Remove_Task.Remove (Header.Seq_Nb);
-         else
+         or
+            delay 0.000005;
             Ada.Text_IO.Put_Line ("_/!\ __Remove_Busy__ /!\ _");
             Remove_Task.Remove (Header.Seq_Nb);
          end select;
@@ -253,21 +258,22 @@ procedure UDP_Server is
                   + (Base_Udp.Pkt_Max - Packet_Number)) + 1;
                Missed := Missed + Nb_Missed;
 
-               Ada.Text_IO.Put_Line ("Append :  "
-                  & Packet_Number'Img & Integer ((Header.Seq_Nb - 1))'Img);
+               Ada.Text_IO.Put_Line ("Append From "
+                  & Packet_Number'Img & " To"
+                  & Integer ((Header.Seq_Nb - 1))'Img);
             end if;
 
             if Nb_Output > 12 then --  !! DBG !!  --
                Strt_Time := Ada.Real_Time.Clock;
                select
                   Append_Task.Append (Packet_Number,
-                                   Header.Seq_Nb - 1,
-                                   From);
+                                      Header.Seq_Nb - 1,
+                                      From);
                else
                   Ada.Text_IO.Put_Line ("_/!\ __Append_Busy__ /!\ _");
                   Append_Task.Append (Packet_Number,
-                                   Header.Seq_Nb - 1,
-                                   From);
+                                      Header.Seq_Nb - 1,
+                                      From);
                end select;
                Elapsed := Ada.Real_Time.Clock - Strt_Time;
                if Ada.Real_Time.To_Duration (Elapsed) > 0.00001 then
@@ -287,7 +293,8 @@ procedure UDP_Server is
                PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
             end if;
 
-            Packet_Mgr.Copy_To_Correct_Location (I, Nb_Missed, Data, Data_Addr);
+            Packet_Mgr.Copy_To_Correct_Location
+                                          (I, Nb_Missed, Data, Data_Addr);
 
             if Nb_Output > 12 then --  !! DBG !!  --
                --  Takes too much time.. Might do a task vector.
@@ -301,17 +308,16 @@ procedure UDP_Server is
 
          end if;
 
-         if Header.Seq_Nb = Base_Udp.Pkt_Max then
-            Packet_Number := 0;
-         else
-            Packet_Number := Packet_Number + 1;
-         end if;
+         --  mod type (doesn't need to be set to 0 on max value)
+         Packet_Number := Packet_Number + 1;
       end if;
 
    end Process_Packet;
 
 
    task body Recv_Socket is
+      Server               : Socket_Type;
+      From                 : Sock_Addr_Type;
       Last                 : Ada.Streams.Stream_Element_Offset;
       Watchdog             : Natural := 0;
       Data_Addr            : System.Address;
@@ -323,6 +329,7 @@ procedure UDP_Server is
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (16));
 
+      Init_Udp (Server);
       Packet_Mgr.Init_Handle_Array;
 
       accept Start;
@@ -345,7 +352,7 @@ procedure UDP_Server is
                for Header'Address use Data'Address;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-               Process_Packet (Data, Header, I, Data_Addr);
+               Process_Packet (Data, Header, I, Data_Addr, From);
                --  Buffer.Append_Wait (Data'Address);
                I := I + 1;
             exception
@@ -367,7 +374,8 @@ procedure UDP_Server is
 begin
 
    Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "log.csv");
-   Ada.Text_IO.Put_Line (Log_File, "Nb_Output;Nb_Received;Packet_Nb;Dropped;Elapsed_Time");
+   Ada.Text_IO.Put_Line (Log_File,
+               "Nb_Output;Nb_Received;Packet_Nb;Dropped;Elapsed_Time");
    Ada.Text_IO.Close (Log_File);
 
    Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "buffers.log");
@@ -377,8 +385,6 @@ begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (2));
    end if;
-
-   Init_Udp;
 
    Log_Task.Start;
    Recv_Socket_Task.Start;

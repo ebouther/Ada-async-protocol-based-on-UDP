@@ -23,7 +23,6 @@ package Reliable_Udp is
    --  Used to store lost packet and when it can be resend if needed
    type Loss is
       record
-         --  Packet      : Pkt_Nb;
          Is_Empty    : Boolean := True;
          Last_Ack    : Ada.Real_Time.Time;
          From        : GNAT.Sockets.Sock_Addr_Type;
@@ -52,6 +51,11 @@ package Reliable_Udp is
    package Losses_Container is
       new Ada.Containers.Vectors (Natural, Loss);
 
+   procedure Append_Ack (First_D          : in Reliable_Udp.Pkt_Nb;
+                         Last_D           : in Reliable_Udp.Pkt_Nb;
+                         Packet_Lost      : in out Reliable_Udp.Loss;
+                         Client_Addr      : in GNAT.Sockets.Sock_Addr_Type);
+
    --  Send acks to client if it's necessary
    task type Ack_Task is
       pragma Priority (System.Priority'First);
@@ -73,25 +77,6 @@ package Reliable_Udp is
    end Remove_Task;
 
    protected type Ack_Management is
-      --  --  Creates a socket used to send Acks only
-      --  procedure Init_Socket;
-
-      --  --  Adds to the Losses_Container missing packets
-      --  procedure Append (Packet_Lost : in Loss);
-
-      --  --  Removes packet from losses container once it has been received
-      --  procedure Remove (Packet   : Pkt_Nb);
-
-      --  --  Renews Ack_Time stored in Loss record.
-      --  --  Used to resend ack after a timeout.
-      --  procedure Update_AckTime (Position  : in Losses_Container.Cursor;
-      --                           Ack_Time   : in Ada.Real_Time.Time);
-
-      --  --  Parses all Losses Container and sends acks if it's necessary.
-      --  procedure Ack;
-
-      --  --  Get Length of the Container.
-      --  function Length return Ada.Containers.Count_Type;
 
       procedure Set (Index    : in Loss_Index;
                      Data     : in Loss);
@@ -106,8 +91,7 @@ package Reliable_Udp is
       function Is_Empty (Index    : in Loss_Index) return Boolean;
 
       private
-      --  Losses            : Losses_Container.Vector;
-      Losses            : Losses_Array;
+         Losses            : Losses_Array;
    end Ack_Management;
 
 end Reliable_Udp;

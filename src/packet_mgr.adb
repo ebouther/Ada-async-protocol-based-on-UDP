@@ -21,7 +21,8 @@ package body Packet_Mgr is
    procedure Init_Handle_Array is
    begin
 
-      --  Need a "+ 1" otherwise it cannot get a free buffer in Release_Full_Buf
+      --  Need a "+ 1" otherwise it cannot get a
+      --  free buffer in Release_Full_Buf
       Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb + 1,
          Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
@@ -33,10 +34,12 @@ package body Packet_Mgr is
 
       --  Kernel keeps memory as virtual till I write inside.
       for I in Buffer_Handler.Handlers'Range loop
-         Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (I).Handle);
+         Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (I)
+            .Handle);
          declare
             Message : Base_Udp.Packet_Payload;
-            for Message'Address use Buffer_Handler.Handlers (I).Handle.Get_Address;
+            for Message'Address use Buffer_Handler.Handlers (I)
+               .Handle.Get_Address;
          begin
             Message := (others => 16#FA#);
             Ada.Text_IO.Put_Line (Message (Message'Last)'Img);
@@ -163,17 +166,18 @@ package body Packet_Mgr is
                   and not Init
                then
                   raise Not_Released_Fast_Enough;
-                  --  Release Buffer even if it is not full
-                  --  Buffer_Handler.Handlers (Buffer_Handler.First).State := Full;
                end if;
                Buffer_Ptr := Buffer_Handler.Handlers
-                                (Buffer_Handler.Current + 1).Handle.Get_Address;
+                                (Buffer_Handler.Current + 1).
+                                    Handle.Get_Address;
             end New_Buffer_Addr;
                if not Init then
-                  Buffer_Handler.Handlers (Buffer_Handler.Current).State := Near_Full;
+                  Buffer_Handler.Handlers (Buffer_Handler.Current).
+                                                      State := Near_Full;
                end if;
                Buffer_Handler.Current := Buffer_Handler.Current + 1;
-               Ada.Text_IO.Put_Line ("Current : " & Buffer_Handler.Current'Img);
+               Ada.Text_IO.Put_Line ("Current : "
+                  & Buffer_Handler.Current'Img);
                Init := False;
          end select;
       end loop;
@@ -302,7 +306,8 @@ package body Packet_Mgr is
          end select;
 
          if To_File then
-            Ada.Text_IO.Open (Log_File, Ada.Text_IO.Append_File, "buffers.log");
+            Ada.Text_IO.Open
+               (Log_File, Ada.Text_IO.Append_File, "buffers.log");
          end if;
 
          declare
@@ -316,25 +321,34 @@ package body Packet_Mgr is
          begin
             for I in Datas'Range loop
                declare
-                  Pkt_Nb   : Base_Udp.Header;
-                  Dead_Beef      : Interfaces.Unsigned_32;
+                  Pkt_U8      : array (1 .. Base_Udp.Load_Size)
+                                 of Interfaces.Unsigned_8;
+                  Pkt_Nb      : Base_Udp.Header;
+                  Content     : Interfaces.Unsigned_64;
+                  Dead_Beef   : Interfaces.Unsigned_32;
 
                   for Pkt_Nb'Address use Datas (I)'Address;
                   for Dead_Beef'Address use Datas (I)'Address;
+                  for Pkt_U8'Address use Datas (I)'Address;
+                  for Content'Address use Pkt_U8 (5)'Address;
                begin
                   if Dead_Beef = 16#DEAD_BEEF# then
                      if To_File then
-                        Ada.Text_IO.Put_Line (Log_File, "Buffer (" & I'Img & " ) : ** DROPPED **");
+                        Ada.Text_IO.Put_Line
+                           (Log_File, "Buffer (" & I'Img
+                              & " ) : ** DROPPED **");
                      else
-                        Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) : ** DROPPED **");
+                        Ada.Text_IO.Put_Line ("Buffer (" & I'Img
+                           & " ) : ** DROPPED **");
                      end if;
                   else
                      if To_File then
-                        Ada.Text_IO.Put_Line (Log_File, "Buffer (" & I'Img & " ) :" &
-                           Pkt_Nb'Img);
+                        Ada.Text_IO.Put_Line
+                           (Log_File, "Buffer (" & I'Img & " ) :" &
+                              Pkt_Nb'Img & Content'Img);
                      else
                         Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) :" &
-                           Pkt_Nb'Img);
+                           Pkt_Nb'Img & Content'Img);
                      end if;
                   end if;
                end;
@@ -360,9 +374,10 @@ package body Packet_Mgr is
    --  Copy_To_Correct_Location  --
    --------------------------------
 
-   procedure Copy_To_Correct_Location (I, Nb_Missed   : Interfaces.Unsigned_64;
-                                       Data           : Base_Udp.Packet_Stream;
-                                       Data_Addr      : System.Address) is
+   procedure Copy_To_Correct_Location
+                                 (I, Nb_Missed   : Interfaces.Unsigned_64;
+                                  Data           : Base_Udp.Packet_Stream;
+                                  Data_Addr      : System.Address) is
 
       Good_Loc_Index :  constant Interfaces.Unsigned_64 := (I + Nb_Missed)
                            mod Base_Udp.Sequence_Size;
