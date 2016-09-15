@@ -2,6 +2,7 @@ with Ada.Text_IO;
 with Ada.Exceptions;
 with System.Multiprocessors.Dispatching_Domains;
 with System.Storage_Elements;
+with Dcod_Pmh_Service.Client;
 
 package body Packet_Mgr is
 
@@ -21,11 +22,26 @@ package body Packet_Mgr is
    procedure Init_Handle_Array is
    begin
 
+      --  dcod-launch
+      Dcod_Pmh_Service.Client.Provide_Buffer (Name => "toto",
+                                              Size => Integer (Base_Udp.Sequence_Size * Base_Udp.Load_Size),
+                                              Depth => PMH_Buf_Nb,
+                                              Endpoint => "http://127.0.0.1:5678/");
+
+      Buffer_Handler.Buffer_Host.Set_Name ("toto");
+      Buffer_Handler.Buffer.Set_Name ("toto");
+      Buffer_Handler.Buffer_Cons.Set_Name ("toto");
+
+      Production.Message_Handling.Start (1.0);
+
+      Buffer_Handler.Buffer.Is_Initialised;
+
       --  Need a "+ 1" otherwise it cannot get a
       --  free buffer in Release_Full_Buf
       Buffer_Handler.Buffer_Host.Initialise (PMH_Buf_Nb + 1,
          Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
+
       Messages_Hangling.Start (Buffer_Handler.Buffer_Host'Unchecked_Access, 1.0);
       Production.Message_Handling.Start (1.0);
       Buffer_Handler.First := Buffer_Handler.Handlers'First;

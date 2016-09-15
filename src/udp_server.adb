@@ -136,6 +136,7 @@ procedure UDP_Server is
          else
             delay 1.0;
             --  Ada.Text_IO.Put_Line ("Buf len : " & Buffer.Cur_Count'Img);
+            Ada.Text_IO.Put_Line ("FIFO Len : " & Reliable_Udp.Fifo.Cur_Count'Img);
             Elapsed_Time := Ada.Calendar.Clock - Start_Time;
             Output_Data.Display
                (True,
@@ -241,24 +242,15 @@ procedure UDP_Server is
             else
                Missed := 0;
             end if;
-
             Packet_Number := Header.Seq_Nb;
-
             Last_Addr := Data_Addr;
-
             if I + Nb_Missed >= Base_Udp.Sequence_Size then
                PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
             end if;
-
             Packet_Mgr.Copy_To_Correct_Location
                                           (I, Nb_Missed, Data, Data_Addr);
-
             if Nb_Output > 12 then --  !! DBG !!  --
-               --  Takes too much time.. Might do a task vector.
-               --  Ada.Text_IO.Put_Line ("** Manage Loss I: " & I'Img
-               --     & " Missed :" & Nb_Missed'Img);
                Buffer_Loss (I, Data_Addr, Last_Addr, Nb_Missed);
-               --  Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
             end if;
 
             I := I + Nb_Missed;
