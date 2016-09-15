@@ -207,6 +207,7 @@ procedure UDP_Server is
    is
       Last_Addr            : System.Address;
       Nb_Missed            : Interfaces.Unsigned_64;
+
       use type Reliable_Udp.Pkt_Nb;
       use type Ada.Real_Time.Time;
    begin

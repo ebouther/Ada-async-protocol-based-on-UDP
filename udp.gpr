@@ -13,7 +13,7 @@ project udp is
   --  end Binder;
 
   package Compiler is
-   for Default_Switches ("ada") use ("-g",
+   for Default_Switches ("ada") use (
                                     "-O2",
                                     "-gnatf",
                                     "-gnaty",

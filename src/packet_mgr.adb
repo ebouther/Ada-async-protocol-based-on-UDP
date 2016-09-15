@@ -23,10 +23,11 @@ package body Packet_Mgr is
 
       --  Need a "+ 1" otherwise it cannot get a
       --  free buffer in Release_Full_Buf
-      Buffer_Handler.Buffer.Initialise (PMH_Buf_Nb + 1,
+      Buffer_Handler.Buffer_Host.Initialise (PMH_Buf_Nb + 1,
          Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
-
+      Messages_Hangling.Start (Buffer_Handler.Buffer_Host'Unchecked_Access, 1.0);
+      Production.Message_Handling.Start (1.0);
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
 
       --  Current is incremented to First when Recv_Packets asks for new Buf
@@ -298,7 +299,7 @@ package body Packet_Mgr is
          use Packet_Buffers;
       begin
          select
-            Buffer_Handler.Buffer.Get_Full_Buffer (Handle);
+            Buffer_Handler.Buffer_Cons.Get_Full_Buffer (Handle);
          or
             delay 1.0;
             Ada.Text_IO.Put_Line ("/!\ Error : Cannot Get A Full Buffer /!\");
@@ -355,7 +356,7 @@ package body Packet_Mgr is
             end loop;
          end;
 
-         Buffer_Handler.Buffer.Release_Full_Buffer (Handle);
+         Buffer_Handler.Buffer_Cons.Release_Full_Buffer (Handle);
          if To_File then
             Ada.Text_IO.Close (Log_File);
          end if;

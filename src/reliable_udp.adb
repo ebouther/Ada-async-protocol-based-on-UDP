@@ -7,11 +7,14 @@ package body Reliable_Udp is
    Ack_Mgr      : Ack_Management;
 
 
+   ------------------
+   --  Append_Ack  --
+   ------------------
+
    procedure Append_Ack (First_D          : in Reliable_Udp.Pkt_Nb;
                          Last_D           : in Reliable_Udp.Pkt_Nb;
                          Client_Addr      : in GNAT.Sockets.Sock_Addr_Type)
    is
-
       Packet_Lost                      : Reliable_Udp.Loss;
       Missed_2_Times_Same_Seq_Number   : exception;
       use type Ada.Real_Time.Time;
@@ -30,6 +33,7 @@ package body Reliable_Udp is
       end loop;
    end Append_Ack;
 
+
    -------------------
    --  Append_Task  --
    -------------------
@@ -37,8 +41,8 @@ package body Reliable_Udp is
    task body Append_Task is
       Ack   :  Append_Ack_Type;
    begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (6));
+      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
+      --     (System.Multiprocessors.CPU_Range (6));
       loop
          Fifo.Remove_First_Wait (Ack);
          if Ack.First_D <= Ack.Last_D then
@@ -101,6 +105,7 @@ package body Reliable_Udp is
                                   GNAT.Sockets.Socket_Datagram);
       accept Start;
       loop
+         delay 0.0;
          select
             accept Stop;
                exit;
