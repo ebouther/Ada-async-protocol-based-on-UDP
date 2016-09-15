@@ -114,7 +114,7 @@ begin
       Pkt_Data := Pkt_Data + 1;
 
       --  DBG  --
-      --  delay 0.00000001;
+      --  delay 0.000000001;
       ---------
    end loop;
 end UDP_Client;

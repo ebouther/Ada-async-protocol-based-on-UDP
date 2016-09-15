@@ -23,6 +23,8 @@ with Packet_Mgr;
 --  with Queue;
 
 procedure UDP_Server is
+   pragma Optimize (Time);
+
    use GNAT.Sockets;
 
    use type Base_Udp.Header;
@@ -90,7 +92,6 @@ procedure UDP_Server is
       Log_Task.Stop;
       Ack_Task.Stop;
       Remove_Task.Stop;
-      Append_Task.Stop;
       PMH_Buffer_Task.Stop;
       Recv_Socket_Task.Stop;
 
@@ -150,7 +151,6 @@ procedure UDP_Server is
       end loop;
    end Timer;
 
-
    task body Loss_Manager is
       Addr        :  System.Address;
       Pos         :  Interfaces.Unsigned_64;
@@ -162,8 +162,8 @@ procedure UDP_Server is
       use System.Storage_Elements;
       use type System.Address;
    begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (3));
+      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
+      --     (System.Multiprocessors.CPU_Range (3));
       loop
          accept Start (Count           : Interfaces.Unsigned_64;
                        Data_Address    : System.Address;
@@ -225,6 +225,8 @@ procedure UDP_Server is
       Nb_Missed            : Interfaces.Unsigned_64;
       Strt_Time            : Ada.Real_Time.Time;
       Elapsed              : Ada.Real_Time.Time_Span;
+      Time                 : Ada.Real_Time.Time_Span;
+      Seconds              : Ada.Real_Time.Seconds_Count;
       use type Reliable_Udp.Pkt_Nb;
       use type Ada.Real_Time.Time;
    begin
@@ -233,13 +235,7 @@ procedure UDP_Server is
 
          Packet_Mgr.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
 
-         select
-            Remove_Task.Remove (Header.Seq_Nb);
-         or
-            delay 0.000005;
-            Ada.Text_IO.Put_Line ("_/!\ __Remove_Busy__ /!\ _");
-            Remove_Task.Remove (Header.Seq_Nb);
-         end select;
+         Remove_Task.Remove (Header.Seq_Nb);
 
          I := I - 1;
       else
@@ -265,22 +261,22 @@ procedure UDP_Server is
 
             if Nb_Output > 12 then --  !! DBG !!  --
                Strt_Time := Ada.Real_Time.Clock;
-               select
-                  Append_Task.Append (Packet_Number,
-                                      Header.Seq_Nb - 1,
-                                      From);
+
+               if Packet_Number <= Header.Seq_Nb then
+                  Reliable_Udp.Append_Ack (Packet_Number, Header.Seq_Nb - 1, From);
                else
-                  Ada.Text_IO.Put_Line ("_/!\ __Append_Busy__ /!\ _");
-                  Append_Task.Append (Packet_Number,
-                                      Header.Seq_Nb - 1,
-                                      From);
-               end select;
-               Elapsed := Ada.Real_Time.Clock - Strt_Time;
-               if Ada.Real_Time.To_Duration (Elapsed) > 0.00001 then
-                  Ada.Text_IO.Put_Line ("Ack : " & Header.Ack'Img
-                     & " Missed : " & Nb_Missed'Img & " Elapsed : "
-                     & Duration'Image (Ada.Real_Time.To_Duration (Elapsed)));
+                  Reliable_Udp.Append_Ack (Packet_Number, Base_Udp.Pkt_Max, From);
+                  Reliable_Udp.Append_Ack (Reliable_Udp.Pkt_Nb'First, Header.Seq_Nb - 1, From);
                end if;
+
+               Elapsed := Ada.Real_Time.Clock - Strt_Time;
+               --  if Ada.Real_Time.To_Duration (Elapsed) > 0.000005 then
+               Ada.Real_Time.Split (Strt_Time, Seconds, Time);
+               Ada.Text_IO.Put_Line ("Ack : " & Header.Ack'Img
+                  & " Missed : " & Nb_Missed'Img & " Elapsed : "
+                  & Duration'Image (Ada.Real_Time.To_Duration (Elapsed))
+                  & " Time : " &  Duration'Image (Ada.Real_Time.To_Duration (Time)));
+               --  end if;
             else
                Missed := 0;
             end if;

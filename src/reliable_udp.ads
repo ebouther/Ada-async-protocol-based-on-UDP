@@ -53,7 +53,6 @@ package Reliable_Udp is
 
    procedure Append_Ack (First_D          : in Reliable_Udp.Pkt_Nb;
                          Last_D           : in Reliable_Udp.Pkt_Nb;
-                         Packet_Lost      : in out Reliable_Udp.Loss;
                          Client_Addr      : in GNAT.Sockets.Sock_Addr_Type);
 
    --  Send acks to client if it's necessary
@@ -65,9 +64,9 @@ package Reliable_Udp is
 
    --  Appends packets to Losses Container
    task type Append_Task is
-      entry Stop;
-      entry Append (First_Dropped, Last_Dropped : Reliable_Udp.Pkt_Nb;
-                   Client_Address               : GNAT.Sockets.Sock_Addr_Type);
+      pragma Optimize (Time);
+      entry Append (First_Dropped, Last_Dropped : in Reliable_Udp.Pkt_Nb;
+                   Client_Address               : in GNAT.Sockets.Sock_Addr_Type);
    end Append_Task;
 
    --  Removes Pkt_Nb from Losses Container

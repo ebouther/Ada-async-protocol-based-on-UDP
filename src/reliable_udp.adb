@@ -7,10 +7,15 @@ package body Reliable_Udp is
    Ack_Mgr      : Ack_Management;
 
 
+   ------------------
+   --  Append_Ack  --
+   ------------------
+
    procedure Append_Ack (First_D          : in Reliable_Udp.Pkt_Nb;
                          Last_D           : in Reliable_Udp.Pkt_Nb;
-                         Packet_Lost      : in out Reliable_Udp.Loss;
-                         Client_Addr      : in GNAT.Sockets.Sock_Addr_Type) is
+                         Client_Addr      : in GNAT.Sockets.Sock_Addr_Type)
+   is
+      Packet_Lost      : Reliable_Udp.Loss;
    begin
       for I in Reliable_Udp.Pkt_Nb range First_D .. Last_D loop
          Packet_Lost.Last_Ack := Ada.Real_Time."-"(Ada.Real_Time.Clock,
@@ -25,38 +30,48 @@ package body Reliable_Udp is
       end loop;
    end Append_Ack;
 
+
    -------------------
    --  Append_Task  --
    -------------------
 
    task body Append_Task is
-      Packet_Lost      : Reliable_Udp.Loss;
       Client_Addr      : GNAT.Sockets.Sock_Addr_Type;
       First_D, Last_D  : Reliable_Udp.Pkt_Nb;
+      Strt_Time        : Ada.Real_Time.Time;
+      Elapsed          : Ada.Real_Time.Time_Span;
+      Time             : Ada.Real_Time.Time_Span;
+      Seconds          : Ada.Real_Time.Seconds_Count;
+      use type Ada.Real_Time.Time;
 
    begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (6));
+      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
+      --     (System.Multiprocessors.CPU_Range (6));
       loop
-         select
-            accept Stop;
-            exit;
-         or
-            accept Append (First_Dropped, Last_Dropped   : Reliable_Udp.Pkt_Nb;
-                           Client_Address                : GNAT.Sockets.Sock_Addr_Type)
-            do
-               First_D        := First_Dropped;
-               Last_D         := Last_Dropped;
-               Client_Addr    := Client_Address;
-            end Append;
 
-            if First_D <= Last_D then
-               Append_Ack (First_D, Last_D, Packet_Lost, Client_Addr);
-            else
-               Append_Ack (First_D, Base_Udp.Pkt_Max, Packet_Lost, Client_Addr);
-               Append_Ack (Reliable_Udp.Pkt_Nb'First, Last_D, Packet_Lost, Client_Addr);
-            end if;
-         end select;
+         accept Append (First_Dropped, Last_Dropped   : in Reliable_Udp.Pkt_Nb;
+                        Client_Address                : in GNAT.Sockets.Sock_Addr_Type)
+         do
+            Strt_Time      := Ada.Real_Time.Clock;
+
+            First_D        := First_Dropped;
+            Last_D         := Last_Dropped;
+            Client_Addr    := Client_Address;
+
+            Elapsed := Ada.Real_Time.Clock - Strt_Time;
+
+         end Append;
+         Ada.Real_Time.Split (Strt_Time, Seconds, Time);
+         Ada.Text_IO.Put_Line (" Append_2 Elapsed : "
+            & Duration'Image (Ada.Real_Time.To_Duration (Elapsed))
+            & " Time : " &  Duration'Image (Ada.Real_Time.To_Duration (Time)));
+
+         if First_D <= Last_D then
+            Append_Ack (First_D, Last_D, Client_Addr);
+         else
+            Append_Ack (First_D, Base_Udp.Pkt_Max, Client_Addr);
+            Append_Ack (Reliable_Udp.Pkt_Nb'First, Last_D, Client_Addr);
+         end if;
       end loop;
    end Append_Task;
 
@@ -111,6 +126,7 @@ package body Reliable_Udp is
                                   GNAT.Sockets.Socket_Datagram);
       accept Start;
       loop
+         delay 0.0;
          select
             accept Stop;
                exit;
