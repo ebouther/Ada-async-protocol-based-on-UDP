@@ -12,15 +12,18 @@ package body Reliable_Udp is
                          Client_Addr      : in GNAT.Sockets.Sock_Addr_Type)
    is
 
-      Packet_Lost      : Reliable_Udp.Loss;
+      Packet_Lost                      : Reliable_Udp.Loss;
+      Missed_2_Times_Same_Seq_Number   : exception;
+      use type Ada.Real_Time.Time;
    begin
       for I in Reliable_Udp.Pkt_Nb range First_D .. Last_D loop
-         Packet_Lost.Last_Ack := Ada.Real_Time."-"(Ada.Real_Time.Clock,
-            Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max));
+         Packet_Lost.Last_Ack := Ada.Real_Time.Clock -
+            Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max);
          Packet_Lost.From := Client_Addr;
          if not Ack_Mgr.Is_Empty (Loss_Index (I)) then
             Ada.Text_IO.Put_Line
                ("/!\ Two packets with the same number were dropped /!\");
+            raise Missed_2_Times_Same_Seq_Number;
          end if;
          Ada.Text_IO.Put_Line ("1. Set : " & I'Img);
          Ack_Mgr.Set (Loss_Index (I), Packet_Lost);
