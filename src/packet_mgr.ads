@@ -1,10 +1,10 @@
 with System;
 with Interfaces;
 
-with Reliable_Udp;
-
-with Base_Udp;
 with Buffers.Local;
+
+with Reliable_Udp;
+with Base_Udp;
 
 package Packet_Mgr is
 
@@ -54,8 +54,14 @@ package Packet_Mgr is
    --  or Display it. Depends on To_File Boolean.
    procedure Get_Filled_Buf (To_File   : in Boolean := True);
 
+
    --  Search position of ack received in current and previous buffers
    --  and then store content in it.
+   function Search_Empty_Mark
+                        (First, Last            : Handle_Index;
+                         Data                   : in Base_Udp.Packet_Stream;
+                         Packet_Number, Seq_Nb : Reliable_Udp.Pkt_Nb) return Boolean;
+
    procedure Save_Ack (Seq_Nb          :  in Reliable_Udp.Pkt_Nb;
                        Packet_Number   :  in Reliable_Udp.Pkt_Nb;
                        Data            :  in Base_Udp.Packet_Stream);

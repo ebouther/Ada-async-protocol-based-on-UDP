@@ -160,8 +160,8 @@ package body Packet_Mgr is
             accept Stop;
                exit;
          or
-            accept New_Buffer_Addr (Buffer_Ptr   : in out System.Address) do
-
+            accept New_Buffer_Addr (Buffer_Ptr   : in out System.Address)
+            do
                if Buffer_Handler.Current + 1 = Buffer_Handler.First
                   and not Init
                then
@@ -190,6 +190,50 @@ package body Packet_Mgr is
    end PMH_Buffer_Addr;
 
 
+   -------------------------
+   --  Search_Empty_Mark  --
+   -------------------------
+
+   function Search_Empty_Mark
+                        (First, Last           : Handle_Index;
+                         Data                  : in Base_Udp.Packet_Stream;
+                         Packet_Number, Seq_Nb : Reliable_Udp.Pkt_Nb) return Boolean
+   is
+
+      Location_Not_Found   : exception;
+
+      use Packet_Buffers;
+      use System.Storage_Elements;
+      use type Reliable_Udp.Pkt_Nb;
+      use type Handle_Index;
+   begin
+      for N in First .. Last loop
+         declare
+            type Data_Array is new Element_Array
+               (1 .. Integer (Base_Udp.Sequence_Size));
+
+            Datas    : Data_Array;
+            Content  : Interfaces.Unsigned_32;
+
+            for Datas'Address use Buffer_Handler.Handlers (N)
+               .Handle.Get_Address;
+            for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
+         begin
+            if Seq_Nb >= Packet_Number
+               and N = Buffer_Handler.Current
+            then
+               raise Location_Not_Found;
+            end if;
+            if Content = 16#DEAD_BEEF# then
+               Datas (Integer (Seq_Nb) + 1) := Data;
+               return True;
+            end if;
+         end;
+      end loop;
+      return False;
+   end Search_Empty_Mark;
+
+
    ----------------
    --  Save_Ack  --
    ----------------
@@ -199,86 +243,35 @@ package body Packet_Mgr is
                        Data            :  in Base_Udp.Packet_Stream) is
 
       Location_Not_Found   : exception;
-
-      use Packet_Buffers;
-      use System.Storage_Elements;
       use type Reliable_Udp.Pkt_Nb;
-      use type Handle_Index;
    begin
       --  Parsing from Buffer_Handler.First to Last should be sufficient
       --  but it raises Location_Not_Found at buffer 15
       if Buffer_Handler.First > Buffer_Handler.Current then
-         for N in Buffer_Handler.First .. Handle_Index'Last loop
-            declare
-               type Data_Array is new Element_Array
-                  (1 .. Integer (Base_Udp.Sequence_Size));
 
-               Datas    : Data_Array;
-               Content  : Interfaces.Unsigned_32;
-
-               for Datas'Address use Buffer_Handler.Handlers (N)
-                  .Handle.Get_Address;
-               for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
-            begin
-               if Seq_Nb >= Packet_Number
-                  and N = Buffer_Handler.Current
-               then
-                  raise Location_Not_Found;
-               end if;
-               if Content = 16#DEAD_BEEF# then
-                  Datas (Integer (Seq_Nb) + 1) := Data;
-                  return;
-               end if;
-            end;
-         end loop;
-
-         for N in Handle_Index'First .. Buffer_Handler.Current loop
-            declare
-               type Data_Array is new Element_Array
-                  (1 .. Integer (Base_Udp.Sequence_Size));
-
-               Datas    : Data_Array;
-               Content  : Interfaces.Unsigned_32;
-
-               for Datas'Address use Buffer_Handler.Handlers (N)
-                  .Handle.Get_Address;
-               for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
-            begin
-               if Seq_Nb >= Packet_Number
-                  and N = Buffer_Handler.Current
-               then
-                  raise Location_Not_Found;
-               end if;
-               if Content = 16#DEAD_BEEF# then
-                  Datas (Integer (Seq_Nb) + 1) := Data;
-                  return;
-               end if;
-            end;
-         end loop;
+         if Search_Empty_Mark (Buffer_Handler.First,
+                               Handle_Index'Last,
+                               Data,
+                               Packet_Number,
+                               Seq_Nb)
+         or
+            Search_Empty_Mark (Handle_Index'First,
+                               Buffer_Handler.Current,
+                               Data,
+                               Packet_Number,
+                               Seq_Nb)
+         then
+            return;
+         end if;
       else
-         for N in Buffer_Handler.First .. Buffer_Handler.Current loop
-            declare
-               type Data_Array is new Element_Array
-                  (1 .. Integer (Base_Udp.Sequence_Size));
-
-               Datas    : Data_Array;
-               Content  : Interfaces.Unsigned_32;
-
-               for Datas'Address use Buffer_Handler.Handlers (N)
-                  .Handle.Get_Address;
-               for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
-            begin
-               if Seq_Nb >= Packet_Number
-                  and N = Buffer_Handler.Current
-               then
-                  raise Location_Not_Found;
-               end if;
-               if Content = 16#DEAD_BEEF# then
-                  Datas (Integer (Seq_Nb) + 1) := Data;
-                  return;
-               end if;
-            end;
-         end loop;
+         if Search_Empty_Mark (Buffer_Handler.First,
+                            Buffer_Handler.Current,
+                            Data,
+                            Packet_Number,
+                            Seq_Nb)
+         then
+            return;
+         end if;
       end if;
       Ada.Text_IO.Put_Line ("Not Found : " & Seq_Nb'Img);
       raise Location_Not_Found;
@@ -379,15 +372,15 @@ package body Packet_Mgr is
                                   Data           : Base_Udp.Packet_Stream;
                                   Data_Addr      : System.Address) is
 
+      use System.Storage_Elements;
+
       Good_Loc_Index :  constant Interfaces.Unsigned_64 := (I + Nb_Missed)
                            mod Base_Udp.Sequence_Size;
       Good_Location  :  Base_Udp.Packet_Stream;
 
-      use System.Storage_Elements;
       for Good_Location'Address use Data_Addr + Storage_Offset
                                  (Good_Loc_Index * Base_Udp.Load_Size);
    begin
-      --  Ada.Text_IO.Put_Line ("Good Loc index : " & Good_Loc_Index'Img);
       Good_Location := Data;
    end Copy_To_Correct_Location;
 
