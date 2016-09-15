@@ -150,6 +150,8 @@ procedure UDP_Server is
          end select;
       end loop;
    end Timer;
+
+
    --  Move to Packet_Mgr
    procedure Buffer_Loss (I           :  Interfaces.Unsigned_64;
                           Data_Addr   :  System.Address;
@@ -194,68 +196,6 @@ procedure UDP_Server is
             Ada.Exceptions.Exception_Message (E));
    end Buffer_Loss;
 
-   --  task body Loss_Manager is
-   --     Addr        :  System.Address;
-   --     Pos         :  Interfaces.Unsigned_64;
-   --     I           :  Interfaces.Unsigned_64;
-   --     Data_Addr   :  System.Address;
-   --     Last_Addr   :  System.Address;
-   --     Nb_Missed   :  Interfaces.Unsigned_64;
-
-   --     use System.Storage_Elements;
-   --     use type System.Address;
-   --  begin
-   --     --  System.Multiprocessors.Dispatching_Domains.Set_CPU
-   --     --     (System.Multiprocessors.CPU_Range (3));
-   --     loop
-   --        accept Start (Count           : Interfaces.Unsigned_64;
-   --                      Data_Address    : System.Address;
-   --                      Last_Address    : System.Address;
-   --                      Number_Missed   : Interfaces.Unsigned_64)
-   --        do
-   --           I           := Count;
-   --           Data_Addr   := Data_Address;
-   --           Last_Addr   := Last_Address;
-   --           Nb_Missed   := Number_Missed;
-   --        end Start;
-
-   --        for N in I .. I + Nb_Missed - 1 loop
-   --           Pos := N;
-   --           if N >= Base_Udp.Sequence_Size
-   --              and I < Base_Udp.Sequence_Size
-   --           then
-   --              Addr  := Data_Addr;
-   --              Pos   := N mod Base_Udp.Sequence_Size;
-   --              --  Ada.Text_IO.Put_Line ("** NEW ADDR: " & N'Img & I'Img);
-   --           else
-   --              Addr  := Last_Addr;
-   --              --  Ada.Text_IO.Put_Line ("** LAST ADDR: " & N'Img & I'Img);
-   --           end if;
-
-   --           declare
-   --              Data_Missed  :  Interfaces.Unsigned_32;
-   --              for Data_Missed'Address use Addr + Storage_Offset
-   --                                               (Pos * Base_Udp.Load_Size);
-   --           begin
-   --              --  if Addr = Data_Addr then
-   --              --     Ada.Text_IO.Put_Line ("-- Write in NEW to pos : "
-   --              --       & Pos'Img);
-   --              --  else
-   --              --     Ada.Text_IO.Put_Line ("-- Write in LAST to pos : "
-   --              --       & Pos'Img);
-   --              --  end if;
-   --              Data_Missed := 16#DEAD_BEEF#;
-   --           end;
-   --        end loop;
-   --     end loop;
-   --     exception
-   --        when E : others =>
-   --           Ada.Text_IO.Put_Line ("exception : " &
-   --              Ada.Exceptions.Exception_Name (E) &
-   --              " message : " &
-   --              Ada.Exceptions.Exception_Message (E));
-
-   --  end Loss_Manager;
 
    --  0.000007
    --  7.25E-05 ratio
@@ -267,10 +207,6 @@ procedure UDP_Server is
    is
       Last_Addr            : System.Address;
       Nb_Missed            : Interfaces.Unsigned_64;
-      Strt_Time            : Ada.Real_Time.Time;
-      Elapsed              : Ada.Real_Time.Time_Span;
-      Time                 : Ada.Real_Time.Time_Span;
-      Seconds              : Ada.Real_Time.Seconds_Count;
       use type Reliable_Udp.Pkt_Nb;
       use type Ada.Real_Time.Time;
    begin
@@ -294,31 +230,13 @@ procedure UDP_Server is
                Nb_Missed := Interfaces.Unsigned_64 (Header.Seq_Nb
                   + (Base_Udp.Pkt_Max - Packet_Number)) + 1;
                Missed := Missed + Nb_Missed;
-               --  Ada.Text_IO.Put_Line ("Append From "
-               --     & Packet_Number'Img & " To"
-               --     & Integer ((Header.Seq_Nb - 1))'Img);
+               Ada.Text_IO.Put_Line ("Append From "
+                  & Packet_Number'Img & " To"
+                  & Integer ((Header.Seq_Nb - 1))'Img);
             end if;
 
             if Nb_Output > 12 then --  !! DBG !!  --
-               Strt_Time := Ada.Real_Time.Clock;
                Reliable_Udp.Fifo.Append_Wait ((From, Packet_Number, Header.Seq_Nb - 1));
-
-               --  Append_Task.Append (Packet_Number, Header.Seq_Nb - 1, From);
-               --  if Packet_Number <= Header.Seq_Nb the
-               --     Reliable_Udp.Append_Ack (Packet_Number, Header.Seq_Nb - 1, From);
-               --  else
-               --     Reliable_Udp.Append_Ack (Packet_Number, Base_Udp.Pkt_Max, From);
-               --     Reliable_Udp.Append_Ack (Reliable_Udp.Pkt_Nb'First, Header.Seq_Nb - 1, From);
-               --  end if;
-
-               Elapsed := Ada.Real_Time.Clock - Strt_Time;
-               --  if Ada.Real_Time.To_Duration (Elapsed) > 0.000005 then
-               Ada.Real_Time.Split (Strt_Time, Seconds, Time);
-               Ada.Text_IO.Put_Line ("Ack : " & Header.Ack'Img
-                  & " Missed : " & Nb_Missed'Img & " Elapsed : "
-                  & Duration'Image (Ada.Real_Time.To_Duration (Elapsed))
-                  & " Time : " &  Duration'Image (Ada.Real_Time.To_Duration (Time)));
-               --  end if;
             else
                Missed := 0;
             end if;
@@ -331,31 +249,15 @@ procedure UDP_Server is
                PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
             end if;
 
-            Strt_Time := Ada.Real_Time.Clock;
-
             Packet_Mgr.Copy_To_Correct_Location
                                           (I, Nb_Missed, Data, Data_Addr);
 
-            Elapsed := Ada.Real_Time.Clock - Strt_Time;
-            Ada.Real_Time.Split (Strt_Time, Seconds, Time);
-            Ada.Text_IO.Put_Line ("Copy_To => Elapsed : "
-               & Duration'Image (Ada.Real_Time.To_Duration (Elapsed))
-               & " Time : " &  Duration'Image (Ada.Real_Time.To_Duration (Time)));
-
             if Nb_Output > 12 then --  !! DBG !!  --
-
-               Strt_Time := Ada.Real_Time.Clock;
                --  Takes too much time.. Might do a task vector.
-               Ada.Text_IO.Put_Line ("** Manage Loss I: " & I'Img
-                  & " Missed :" & Nb_Missed'Img);
+               --  Ada.Text_IO.Put_Line ("** Manage Loss I: " & I'Img
+               --     & " Missed :" & Nb_Missed'Img);
                Buffer_Loss (I, Data_Addr, Last_Addr, Nb_Missed);
                --  Manage_Loss_Task.Start (I, Data_Addr, Last_Addr, Nb_Missed);
-
-               Elapsed := Ada.Real_Time.Clock - Strt_Time;
-               Ada.Real_Time.Split (Strt_Time, Seconds, Time);
-               Ada.Text_IO.Put_Line ("Manage_Loss => Elapsed : "
-                  & Duration'Image (Ada.Real_Time.To_Duration (Elapsed))
-                  & " Time : " &  Duration'Image (Ada.Real_Time.To_Duration (Time)));
             end if;
 
             I := I + Nb_Missed;
@@ -405,7 +307,6 @@ procedure UDP_Server is
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
                Process_Packet (Data, Header, I, Data_Addr, From);
-               --  Buffer.Append_Wait (Data'Address);
                I := I + 1;
             exception
                when Socket_Error =>
@@ -417,7 +318,6 @@ procedure UDP_Server is
                      Ada.Exceptions.Exception_Name (E) &
                      " message : " &
                      Ada.Exceptions.Exception_Message (E));
-
             end;
          end select;
       end loop;
