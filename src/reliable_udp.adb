@@ -9,8 +9,10 @@ package body Reliable_Udp is
 
    procedure Append_Ack (First_D          : in Reliable_Udp.Pkt_Nb;
                          Last_D           : in Reliable_Udp.Pkt_Nb;
-                         Packet_Lost      : in out Reliable_Udp.Loss;
-                         Client_Addr      : in GNAT.Sockets.Sock_Addr_Type) is
+                         Client_Addr      : in GNAT.Sockets.Sock_Addr_Type)
+   is
+
+      Packet_Lost      : Reliable_Udp.Loss;
    begin
       for I in Reliable_Udp.Pkt_Nb range First_D .. Last_D loop
          Packet_Lost.Last_Ack := Ada.Real_Time."-"(Ada.Real_Time.Clock,
@@ -30,7 +32,6 @@ package body Reliable_Udp is
    -------------------
 
    task body Append_Task is
-      Packet_Lost      : Reliable_Udp.Loss;
       Client_Addr      : GNAT.Sockets.Sock_Addr_Type;
       First_D, Last_D  : Reliable_Udp.Pkt_Nb;
 
@@ -51,10 +52,10 @@ package body Reliable_Udp is
             end Append;
 
             if First_D <= Last_D then
-               Append_Ack (First_D, Last_D, Packet_Lost, Client_Addr);
+               Append_Ack (First_D, Last_D, Client_Addr);
             else
-               Append_Ack (First_D, Base_Udp.Pkt_Max, Packet_Lost, Client_Addr);
-               Append_Ack (Reliable_Udp.Pkt_Nb'First, Last_D, Packet_Lost, Client_Addr);
+               Append_Ack (First_D, Base_Udp.Pkt_Max, Client_Addr);
+               Append_Ack (Reliable_Udp.Pkt_Nb'First, Last_D, Client_Addr);
             end if;
          end select;
       end loop;

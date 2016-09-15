@@ -53,7 +53,6 @@ package Reliable_Udp is
 
    procedure Append_Ack (First_D          : in Reliable_Udp.Pkt_Nb;
                          Last_D           : in Reliable_Udp.Pkt_Nb;
-                         Packet_Lost      : in out Reliable_Udp.Loss;
                          Client_Addr      : in GNAT.Sockets.Sock_Addr_Type);
 
    --  Send acks to client if it's necessary
