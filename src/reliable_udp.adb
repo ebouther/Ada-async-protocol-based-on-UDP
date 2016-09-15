@@ -22,7 +22,7 @@ package body Reliable_Udp is
          Packet_Lost.From := Client_Addr;
          if not Ack_Mgr.Is_Empty (Loss_Index (I)) then
             Ada.Text_IO.Put_Line
-               ("/!\ Two packets with the same number were dropped /!\");
+               ("/!\ Two packets with the same number:" & I'Img  & " were dropped /!\");
             raise Missed_2_Times_Same_Seq_Number;
          end if;
          Ada.Text_IO.Put_Line ("1. Set : " & I'Img);
@@ -35,32 +35,18 @@ package body Reliable_Udp is
    -------------------
 
    task body Append_Task is
-      Client_Addr      : GNAT.Sockets.Sock_Addr_Type;
-      First_D, Last_D  : Reliable_Udp.Pkt_Nb;
-
+      Ack   :  Append_Ack_Type;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (6));
       loop
-         select
-            accept Stop;
-            exit;
-         or
-            accept Append (First_Dropped, Last_Dropped   : Reliable_Udp.Pkt_Nb;
-                           Client_Address                : GNAT.Sockets.Sock_Addr_Type)
-            do
-               First_D        := First_Dropped;
-               Last_D         := Last_Dropped;
-               Client_Addr    := Client_Address;
-            end Append;
-
-            if First_D <= Last_D then
-               Append_Ack (First_D, Last_D, Client_Addr);
-            else
-               Append_Ack (First_D, Base_Udp.Pkt_Max, Client_Addr);
-               Append_Ack (Reliable_Udp.Pkt_Nb'First, Last_D, Client_Addr);
-            end if;
-         end select;
+         Fifo.Remove_First_Wait (Ack);
+         if Ack.First_D <= Ack.Last_D then
+            Append_Ack (Ack.First_D, Ack.Last_D, Ack.From);
+         else
+            Append_Ack (Ack.First_D, Base_Udp.Pkt_Max, Ack.From);
+            Append_Ack (Reliable_Udp.Pkt_Nb'First, Ack.Last_D, Ack.From);
+         end if;
       end loop;
    end Append_Task;
 

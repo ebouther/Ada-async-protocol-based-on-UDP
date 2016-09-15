@@ -9,6 +9,7 @@ with GNAT.Sockets.Thin;
 pragma Warnings (On);
 
 with Base_Udp;
+with Queue;
 
 package Reliable_Udp is
 
@@ -51,6 +52,16 @@ package Reliable_Udp is
    package Losses_Container is
       new Ada.Containers.Vectors (Natural, Loss);
 
+   type Append_Ack_Type is
+      record
+         From     : GNAT.Sockets.Sock_Addr_Type;
+         First_D  : Reliable_Udp.Pkt_Nb;
+         Last_D   : Reliable_Udp.Pkt_Nb;
+      end record;
+
+   package Sync_Queue is new Queue (Append_Ack_Type);
+   Fifo  : Sync_Queue.Synchronized_Queue;
+
    procedure Append_Ack (First_D          : in Reliable_Udp.Pkt_Nb;
                          Last_D           : in Reliable_Udp.Pkt_Nb;
                          Client_Addr      : in GNAT.Sockets.Sock_Addr_Type);
@@ -63,11 +74,7 @@ package Reliable_Udp is
    end Ack_Task;
 
    --  Appends packets to Losses Container
-   task type Append_Task is
-      entry Stop;
-      entry Append (First_Dropped, Last_Dropped : Reliable_Udp.Pkt_Nb;
-                   Client_Address               : GNAT.Sockets.Sock_Addr_Type);
-   end Append_Task;
+   task Append_Task;
 
    --  Removes Pkt_Nb from Losses Container
    task type Remove_Task is

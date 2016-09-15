@@ -57,7 +57,7 @@ procedure UDP_Server is
    --  package Sync_Queue is new Queue (System.Address);
    --  Buffer               : Sync_Queue.Synchronized_Queue;
 
-   Append_Task          : Reliable_Udp.Append_Task;
+   --  Append_Task          : Reliable_Udp.Append_Task;
    Remove_Task          : Reliable_Udp.Remove_Task;
    Ack_Task             : Reliable_Udp.Ack_Task;
 
@@ -301,9 +301,10 @@ procedure UDP_Server is
 
             if Nb_Output > 12 then --  !! DBG !!  --
                Strt_Time := Ada.Real_Time.Clock;
+               Reliable_Udp.Fifo.Append_Wait ((From, Packet_Number, Header.Seq_Nb - 1));
 
-               Append_Task.Append (Packet_Number, Header.Seq_Nb - 1, From);
-               --  if Packet_Number <= Header.Seq_Nb then
+               --  Append_Task.Append (Packet_Number, Header.Seq_Nb - 1, From);
+               --  if Packet_Number <= Header.Seq_Nb the
                --     Reliable_Udp.Append_Ack (Packet_Number, Header.Seq_Nb - 1, From);
                --  else
                --     Reliable_Udp.Append_Ack (Packet_Number, Base_Udp.Pkt_Max, From);
@@ -357,7 +358,6 @@ procedure UDP_Server is
                   & " Time : " &  Duration'Image (Ada.Real_Time.To_Duration (Time)));
             end if;
 
-            --  Ada.Text_IO.Put_Line ("Nb_Missed : " & Nb_Missed'Img);
             I := I + Nb_Missed;
 
          end if;
