@@ -6,7 +6,6 @@ with Reliable_Udp;
 with Base_Udp;
 --  with Buffers.Local;
 with Buffers.Shared.Produce;
-with Buffers.Shared.Host;
 with Buffers.Shared.Consume;
 
 package Packet_Mgr is
@@ -38,16 +37,18 @@ package Packet_Mgr is
       Buffers.Generic_Buffers
          (Element_Type => Base_Udp.Packet_Stream);
 
-   Messages_Hangling : aliased Buffers.Shared.Host.Message_Handling_Task;
-   Production : Buffers.Shared.Produce.Produce_Couple_Type;
+   Production        : Buffers.Shared.Produce.Produce_Couple_Type;
+   Buffer_Prod       : Buffers.Shared.Produce.Produce_Type renames Production.Producer;
+
+   Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
+   Buffer_Cons       : Buffers.Shared.Consume.Consume_Type renames Consumption.Consumer;
+
+   --  Messages_Hangling : aliased Buffers.Shared.Host.Message_Handling_Task;
+   --  Buffer_Host       : aliased Buffers.Shared.Host.Host_Type
+   --                           (Messages_Hangling'Unchecked_Access);
 
    type Buf_Handler is
       record
-         --  Buffer      : aliased Buffers.Local.Local_Buffer_Type;
-         Buffer            : Buffers.Shared.Produce.Produce_Type;
-         Buffer_Cons       : Buffers.Shared.Consume.Consume_Type;
-         Buffer_Host       : aliased Buffers.Shared.Host.Host_Type
-                              (Messages_Hangling'Unchecked_Access);
          Handlers          : Handle_Array;
          First             : Handle_Index;
          Current           : Handle_Index;

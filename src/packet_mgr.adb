@@ -2,7 +2,9 @@ with Ada.Text_IO;
 with Ada.Exceptions;
 with System.Multiprocessors.Dispatching_Domains;
 with System.Storage_Elements;
+
 with Dcod_Pmh_Service.Client;
+with Common_Types;
 
 package body Packet_Mgr is
 
@@ -20,6 +22,7 @@ package body Packet_Mgr is
    -------------------------
 
    procedure Init_Handle_Array is
+      use type Common_Types.Buffer_Size_Type;
    begin
 
       --  dcod-launch
@@ -29,22 +32,26 @@ package body Packet_Mgr is
                                               Depth => PMH_Buf_Nb + 1,
                                               Endpoint => "http://stare-2:5678");
 
-      Buffer_Handler.Buffer_Host.Set_Name ("toto");
-      Buffer_Handler.Buffer.Set_Name ("toto");
-      Buffer_Handler.Buffer_Cons.Set_Name ("toto");
+      --  Buffer_Host.Set_Name ("toto");
+      Buffer_Prod.Set_Name ("toto");
+      Buffer_Cons.Set_Name ("toto");
 
       Production.Message_Handling.Start (1.0);
-
-      Buffer_Handler.Buffer.Is_Initialised;
+      Consumption.Message_Handling.Start (1.0);
 
       --  Need a "+ 1" otherwise it cannot get a
       --  free buffer in Release_Full_Buf
-      Buffer_Handler.Buffer_Host.Initialise (PMH_Buf_Nb + 1,
-         Size => Buffers.Buffer_Size_Type
-         (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
+      --  Buffer_Host.Initialise
+      --        (Buffer_Number => PMH_Buf_Nb + 1,
+      --         Size => ((Common_Types.Buffer_Size_Type (Base_Udp.Sequence_Size
+      --                           * Base_Udp.Load_Size) / 4096) + 1) * 4096);
 
-      --  Messages_Hangling.Start (Buffer_Handler.Buffer_Host'Unchecked_Access, 1.0);
-      Production.Message_Handling.Start (1.0);
+      --  Messages_Hangling.Start (Buffer_Host'Unchecked_Access, 1.0);
+
+      Buffer_Prod.Is_Initialised;
+      Ada.Text_IO.Put_Line ("Is_Initialised");
+
+      Ada.Text_IO.Put_Line ("Production Start");
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
 
       --  Current is incremented to First when Recv_Packets asks for new Buf
@@ -52,7 +59,7 @@ package body Packet_Mgr is
 
       --  Kernel keeps memory as virtual till I write inside.
       for I in Buffer_Handler.Handlers'Range loop
-         Buffer_Handler.Buffer.Get_Free_Buffer (Buffer_Handler.Handlers (I)
+         Buffer_Prod.Get_Free_Buffer (Buffer_Handler.Handlers (I)
             .Handle);
          declare
             Message : Base_Udp.Packet_Payload;
@@ -64,7 +71,7 @@ package body Packet_Mgr is
          end;
       end loop;
       Ada.Text_IO.Put_Line ("_Initialization Finished_");
-      exception
+   exception
       when E : others =>
          Ada.Text_IO.Put_Line ("exception : " &
             Ada.Exceptions.Exception_Name (E) &
@@ -84,7 +91,7 @@ package body Packet_Mgr is
       Buffers.Set_Used_Bytes (Buffer_Handler.Handlers (Index).Handle,
                Packet_Buffers.To_Bytes (Integer (Base_Udp.Sequence_Size)));
 
-      Buffer_Handler.Buffer.Release_Free_Buffer
+      Buffer_Prod.Release_Free_Buffer
                         (Buffer_Handler.Handlers
                            (Index).Handle);
 
@@ -149,7 +156,7 @@ package body Packet_Mgr is
 
             Buffer_Handler.Handlers (Buffer_Handler.First).Handle.Reuse;
 
-            Buffer_Handler.Buffer.Get_Free_Buffer
+            Buffer_Prod.Get_Free_Buffer
                (Buffer_Handler.Handlers
                   (Buffer_Handler.First).Handle);
 
@@ -321,7 +328,7 @@ package body Packet_Mgr is
          use Packet_Buffers;
       begin
          select
-            Buffer_Handler.Buffer_Cons.Get_Full_Buffer (Handle);
+            Buffer_Cons.Get_Full_Buffer (Handle);
          or
             delay 1.0;
             Ada.Text_IO.Put_Line ("/!\ Error : Cannot Get A Full Buffer /!\");
@@ -378,7 +385,7 @@ package body Packet_Mgr is
             end loop;
          end;
 
-         Buffer_Handler.Buffer_Cons.Release_Full_Buffer (Handle);
+         Buffer_Cons.Release_Full_Buffer (Handle);
          if To_File then
             Ada.Text_IO.Close (Log_File);
          end if;
