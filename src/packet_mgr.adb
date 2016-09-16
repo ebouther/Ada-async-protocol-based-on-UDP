@@ -197,10 +197,10 @@ package body Packet_Mgr is
    function Search_Empty_Mark
                         (First, Last           : Handle_Index;
                          Data                  : in Base_Udp.Packet_Stream;
-                         Packet_Number, Seq_Nb : Reliable_Udp.Pkt_Nb) return Boolean
+                         Seq_Nb                : Reliable_Udp.Pkt_Nb) return Boolean
    is
 
-      Location_Not_Found   : exception;
+      --  Location_Not_Found   : exception;
 
       use Packet_Buffers;
       use System.Storage_Elements;
@@ -219,11 +219,6 @@ package body Packet_Mgr is
                .Handle.Get_Address;
             for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
          begin
-            if Seq_Nb >= Packet_Number
-               and N = Buffer_Handler.Current
-            then
-               raise Location_Not_Found;
-            end if;
             if Content = 16#DEAD_BEEF# then
                Datas (Integer (Seq_Nb) + 1) := Data;
                return True;
@@ -244,6 +239,7 @@ package body Packet_Mgr is
 
       Location_Not_Found   : exception;
       use type Reliable_Udp.Pkt_Nb;
+      pragma Unreferenced (Packet_Number);
    begin
       --  Parsing from Buffer_Handler.First to Last should be sufficient
       --  but it raises Location_Not_Found at buffer 15
@@ -252,23 +248,20 @@ package body Packet_Mgr is
          if Search_Empty_Mark (Buffer_Handler.First,
                                Handle_Index'Last,
                                Data,
-                               Packet_Number,
                                Seq_Nb)
          or
             Search_Empty_Mark (Handle_Index'First,
                                Buffer_Handler.Current,
                                Data,
-                               Packet_Number,
                                Seq_Nb)
          then
             return;
          end if;
       else
          if Search_Empty_Mark (Buffer_Handler.First,
-                            Buffer_Handler.Current,
-                            Data,
-                            Packet_Number,
-                            Seq_Nb)
+                               Buffer_Handler.Current,
+                               Data,
+                               Seq_Nb)
          then
             return;
          end if;

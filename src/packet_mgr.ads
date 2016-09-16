@@ -60,7 +60,7 @@ package Packet_Mgr is
    function Search_Empty_Mark
                         (First, Last            : Handle_Index;
                          Data                   : in Base_Udp.Packet_Stream;
-                         Packet_Number, Seq_Nb : Reliable_Udp.Pkt_Nb) return Boolean;
+                         Seq_Nb                 : Reliable_Udp.Pkt_Nb) return Boolean;
 
    procedure Save_Ack (Seq_Nb          :  in Reliable_Udp.Pkt_Nb;
                        Packet_Number   :  in Reliable_Udp.Pkt_Nb;
