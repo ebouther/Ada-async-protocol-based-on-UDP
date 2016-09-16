@@ -4,9 +4,11 @@ with System.Multiprocessors.Dispatching_Domains;
 with System.Storage_Elements;
 
 with Dcod_Pmh_Service.Client;
+with Buffers.Shared.Produce;
+with Buffers.Shared.Consume;
 with Common_Types;
 
-package body Packet_Mgr is
+package body Buffer_Handling is
 
    use type Interfaces.Unsigned_8;
    use type Interfaces.Unsigned_16;
@@ -14,44 +16,38 @@ package body Packet_Mgr is
    use type Interfaces.Unsigned_64;
 
 
-   Buffer_Handler : Buf_Handler;
+   Buffer_Handler    : Buf_Handler;
+
+   Production        : Buffers.Shared.Produce.Produce_Couple_Type;
+   Buffer_Prod       : Buffers.Shared.Produce.Produce_Type renames Production.Producer;
+
+   Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
+   Buffer_Cons       : Buffers.Shared.Consume.Consume_Type renames Consumption.Consumer;
 
 
-   -------------------------
-   --  Init_Handle_Array  --
-   -------------------------
+   --------------------
+   --  Init_Buffers  --
+   --------------------
 
-   procedure Init_Handle_Array is
+   procedure Init_Buffers is
       use type Common_Types.Buffer_Size_Type;
    begin
 
-      --  dcod-launch
+      --  Need a "+ 1" otherwise it cannot get a
+      --  free buffer in Release_Full_Buf
       Dcod_Pmh_Service.Client.Provide_Buffer (Name => "toto",
                                               Size => ((Integer (Base_Udp.Sequence_Size
                                                 * Base_Udp.Load_Size) / 4096) + 1) * 4096,
                                               Depth => PMH_Buf_Nb + 1,
                                               Endpoint => "http://stare-2:5678");
 
-      --  Buffer_Host.Set_Name ("toto");
-      Buffer_Prod.Set_Name ("toto");
-      Buffer_Cons.Set_Name ("toto");
-
+      Buffer_Prod.Set_Name (Base_Udp.Buffer_Name);
       Production.Message_Handling.Start (1.0);
+      Buffer_Prod.Is_Initialised;
+
+      Buffer_Cons.Set_Name (Base_Udp.Buffer_Name);
       Consumption.Message_Handling.Start (1.0);
 
-      --  Need a "+ 1" otherwise it cannot get a
-      --  free buffer in Release_Full_Buf
-      --  Buffer_Host.Initialise
-      --        (Buffer_Number => PMH_Buf_Nb + 1,
-      --         Size => ((Common_Types.Buffer_Size_Type (Base_Udp.Sequence_Size
-      --                           * Base_Udp.Load_Size) / 4096) + 1) * 4096);
-
-      --  Messages_Hangling.Start (Buffer_Host'Unchecked_Access, 1.0);
-
-      Buffer_Prod.Is_Initialised;
-      Ada.Text_IO.Put_Line ("Is_Initialised");
-
-      Ada.Text_IO.Put_Line ("Production Start");
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
 
       --  Current is incremented to First when Recv_Packets asks for new Buf
@@ -77,7 +73,7 @@ package body Packet_Mgr is
             Ada.Exceptions.Exception_Name (E) &
             " message : " &
             Ada.Exceptions.Exception_Message (E));
-   end Init_Handle_Array;
+   end Init_Buffers;
 
 
    ------------------------------
@@ -124,7 +120,6 @@ package body Packet_Mgr is
                      for Data'Address use Addr + Storage_Offset
                                                    (N * Base_Udp.Load_Size);
                   begin
-                     --  Ada.Text_IO.Put_Line ("DEAD_BEEF at : " & N'Img);
                      exit Parse_Buffer when Data = 16#DEAD_BEEF#;
                   end;
                   N := N + 1;
@@ -138,12 +133,54 @@ package body Packet_Mgr is
    end Check_Buf_Integrity;
 
 
+  -----------------------
+  --  Mark_Empty_Cell  --
+  -----------------------
+
+   procedure Mark_Empty_Cell (I           :  Interfaces.Unsigned_64;
+                              Data_Addr   :  System.Address;
+                              Last_Addr   :  System.Address;
+                              Nb_Missed   :  Interfaces.Unsigned_64)
+   is
+      Addr        :  System.Address;
+      Pos         :  Interfaces.Unsigned_64;
+
+      use System.Storage_Elements;
+      use type System.Address;
+   begin
+      for N in I .. I + Nb_Missed - 1 loop
+         Pos := N;
+         if N >= Base_Udp.Sequence_Size
+            and I < Base_Udp.Sequence_Size
+         then
+            Addr  := Data_Addr;
+            Pos   := N mod Base_Udp.Sequence_Size;
+         else
+            Addr  := Last_Addr;
+         end if;
+
+         declare
+            Data_Missed  :  Interfaces.Unsigned_32;
+            for Data_Missed'Address use Addr + Storage_Offset
+                                             (Pos * Base_Udp.Load_Size);
+         begin
+            Data_Missed := 16#DEAD_BEEF#;
+         end;
+      end loop;
+   exception
+      when E : others =>
+         Ada.Text_IO.Put_Line ("exception : " &
+            Ada.Exceptions.Exception_Name (E) &
+            " message : " &
+            Ada.Exceptions.Exception_Message (E));
+   end Mark_Empty_Cell;
+
+
   ------------------------
   --  Release_Full_Buf  --
   ------------------------
 
    task body Release_Full_Buf is
-
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (11));
@@ -229,8 +266,6 @@ package body Packet_Mgr is
                          Data                  : in Base_Udp.Packet_Stream;
                          Seq_Nb                : Reliable_Udp.Pkt_Nb) return Boolean
    is
-
-      --  Location_Not_Found   : exception;
 
       use Packet_Buffers;
       use System.Storage_Elements;
@@ -407,4 +442,4 @@ package body Packet_Mgr is
       Good_Location := Data;
    end Copy_To_Correct_Location;
 
-end Packet_Mgr;
+end Buffer_Handling;

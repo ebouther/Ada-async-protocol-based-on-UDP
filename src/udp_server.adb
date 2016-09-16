@@ -1,7 +1,6 @@
 with Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Streams;
-with Ada.Exceptions;
 with Ada.Unchecked_Conversion;
 with Ada.Calendar;
 with Interfaces.C;
@@ -19,8 +18,7 @@ pragma Warnings (On);
 with Base_Udp;
 with Output_Data;
 with Reliable_Udp;
-with Packet_Mgr;
---  with Queue;
+with Buffer_Handling;
 
 procedure UDP_Server is
    pragma Optimize (Time);
@@ -40,12 +38,6 @@ procedure UDP_Server is
       entry Stop;
    end Recv_Socket;
 
-   --  task type Loss_Manager is
-   --     entry Start (Count           : Interfaces.Unsigned_64;
-   --                  Data_Address    : System.Address;
-   --                  Last_Address    : System.Address;
-   --                  Number_Missed   : Interfaces.Unsigned_64);
-   --  end Loss_Manager;
 
    procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
                              Header    : in Reliable_Udp.Header;
@@ -53,21 +45,26 @@ procedure UDP_Server is
                              Data_Addr : in out System.Address;
                              From      : in Sock_Addr_Type);
 
+   function To_Int is
+      new Ada.Unchecked_Conversion
+         (GNAT.Sockets.Socket_Type, Interfaces.C.int);
 
-   --  package Sync_Queue is new Queue (System.Address);
-   --  Buffer               : Sync_Queue.Synchronized_Queue;
+   procedure Init_Udp (Server : in out Socket_Type);
 
-   --  Append_Task          : Reliable_Udp.Append_Task;
+   pragma Warnings (Off);
+   procedure Stop_Server;
+   pragma Warnings (On);
+
+
    Remove_Task          : Reliable_Udp.Remove_Task;
    Ack_Task             : Reliable_Udp.Ack_Task;
 
    Recv_Socket_Task     : Recv_Socket;
    Log_Task             : Timer;
-   --  Manage_Loss_Task     : Loss_Manager;
 
-   Check_Integrity_Task : Packet_Mgr.Check_Buf_Integrity;
-   PMH_Buffer_Task      : Packet_Mgr.PMH_Buffer_Addr;
-   Release_Buf_Task     : Packet_Mgr.Release_Full_Buf;
+   Check_Integrity_Task : Buffer_Handling.Check_Buf_Integrity;
+   PMH_Buffer_Task      : Buffer_Handling.PMH_Buffer_Addr;
+   Release_Buf_Task     : Buffer_Handling.Release_Full_Buf;
 
    Start_Time           : Ada.Calendar.Time;
    Elapsed_Time         : Duration;
@@ -80,13 +77,11 @@ procedure UDP_Server is
    Busy                 : Interfaces.C.int := 50;
    Opt_Return           : Interfaces.C.int;
 
-   function To_Int is
-      new Ada.Unchecked_Conversion
-         (GNAT.Sockets.Socket_Type, Interfaces.C.int);
 
-   pragma Warnings (Off);
-   procedure Stop_Server;
-   pragma Warnings (On);
+   -------------------
+   --  Stop_Server  --
+   -------------------
+
    procedure Stop_Server is
    begin
       Log_Task.Stop;
@@ -97,7 +92,11 @@ procedure UDP_Server is
 
    end Stop_Server;
 
-   procedure Init_Udp (Server : in out Socket_Type);
+
+   ----------------
+   --  Init_Udp  --
+   ----------------
+
    procedure Init_Udp (Server : in out Socket_Type) is
       Address  : Sock_Addr_Type;
    begin
@@ -123,6 +122,10 @@ procedure UDP_Server is
    end Init_Udp;
 
 
+   -------------
+   --  Timer  --
+   -------------
+
    task body Timer is
       use type Ada.Calendar.Time;
    begin
@@ -135,7 +138,6 @@ procedure UDP_Server is
             exit;
          else
             delay 1.0;
-            --  Ada.Text_IO.Put_Line ("Buf len : " & Buffer.Cur_Count'Img);
             Ada.Text_IO.Put_Line ("FIFO Len : " & Reliable_Udp.Fifo.Cur_Count'Img);
             Elapsed_Time := Ada.Calendar.Clock - Start_Time;
             Output_Data.Display
@@ -153,50 +155,9 @@ procedure UDP_Server is
    end Timer;
 
 
-   --  Move to Packet_Mgr
-   procedure Buffer_Loss (I           :  Interfaces.Unsigned_64;
-                          Data_Addr   :  System.Address;
-                          Last_Addr   :  System.Address;
-                          Nb_Missed   :  Interfaces.Unsigned_64);
-
-   procedure Buffer_Loss (I           :  Interfaces.Unsigned_64;
-                          Data_Addr   :  System.Address;
-                          Last_Addr   :  System.Address;
-                          Nb_Missed   :  Interfaces.Unsigned_64)
-   is
-      Addr        :  System.Address;
-      Pos         :  Interfaces.Unsigned_64;
-
-      use System.Storage_Elements;
-      use type System.Address;
-   begin
-      for N in I .. I + Nb_Missed - 1 loop
-         Pos := N;
-         if N >= Base_Udp.Sequence_Size
-            and I < Base_Udp.Sequence_Size
-         then
-            Addr  := Data_Addr;
-            Pos   := N mod Base_Udp.Sequence_Size;
-         else
-            Addr  := Last_Addr;
-         end if;
-
-         declare
-            Data_Missed  :  Interfaces.Unsigned_32;
-            for Data_Missed'Address use Addr + Storage_Offset
-                                             (Pos * Base_Udp.Load_Size);
-         begin
-            Data_Missed := 16#DEAD_BEEF#;
-         end;
-      end loop;
-   exception
-      when E : others =>
-         Ada.Text_IO.Put_Line ("exception : " &
-            Ada.Exceptions.Exception_Name (E) &
-            " message : " &
-            Ada.Exceptions.Exception_Message (E));
-   end Buffer_Loss;
-
+   ----------------------
+   --  Process_Packet  --
+   ----------------------
 
    --  0.000007
    --  7.25E-05 ratio
@@ -214,7 +175,7 @@ procedure UDP_Server is
    begin
 
       if Header.Ack then
-         Packet_Mgr.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
+         Buffer_Handling.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
          Remove_Task.Remove (Header.Seq_Nb);
          I := I - 1;
       else
@@ -226,15 +187,15 @@ procedure UDP_Server is
          if Header.Seq_Nb /= Packet_Number then
             if Header.Seq_Nb > Packet_Number then
                Nb_Missed := Interfaces.Unsigned_64
-                  (Header.Seq_Nb - Packet_Number);
+                              (Header.Seq_Nb - Packet_Number);
                Missed := Missed + Nb_Missed;
             else
                Nb_Missed := Interfaces.Unsigned_64 (Header.Seq_Nb
-                  + (Base_Udp.Pkt_Max - Packet_Number)) + 1;
+                              + (Base_Udp.Pkt_Max - Packet_Number)) + 1;
                Missed := Missed + Nb_Missed;
                Ada.Text_IO.Put_Line ("Append From "
-                  & Packet_Number'Img & " To"
-                  & Integer ((Header.Seq_Nb - 1))'Img);
+                              & Packet_Number'Img & " To"
+                              & Integer ((Header.Seq_Nb - 1))'Img);
             end if;
 
             if Nb_Output > 12 then --  !! DBG !!  --
@@ -247,20 +208,22 @@ procedure UDP_Server is
             if I + Nb_Missed >= Base_Udp.Sequence_Size then
                PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
             end if;
-            Packet_Mgr.Copy_To_Correct_Location
+            Buffer_Handling.Copy_To_Correct_Location
                                           (I, Nb_Missed, Data, Data_Addr);
             if Nb_Output > 12 then --  !! DBG !!  --
-               Buffer_Loss (I, Data_Addr, Last_Addr, Nb_Missed);
+               Buffer_Handling.Mark_Empty_Cell (I, Data_Addr, Last_Addr, Nb_Missed);
             end if;
-
             I := I + Nb_Missed;
-
          end if;
          --  mod type (doesn't need to be set to 0 on max value)
          Packet_Number := Packet_Number + 1;
       end if;
    end Process_Packet;
 
+
+   -------------------
+   --  Recv_Socket  --
+   -------------------
 
    task body Recv_Socket is
       Server               : Socket_Type;
@@ -277,7 +240,7 @@ procedure UDP_Server is
          (System.Multiprocessors.CPU_Range (16));
 
       Init_Udp (Server);
-      Packet_Mgr.Init_Handle_Array;
+      Buffer_Handling.Init_Buffers;
 
       accept Start;
       loop
@@ -306,11 +269,6 @@ procedure UDP_Server is
                   Watchdog := Watchdog + 1;
                   Ada.Text_IO.Put_Line ("Socket Error");
                   exit when Watchdog = 10;
-               when E : others =>
-                  Ada.Text_IO.Put_Line ("exception : " &
-                     Ada.Exceptions.Exception_Name (E) &
-                     " message : " &
-                     Ada.Exceptions.Exception_Message (E));
             end;
          end select;
       end loop;

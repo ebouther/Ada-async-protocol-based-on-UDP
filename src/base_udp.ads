@@ -9,6 +9,9 @@ package Base_Udp is
    --  8 or 16 otherwise it's too big for Set_Used_Bytes parameter (Integer)
    subtype Header is Interfaces.Unsigned_16;
 
+   --  Used by Buffers' Set_Name
+   Buffer_Name    : constant String := "toto";
+
    --  Packet Payload size in Bytes
    Load_Size      : constant := 8972;
 

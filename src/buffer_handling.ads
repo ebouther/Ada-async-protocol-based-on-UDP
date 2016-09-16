@@ -4,10 +4,9 @@ with Interfaces;
 with Reliable_Udp;
 with Base_Udp;
 
-with Buffers.Shared.Produce;
-with Buffers.Shared.Consume;
+with Buffers;
 
-package Packet_Mgr is
+package Buffer_Handling is
 
    --  Number of pmh buffers initialized
    PMH_Buf_Nb     : constant := 15;
@@ -36,15 +35,6 @@ package Packet_Mgr is
       Buffers.Generic_Buffers
          (Element_Type => Base_Udp.Packet_Stream);
 
-   Production        : Buffers.Shared.Produce.Produce_Couple_Type;
-   Buffer_Prod       : Buffers.Shared.Produce.Produce_Type renames Production.Producer;
-
-   Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
-   Buffer_Cons       : Buffers.Shared.Consume.Consume_Type renames Consumption.Consumer;
-
-   --  Messages_Hangling : aliased Buffers.Shared.Host.Message_Handling_Task;
-   --  Buffer_Host       : aliased Buffers.Shared.Host.Host_Type
-   --                           (Messages_Hangling'Unchecked_Access);
 
    type Buf_Handler is
       record
@@ -55,7 +45,7 @@ package Packet_Mgr is
 
    --  Initialize "PMH_Buf_Nb" of Buffer and attach a buffer
    --  to each Handler of Handle_Array
-   procedure Init_Handle_Array;
+   procedure Init_Buffers;
 
    --  Release Buffer at Handlers (Index) and change its State to Empty
    procedure Release_Free_Buffer_At (Index : in Handle_Index);
@@ -83,6 +73,13 @@ package Packet_Mgr is
                        Data           : Base_Udp.Packet_Stream;
                        Data_Addr      : System.Address);
 
+   --  Write 16#DEAD_BEEF# at missed packets location.
+   --  Enables Search_Empty_Mark to save ack in correct Cell
+   procedure Mark_Empty_Cell (I           :  Interfaces.Unsigned_64;
+                              Data_Addr   :  System.Address;
+                              Last_Addr   :  System.Address;
+                              Nb_Missed   :  Interfaces.Unsigned_64);
+
    --  Release Buffer and Reuse Handler only if Buffer State is "Full"
    task type Release_Full_Buf is
       entry Start;
@@ -100,4 +97,4 @@ package Packet_Mgr is
       entry Start;
    end Check_Buf_Integrity;
 
-end Packet_Mgr;
+end Buffer_Handling;
