@@ -24,9 +24,10 @@ package body Packet_Mgr is
 
       --  dcod-launch
       Dcod_Pmh_Service.Client.Provide_Buffer (Name => "toto",
-                                              Size => Integer (Base_Udp.Sequence_Size * Base_Udp.Load_Size),
-                                              Depth => PMH_Buf_Nb,
-                                              Endpoint => "http://127.0.0.1:5678/");
+                                              Size => ((Integer (Base_Udp.Sequence_Size
+                                                * Base_Udp.Load_Size) / 4096) + 1) * 4096,
+                                              Depth => PMH_Buf_Nb + 1,
+                                              Endpoint => "http://stare-2:5678");
 
       Buffer_Handler.Buffer_Host.Set_Name ("toto");
       Buffer_Handler.Buffer.Set_Name ("toto");
@@ -42,7 +43,7 @@ package body Packet_Mgr is
          Size => Buffers.Buffer_Size_Type
          (Base_Udp.Sequence_Size * Base_Udp.Load_Size));
 
-      Messages_Hangling.Start (Buffer_Handler.Buffer_Host'Unchecked_Access, 1.0);
+      --  Messages_Hangling.Start (Buffer_Handler.Buffer_Host'Unchecked_Access, 1.0);
       Production.Message_Handling.Start (1.0);
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
 
@@ -63,7 +64,12 @@ package body Packet_Mgr is
          end;
       end loop;
       Ada.Text_IO.Put_Line ("_Initialization Finished_");
-
+      exception
+      when E : others =>
+         Ada.Text_IO.Put_Line ("exception : " &
+            Ada.Exceptions.Exception_Name (E) &
+            " message : " &
+            Ada.Exceptions.Exception_Message (E));
    end Init_Handle_Array;
 
 
