@@ -1,10 +1,11 @@
 with System;
 with Interfaces;
 
-with Buffers.Local;
-
 with Reliable_Udp;
 with Base_Udp;
+
+with Buffers.Shared.Produce;
+with Buffers.Shared.Consume;
 
 package Packet_Mgr is
 
@@ -35,12 +36,21 @@ package Packet_Mgr is
       Buffers.Generic_Buffers
          (Element_Type => Base_Udp.Packet_Stream);
 
+   Production        : Buffers.Shared.Produce.Produce_Couple_Type;
+   Buffer_Prod       : Buffers.Shared.Produce.Produce_Type renames Production.Producer;
+
+   Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
+   Buffer_Cons       : Buffers.Shared.Consume.Consume_Type renames Consumption.Consumer;
+
+   --  Messages_Hangling : aliased Buffers.Shared.Host.Message_Handling_Task;
+   --  Buffer_Host       : aliased Buffers.Shared.Host.Host_Type
+   --                           (Messages_Hangling'Unchecked_Access);
+
    type Buf_Handler is
       record
-         Buffer      : aliased Buffers.Local.Local_Buffer_Type;
-         Handlers    : Handle_Array;
-         First       : Handle_Index;
-         Current     : Handle_Index;
+         Handlers          : Handle_Array;
+         First             : Handle_Index;
+         Current           : Handle_Index;
       end record;
 
    --  Initialize "PMH_Buf_Nb" of Buffer and attach a buffer
