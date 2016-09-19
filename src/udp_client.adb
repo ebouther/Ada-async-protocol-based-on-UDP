@@ -70,6 +70,7 @@ procedure UDP_Client is
       Ack      : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
       Data     : Ada.Streams.Stream_Element_Array (1 .. 64);
       Res      : Interfaces.C.int;
+      Send     : Boolean := True;
 
       for Ack'Address use Ack_U8'Address;
       for Data'Address use Ack'Address;
@@ -83,8 +84,13 @@ procedure UDP_Client is
          Ada.Text_IO.Put_Line ("ACK [" & Res'Img
             & " ]: Dropped :" & Head.Seq_Nb'Img);
          --------------------------
-
-         Send_Packet (Ack_U8, True);
+         --  Fake Ack loss
+         if Send then
+            Send_Packet (Ack_U8, True);
+            Send := False;
+         else
+            Send := True;
+         end if;
       end loop;
    end Rcv_Ack;
 
@@ -112,9 +118,9 @@ begin
 
          --  Stress test (Simulate Drops)
 
-         --  if Header.Seq_Nb mod 32767 = 0 then
-         --     Header.Seq_Nb := Header.Seq_Nb + 4;
-         --  end if;
+         if Header.Seq_Nb = 4242 then
+            Header.Seq_Nb := Header.Seq_Nb + 2;
+         end if;
       end if;
       Pkt_Data := Pkt_Data + 1;
 

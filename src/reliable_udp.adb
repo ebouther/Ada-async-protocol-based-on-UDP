@@ -21,7 +21,7 @@ package body Reliable_Udp is
    begin
       for I in Reliable_Udp.Pkt_Nb range First_D .. Last_D loop
          Packet_Lost.Last_Ack := Ada.Real_Time.Clock -
-            Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max);
+            Ada.Real_Time.Microseconds (Base_Udp.RTT_US_Max);
          Packet_Lost.From := Client_Addr;
          if not Ack_Mgr.Is_Empty (Loss_Index (I)) then
             Ada.Text_IO.Put_Line
@@ -113,7 +113,7 @@ package body Reliable_Udp is
             if not Ack_Mgr.Is_Empty (Index) then
                Element := Ack_Mgr.Get (Index);
                if Ada.Real_Time.Clock - Element.Last_Ack >
-                  Ada.Real_Time.Milliseconds (Base_Udp.RTT_MS_Max)
+                  Ada.Real_Time.Microseconds (Base_Udp.RTT_US_Max)
                then
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Ack_Mgr.Set (Index, Element);

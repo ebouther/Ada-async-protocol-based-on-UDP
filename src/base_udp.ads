@@ -15,8 +15,8 @@ package Base_Udp is
    --  Packet Payload size in Bytes
    Load_Size      : constant := 8972;
 
-   --  Round Time Trip maximum value in ms
-   RTT_MS_Max     : constant := 107;
+   --  Round Time Trip maximum value in micro seconds
+   RTT_US_Max     : constant := 150;
 
    --  Size of header in Bytes
    Header_Size    : constant := Header'Size / System.Storage_Unit;
