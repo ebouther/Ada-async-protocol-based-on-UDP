@@ -38,10 +38,11 @@ package body Buffer_Handling is
       --  Need a "+ 1" otherwise it cannot get a
       --  free buffer in Release_Full_Buf
       Dcod_Pmh_Service.Client.Provide_Buffer (Name => "toto",
-                                              Size => ((Integer (Base_Udp.Sequence_Size
-                                                * Base_Udp.Load_Size) / 4096) + 1) * 4096,
-                                              Depth => PMH_Buf_Nb + 1,
-                                              Endpoint => "http://stare-2:5678");
+                                              Size => Base_Udp.Buffer_Size,
+                                              Depth => Base_Udp.PMH_Buf_Nb + 1,
+                                              Endpoint => Base_Udp.End_Point);
+      Ada.Text_IO.Put_Line ("Buffer   Size :" & Base_Udp.Buffer_Size'Img
+         & " Depth : " & Integer (Base_Udp.PMH_Buf_Nb + 1)'Img);
 
       Buffer_Prod.Set_Name (Base_Udp.Buffer_Name);
       Production.Message_Handling.Start (1.0);

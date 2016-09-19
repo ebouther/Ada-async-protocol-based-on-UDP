@@ -8,12 +8,13 @@ with Buffers;
 
 package Buffer_Handling is
 
-   --  Number of pmh buffers initialized
-   PMH_Buf_Nb     : constant := 15;
+   package Packet_Buffers is new
+      Buffers.Generic_Buffers
+         (Element_Type => Base_Udp.Packet_Stream);
 
    --  Index Type for "Handlers" array
    --  "is mod type" enables a circular parsing
-   type Handle_Index is mod PMH_Buf_Nb;
+   type Handle_Index is mod Base_Udp.PMH_Buf_Nb;
 
    --  State of Buffer:
    --  Empty =>  Buf is released
@@ -30,11 +31,6 @@ package Buffer_Handling is
 
    --  Contains all the Handlers
    type Handle_Array is array (Handle_Index) of Handler;
-
-   package Packet_Buffers is new
-      Buffers.Generic_Buffers
-         (Element_Type => Base_Udp.Packet_Stream);
-
 
    type Buf_Handler is
       record
