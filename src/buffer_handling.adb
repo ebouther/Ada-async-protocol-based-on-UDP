@@ -19,10 +19,12 @@ package body Buffer_Handling is
    Buffer_Handler    : Buf_Handler;
 
    Production        : Buffers.Shared.Produce.Produce_Couple_Type;
-   Buffer_Prod       : Buffers.Shared.Produce.Produce_Type renames Production.Producer;
+   Buffer_Prod       : Buffers.Shared.Produce.Produce_Type
+                           renames Production.Producer;
 
    Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
-   Buffer_Cons       : Buffers.Shared.Consume.Consume_Type renames Consumption.Consumer;
+   Buffer_Cons       : Buffers.Shared.Consume.Consume_Type
+                           renames Consumption.Consumer;
 
 
    --------------------
@@ -45,8 +47,8 @@ package body Buffer_Handling is
       Production.Message_Handling.Start (1.0);
       Buffer_Prod.Is_Initialised;
 
-      Buffer_Cons.Set_Name (Base_Udp.Buffer_Name);
-      Consumption.Message_Handling.Start (1.0);
+      --  Buffer_Cons.Set_Name (Base_Udp.Buffer_Name);
+      --  Consumption.Message_Handling.Start (1.0);
 
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
 
@@ -200,7 +202,7 @@ package body Buffer_Handling is
             Buffer_Handler.First := Buffer_Handler.First + 1;
             Ada.Text_IO.Put_Line ("First : " & Buffer_Handler.First'Img);
 
-            Get_Filled_Buf;
+            --  Get_Filled_Buf;
          end if;
       end loop;
    exception
