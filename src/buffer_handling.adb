@@ -32,8 +32,16 @@ package body Buffer_Handling is
    --------------------
 
    procedure Init_Buffers is
+      Ret  : Interfaces.C.int;
+
       use type Common_Types.Buffer_Size_Type;
+      use type Interfaces.C.int;
    begin
+
+      Ret := mlockall (2);
+      if Ret = -1 then
+         Perror ("Mlockall Error");
+      end if;
 
       --  Need a "+ 1" otherwise it cannot get a
       --  free buffer in Release_Full_Buf
@@ -41,6 +49,7 @@ package body Buffer_Handling is
                                               Size => Base_Udp.Buffer_Size,
                                               Depth => Base_Udp.PMH_Buf_Nb + 1,
                                               Endpoint => Base_Udp.End_Point);
+
       Ada.Text_IO.Put_Line ("Buffer   Size :" & Base_Udp.Buffer_Size'Img
          & " Depth : " & Integer (Base_Udp.PMH_Buf_Nb + 1)'Img);
 
@@ -66,7 +75,10 @@ package body Buffer_Handling is
                .Handle.Get_Address;
          begin
             Message := (others => 16#FA#);
-            Ada.Text_IO.Put_Line (Message (Message'Last)'Img);
+            --  Ret := mlock (Message'Address, Message'Size);
+            --  if Ret = -1 then
+            --     Perror ("Mlock Error");
+            --  end if;
          end;
       end loop;
       Ada.Text_IO.Put_Line ("_Initialization Finished_");

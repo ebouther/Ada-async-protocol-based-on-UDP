@@ -28,7 +28,6 @@ package body Reliable_Udp is
                ("/!\ Two packets with the same number:" & I'Img  & " were dropped /!\");
             raise Missed_2_Times_Same_Seq_Number;
          end if;
-         --  Ada.Text_IO.Put_Line ("1. Set : " & I'Img);
          Ack_Mgr.Set (Loss_Index (I), Packet_Lost);
       end loop;
    end Append_Ack;

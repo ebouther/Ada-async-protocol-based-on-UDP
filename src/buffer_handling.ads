@@ -1,5 +1,5 @@
 with System;
-with Interfaces;
+with Interfaces.C;
 
 with Reliable_Udp;
 with Base_Udp;
@@ -38,6 +38,18 @@ package Buffer_Handling is
          First             : Handle_Index;
          Current           : Handle_Index;
       end record;
+
+   procedure Perror (Message : String);
+   pragma Import (C, Perror, "perror");
+
+   function mlockall (Flags : Interfaces.C.int)
+      return Interfaces.C.int;
+   pragma Import (C, mlockall, "mlockall");
+
+   function mlock (Addr : System.Address;
+                   Len  : Interfaces.C.size_t)
+      return Interfaces.C.int;
+   pragma Import (C, mlock, "mlock");
 
    --  Initialize "PMH_Buf_Nb" of Buffer and attach a buffer
    --  to each Handler of Handle_Array
@@ -92,5 +104,6 @@ package Buffer_Handling is
    task type Check_Buf_Integrity is
       entry Start;
    end Check_Buf_Integrity;
+
 
 end Buffer_Handling;

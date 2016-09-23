@@ -199,11 +199,7 @@ procedure UDP_Server is
                               & Integer ((Header.Seq_Nb - 1))'Img);
             end if;
 
-            if Nb_Output > 12 then --  !! DBG !!  --
-               Reliable_Udp.Fifo.Append_Wait ((From, Packet_Number, Header.Seq_Nb - 1));
-            else
-               Missed := 0;
-            end if;
+            Reliable_Udp.Fifo.Append_Wait ((From, Packet_Number, Header.Seq_Nb - 1));
             Packet_Number := Header.Seq_Nb;
             Last_Addr := Data_Addr;
             if I + Nb_Missed >= Base_Udp.Sequence_Size then
@@ -211,9 +207,7 @@ procedure UDP_Server is
             end if;
             Buffer_Handling.Copy_To_Correct_Location
                                           (I, Nb_Missed, Data, Data_Addr);
-            if Nb_Output > 12 then --  !! DBG !!  --
-               Buffer_Handling.Mark_Empty_Cell (I, Data_Addr, Last_Addr, Nb_Missed);
-            end if;
+            Buffer_Handling.Mark_Empty_Cell (I, Data_Addr, Last_Addr, Nb_Missed);
             I := I + Nb_Missed;
          end if;
          --  mod type (doesn't need to be set to 0 on max value)

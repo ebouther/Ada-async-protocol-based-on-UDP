@@ -118,9 +118,9 @@ begin
 
          --  Stress test (Simulate Drops)
 
-         if Header.Seq_Nb = 4242 then
-            Header.Seq_Nb := Header.Seq_Nb + 2;
-         end if;
+         --  if Header.Seq_Nb = 4242 then
+         --     Header.Seq_Nb := Header.Seq_Nb + 2;
+         --  end if;
       end if;
       Pkt_Data := Pkt_Data + 1;
 
