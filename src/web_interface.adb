@@ -32,7 +32,7 @@ procedure Web_Interface is
          Message_Body  => AWS.Templates.Parse ("templates/index.thtml", Translations),
          Status_Code   => AWS.Messages.S200);
    end HW_CB;
-
+   Nb : Integer := 0;
 begin
    AWS.Server.Start
      (WS, "RATP Interface", Callback => HW_CB'Unrestricted_Access, Port => 4242);
@@ -40,6 +40,8 @@ begin
    AWS.Net.WebSocket.Registry.Control.Start;
 
    loop
-      AWS.Net.WebSocket.Registry.Send (Rcp, "A simple message");
+      AWS.Net.WebSocket.Registry.Send (Rcp, "debit|" & Nb'Img);
+      Nb := Nb + 1;
+      delay 2.0;
    end loop;
 end Web_Interface;

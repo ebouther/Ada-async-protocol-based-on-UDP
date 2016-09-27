@@ -11,7 +11,13 @@
    ws.onmessage = function (evt) 
    { 
       var received_msg = evt.data;
-      console.log("Message received...");
+      var split = received_msg.split("|");
+      
+      var elem = document.getElementById(split[0]);
+      elem.innerHTML = split[1];
+      console.log("Message received : " + evt.data);
+      console.log("Id: " + split[0]
+         + " data: " + split[1]);
    };
 
    ws.onclose = function()

@@ -1,8 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
-@@INCLUDE@@@ index.tjs
-
 <head>
   <title>RATP DAQ</title>
   <meta charset="utf-8">
@@ -11,7 +8,9 @@
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
   <style>
-    .row.content {height: 550px}
+    .row.content {height: 100vh;}
+    .well {text-align : center;}
+    .center-text {text-align : center;}
     
     .sidenav {
       background-color: #f1f1f1;
@@ -48,7 +47,7 @@
 <div class="container-fluid">
   <div class="row content">
     <div class="col-sm-3 sidenav hidden-xs">
-      <h2>DAQ</h2>
+      <h2 class="center-text">RATP</h2>
       <ul class="nav nav-pills nav-stacked">
         <li class="active"><a href="#section1">Stats</a></li>
         <li><a href="#section2">Settings</a></li>
@@ -59,37 +58,39 @@
     <div class="col-sm-9">
       <div class="well">
         <h4>Stats</h4>
-        <p>Some text..</p>
+        <p>DAQ Stats...</p>
       </div>
       <div class="row">
         <div class="col-sm-3">
           <div class="well">
             <h4>Debit</h4>
-            <p>1 Million</p> 
+            <p id="debit">0.0</p> 
+            <p>Gb/s</p>
           </div>
         </div>
         <div class="col-sm-3">
           <div class="well">
             <h4>Drops</h4>
-            <p>100 Million</p> 
+            <p id="drops">0</p> 
           </div>
         </div>
         <div class="col-sm-3">
           <div class="well">
             <h4>Packets per sec</h4>
-            <p>10 Million</p> 
+            <p id="pps">0</p> 
           </div>
         </div>
         <div class="col-sm-3">
           <div class="well">
             <h4>Total Received</h4>
-            <p>1423213</p> 
+            <p id="total_pkt">0</p> 
           </div>
         </div>
       </div>
       <div class="row">
         <div class="col-sm-4">
           <div class="well">
+            <h4>UpTime</h4>
             <p>Text</p> 
             <p>Text</p> 
             <p>Text</p> 
@@ -125,7 +126,9 @@
     </div>
   </div>
 </div>
-
 </body>
+
+@@INCLUDE@@@ index.tjs
+
 </html>
 
