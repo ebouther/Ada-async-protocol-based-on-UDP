@@ -73,7 +73,6 @@ procedure UDP_Server is
    Nb_Packet_Received   : Interfaces.Unsigned_64 := 0;
    Packet_Number        : Reliable_Udp.Pkt_Nb := 0;
    Missed               : Interfaces.Unsigned_64 := 0;
-   Last_Nb              : Interfaces.Unsigned_64 := 0;
    Nb_Output            : Natural := 0;
    Log_File             : Ada.Text_IO.File_Type;
    Busy                 : Interfaces.C.int := 50;
@@ -130,6 +129,9 @@ procedure UDP_Server is
 
    task body Timer is
       use type Ada.Calendar.Time;
+
+      Last_Missed : Interfaces.Unsigned_64 := 0;
+      Last_Nb     : Interfaces.Unsigned_64 := 0;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (14));
@@ -147,10 +149,12 @@ procedure UDP_Server is
                Elapsed_Time,
                Packet_Number,
                Missed,
+               Last_Missed,
                Nb_Packet_Received,
                Last_Nb,
                Nb_Output);
-               Last_Nb := Nb_Packet_Received;
+            Last_Nb := Nb_Packet_Received;
+            Last_Missed := Missed;
             Nb_Output := Nb_Output + 1;
          end select;
       end loop;

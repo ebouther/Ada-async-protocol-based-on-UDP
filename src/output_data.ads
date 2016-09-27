@@ -7,7 +7,7 @@ package Output_Data is
    procedure Display (Log : in Boolean;
       Elapsed_Time         : in Duration;
       Last_Packet          : in Reliable_Udp.Pkt_Nb;
-      Missed               : in Interfaces.Unsigned_64;
+      Missed, Last_Missed  : in Interfaces.Unsigned_64;
       Nb_Packet_Received   : in Interfaces.Unsigned_64;
       Last_Nb              : in Interfaces.Unsigned_64;
       Nb_Output            : in Natural);

@@ -1,8 +1,7 @@
 <script type="text/javascript">
 
-   // -----  Chart  ------- //
-   var ctx = document.getElementById("myChart");
-   var config = {
+   // -----  Charts  ------- //
+   var debitConfig = {
        type: 'line',
        data: {
            labels: [],
@@ -13,27 +12,50 @@
        },
        options: {}
    };
-   $.each(config.data.datasets, function(i, dataset) {
+   $.each(debitConfig.data.datasets, function(i, dataset) {
        dataset.borderColor = 'rgba(255,99,132,1)';
        dataset.backgroundColor = 'rgba(255,99,132,0.2)';
        dataset.pointBorderColor = 'rgba(255,99,132,1)';
        dataset.pointBackgroundColor = 'rgba(255,99,132,0.2)';
        dataset.pointBorderWidth = 1;
    });
-   var myChart = new Chart(ctx, config);
 
-   var append_Chart = function (value) {
-      myChart.data.labels.push (myChart.data.labels.length);
-      myChart.data.datasets[0].data.push(parseFloat(value) / 1000000000.0);
-      myChart.update ();
+   var dropsConfig = {
+       type: 'line',
+       data: {
+           labels: [],
+           datasets: [{
+               label:'Packets Dropped',
+               data: []
+           }]
+       },
+       options: {}
    };
+   $.each(dropsConfig.data.datasets, function(i, dataset) {
+       dataset.borderColor = 'rgba(54, 162, 235, 1)';
+       dataset.backgroundColor = 'rgba(54, 162, 235, 0.2)';
+       dataset.pointBorderColor = 'rgba(54, 162, 235, 1)';
+       dataset.pointBackgroundColor = 'rgba(54, 162, 235, 0.2)';
+       dataset.pointBorderWidth = 1;
+   });
 
-   function toDateTime(secs) {
-       var t = new Date(1970, 0, 1);
-       t.setSeconds(secs);
-       return t;
-   }
 
+   var debitChart = new Chart($("#debitChart"), debitConfig);
+   var dropsChart = new Chart($("#dropsChart"), dropsConfig);
+
+   var append_Chart = function (chart, value, max_labels) {
+      if (chart.data.labels.length == 0)
+         chart.data.labels.push (0);
+      else
+         chart.data.labels.push
+            (chart.data.labels[chart.data.labels.length - 1] + 1);
+      chart.data.datasets[0].data.push(value);
+      while (max_labels > 1 && chart.data.labels.length > max_labels) {
+         chart.data.labels.shift();
+         chart.data.datasets[0].data.shift();
+      }
+      chart.update ();
+   };
 
    // ------ WebSocket -------- //
    var ws = new WebSocket('ws://' + window.location.host + '/echo');
@@ -57,7 +79,12 @@
       }
 
       if (split[0] == "debit") {
-         append_Chart (split[1])
+         append_Chart (debitChart,
+                       parseFloat(split[1]) / 1000000000.0,
+                       $('#max_labels_debit').val());
+      }
+      if (split[0] == "drops") {
+         append_Chart (dropsChart, split[1], $('#max_labels_drops').val());
       }
       //console.log("Id: " + split[0]
       //   + " data: " + split[1]);

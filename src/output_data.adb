@@ -33,7 +33,7 @@ package body Output_Data is
    procedure Display (Log : in Boolean;
       Elapsed_Time         : in Duration;
       Last_Packet          : in Reliable_Udp.Pkt_Nb;
-      Missed               : in Interfaces.Unsigned_64;
+      Missed, Last_Missed  : in Interfaces.Unsigned_64;
       Nb_Packet_Received   : in Interfaces.Unsigned_64;
       Last_Nb              : in Interfaces.Unsigned_64;
       Nb_Output            : in Natural)
@@ -70,9 +70,12 @@ package body Output_Data is
       --  WebSocket --
       Web_Interface.Send_To_Client ("debit", Debit'Img);
       Web_Interface.Send_To_Client ("pps", Pps'Img);
-      Web_Interface.Send_To_Client ("drops", Missed'Img);
+      Web_Interface.Send_To_Client ("total_drops", Missed'Img);
+      Web_Interface.Send_To_Client ("drops",
+         Interfaces.Unsigned_64'Image (Missed - Last_Missed));
       Web_Interface.Send_To_Client ("uptime", Nb_Output'Img);
       Web_Interface.Send_To_Client ("total_pkt", Nb_Packet_Received'Img);
+      Web_Interface.Send_To_Client ("ratio", Ratio'Img);
 
       if Log then
          Log_CSV (Elapsed_Time,

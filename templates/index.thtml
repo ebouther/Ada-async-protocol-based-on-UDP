@@ -1,125 +1,152 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <title>RATP DAQ</title>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.3.0/Chart.min.js"></script>
-  <style>
-    .row.content {height: 100%;}
-    .well {text-align : center;}
-    .center-text {text-align : center;}
-    
-    .sidenav {
-      background-color: #f1f1f1;
-      height: 100%;
-    }
-        
-    @media screen and (max-width: 767px) {
-      .row.content {height: auto;} 
-    }
-  </style>
-</head>
-<body>
+   <head>
+      <title>RATP DAQ</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+      <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+      <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.3.0/Chart.min.js"></script>
+      <style>
+         .data {
+            font-size : 2vw;
+            font-weight: bold;
+         }
+         .row.content {height: 250px;}
+         .well {text-align : center;}
+         .center-text {text-align : center;}
 
-<nav class="navbar navbar-inverse visible-xs">
-  <div class="container-fluid">
-    <div class="navbar-header">
-      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#myNavbar">
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>                        
-      </button>
-      <a class="navbar-brand" href="#">RATP DAQ</a>
-    </div>
-    <div class="collapse navbar-collapse" id="myNavbar">
-      <ul class="nav navbar-nav">
-        <li class="active"><a href="#">Stats</a></li>
-        <li><a href="#">Settings</a></li>
-      </ul>
-    </div>
-  </div>
-</nav>
+         .sidenav {
+            background-color: #f1f1f1;
+            height: 100%;
+         }
 
-<div class="container-fluid">
-  <div class="row content">
-    <div class="col-sm-3 sidenav hidden-xs">
-      <h2 class="center-text">RATP</h2>
-      <ul class="nav nav-pills nav-stacked">
-        <li class="active"><a href="#section1">Stats</a></li>
-        <li><a href="#section2">Settings</a></li>
-      </ul><br>
-    </div>
-    <br>
-    
-    <div class="col-sm-9">
-      <div class="well">
-        <h4>Stats</h4>
-        <p>DAQ Stats...</p>
-      </div>
-      <div class="row">
-        <div class="col-sm-3">
-          <div class="well">
-            <h4>Debit</h4>
-            <p id="debit">0.0</p> 
-          </div>
-        </div>
-        <div class="col-sm-3">
-          <div class="well">
-            <h4>Drops</h4>
-            <p id="drops">0</p> 
-          </div>
-        </div>
-        <div class="col-sm-3">
-          <div class="well">
-            <h4>Packets per sec</h4>
-            <p id="pps">0</p> 
-          </div>
-        </div>
-        <div class="col-sm-3">
-          <div class="well">
-            <h4>Total Received</h4>
-            <p id="total_pkt">0</p> 
-          </div>
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-sm-4">
-          <div class="well">
-            <h4>Uptime</h4>
-            <p id="uptime">0</p> 
-            <p>seconds</p> 
-          </div>
-        </div>
-        <div class="col-sm-4">
-          <div class="well">
-            <p>Text</p> 
-            <p>Text</p> 
-            <p>Text</p> 
-          </div>
-        </div>
-        <div class="col-sm-4">
-          <div class="well">
-            <p>Text</p> 
-            <p>Text</p> 
-            <p>Text</p> 
-          </div>
-        </div>
-      </div>
-      <div class="row">
-         <div class="col-sm-12">
-            <canvas id="myChart" width="auto" height="auto"></canvas>
+         @media screen and (max-width: 767px) {
+            .row.content {height: auto;} 
+            .data {
+               font-size : 150%;
+               font-weight: bold;
+            }
+         }
+      </style>
+   </head>
+   <body>
+
+      <nav class="navbar navbar-inverse visible-xs">
+      <div class="container-fluid">
+         <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#myNavbar">
+               <span class="icon-bar"></span>
+               <span class="icon-bar"></span>
+               <span class="icon-bar"></span>                        
+            </button>
+            <a class="navbar-brand" href="#">RATP DAQ</a>
+         </div>
+         <div class="collapse navbar-collapse" id="myNavbar">
+            <ul class="nav navbar-nav">
+               <li class="active"><a href="#">Stats</a></li>
+               <li><a href="#">Settings</a></li>
+            </ul>
          </div>
       </div>
-    </div>
-  </div>
-</div>
-</body>
+      </nav>
 
-@@INCLUDE@@@ index.tjs
+      <div class="container-fluid">
+         <div class="row content">
+            <div class="col-sm-2 sidenav hidden-xs">
+               <h2 class="center-text">RATP</h2>
+               <ul class="nav nav-pills nav-stacked">
+                  <li class="active"><a href="#section1">Stats</a></li>
+                  <li><a href="#section2">Settings</a></li>
+               </ul><br>
+            </div>
+            <br>
 
-</html>
+            <div class="col-sm-10">
+               <div class="well col-sm-12">
+                  <h2>Stats</h2>
+                  <div class="col-sm-4">
+                     <button type="button" class="btn btn-success btn-lg">Start Acquisition</button>
+                  </div>
+                  <div class="col-sm-offset-4 col-sm-4">
+                     <button type="button" class="btn btn-danger btn-lg">Stop Acquisition</button>
+                  </div>
+               </div>
+               <div class="row">
+                  <div class="col-sm-3">
+                     <div class="well">
+                        <h4>Debit</h4>
+                        <p class="data" id="debit">0.0</p> 
+                     </div>
+                  </div>
+                  <div class="col-sm-3">
+                     <div class="well">
+                        <h4>Drops</h4>
+                        <p class="data" id="drops">0</p> 
+                     </div>
+                  </div>
+                  <div class="col-sm-3">
+                     <div class="well">
+                        <h4>Packets per sec</h4>
+                        <p class="data" id="pps">0</p> 
+                     </div>
+                  </div>
+                  <div class="col-sm-3">
+                     <div class="well">
+                        <h4>Ratio</h4>
+                        <p class="data" id="ratio">0</p> 
+                     </div>
+                  </div>
+               </div>
+               <div class="row">
+                  <div class="col-sm-4">
+                     <div class="well">
+                        <h4>Uptime</h4>
+                        <p class="data" id="uptime">0</p> 
+                        <p>Seconds</p> 
+                     </div>
+                  </div>
+                  <div class="col-sm-4">
+                     <div class="well">
+                        <h4>Total Dropped</h4>
+                        <p class="data" id="total_drops">0</p> 
+                        <p>Packets</p> 
+                     </div>
+                  </div>
+                  <div class="col-sm-4">
+                     <div class="well">
+                        <h4>Total Received</h4>
+                        <p class="data" id="total_pkt">0</p> 
+                        <p>Packets</p> 
+                     </div>
+                  </div>
+               </div>
+               <div class="row">
+                  <div class="well col-sm-6">
+                     <div class="col-sm-offset-4 col-sm-4">
+                        <label for="max_labels" class="col-form-label">Max X Values :</label>
+                        <input class="form-control" type="number" value="0" id="max_labels_debit">
+                     </div>
+                     <canvas id="debitChart" width="auto" height="auto"></canvas>
+                  </div>
+                  <div class="well col-sm-6">
+                     <div class="col-sm-offset-4 col-sm-4">
+                        <label for="max_labels" class="col-form-label">Max X Values :</label>
+                        <input class="form-control" type="number" value="0" id="max_labels_drops">
+                     </div>
+                     <canvas id="dropsChart" width="auto" height="auto"></canvas>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </div>
+   </body>
+
+   <script type="text/javascript">
+      @@INCLUDE@@@ charts.tjs
+      @@INCLUDE@@@ websocket.tjs
+      </script>
+
+   </html>
 
