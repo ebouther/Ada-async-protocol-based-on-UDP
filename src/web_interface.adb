@@ -1,21 +1,27 @@
-with AWS.Response;
 with AWS.Server;
-with AWS.Status;
 with AWS.Messages;
 with AWS.MIME;
 with AWS.Templates;
 with AWS.Net.WebSocket.Registry.Control;
 with WebSocket;
 
-procedure Web_Interface is
+package body Web_Interface is
 
    WS  : AWS.Server.HTTP;
 
    Rcp : constant AWS.Net.WebSocket.Registry.Recipient :=
            AWS.Net.WebSocket.Registry.Create (URI => "/echo");
 
-   function HW_CB (Request : in AWS.Status.Data)
-     return AWS.Response.Data;
+   function Create
+     (Socket  : AWS.Net.Socket_Access;
+      Request : AWS.Status.Data) return AWS.Net.WebSocket.Object'Class
+   is
+   begin
+      return MySocket'
+        (AWS.Net.WebSocket.Object
+          (AWS.Net.WebSocket.Create (Socket, Request)) with null record);
+   end Create;
+
 
    function HW_CB (Request : in AWS.Status.Data)
      return AWS.Response.Data
@@ -32,16 +38,21 @@ procedure Web_Interface is
          Message_Body  => AWS.Templates.Parse ("templates/index.thtml", Translations),
          Status_Code   => AWS.Messages.S200);
    end HW_CB;
-   Nb : Integer := 0;
-begin
-   AWS.Server.Start
-     (WS, "RATP Interface", Callback => HW_CB'Unrestricted_Access, Port => 4242);
-   AWS.Net.WebSocket.Registry.Register ("/echo", WebSocket.Create'Access);
-   AWS.Net.WebSocket.Registry.Control.Start;
 
-   loop
-      AWS.Net.WebSocket.Registry.Send (Rcp, "debit|" & Nb'Img);
-      Nb := Nb + 1;
-      delay 2.0;
-   end loop;
+
+   procedure Init_WebServer (Port : Integer := 80) is
+   begin
+      AWS.Server.Start
+        (WS, "RATP Interface", Callback => HW_CB'Unrestricted_Access, Port => Port);
+      AWS.Net.WebSocket.Registry.Register ("/echo", WebSocket.Create'Access);
+      AWS.Net.WebSocket.Registry.Control.Start;
+   end  Init_WebServer;
+
+
+   procedure Send_To_Client (Id     : String;
+                             Data   : String) is
+   begin
+      AWS.Net.WebSocket.Registry.Send (Rcp, Id & "|" & Data);
+   end Send_To_Client;
+
 end Web_Interface;

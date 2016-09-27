@@ -1,6 +1,42 @@
 <script type="text/javascript">
 
-   var ws = new WebSocket('ws://localhost:4242/echo');
+   // -----  Chart  ------- //
+   var ctx = document.getElementById("myChart");
+   var config = {
+       type: 'line',
+       data: {
+           labels: [],
+           datasets: [{
+               label:'Debit',
+               data: []
+           }]
+       },
+       options: {}
+   };
+   $.each(config.data.datasets, function(i, dataset) {
+       dataset.borderColor = 'rgba(255,99,132,1)';
+       dataset.backgroundColor = 'rgba(255,99,132,0.2)';
+       dataset.pointBorderColor = 'rgba(255,99,132,1)';
+       dataset.pointBackgroundColor = 'rgba(255,99,132,0.2)';
+       dataset.pointBorderWidth = 1;
+   });
+   var myChart = new Chart(ctx, config);
+
+   var append_Chart = function (value) {
+      myChart.data.labels.push (myChart.data.labels.length);
+      myChart.data.datasets[0].data.push(parseFloat(value) / 1000000000.0);
+      myChart.update ();
+   };
+
+   function toDateTime(secs) {
+       var t = new Date(1970, 0, 1);
+       t.setSeconds(secs);
+       return t;
+   }
+
+
+   // ------ WebSocket -------- //
+   var ws = new WebSocket('ws://' + window.location.host + '/echo');
 
    ws.onopen = function()
    {
@@ -12,18 +48,25 @@
    { 
       var received_msg = evt.data;
       var split = received_msg.split("|");
-      
-      var elem = document.getElementById(split[0]);
-      elem.innerHTML = split[1];
-      console.log("Message received : " + evt.data);
-      console.log("Id: " + split[0]
-         + " data: " + split[1]);
+      var num = null;
+
+      if (!isNaN (num = parseFloat(split[1])) && split[0] != "uptime") {
+         $("#" + split[0]).html(num.toExponential());
+      } else {
+         $("#" + split[0]).html(split[1]);
+      }
+
+      if (split[0] == "debit") {
+         append_Chart (split[1])
+      }
+      //console.log("Id: " + split[0]
+      //   + " data: " + split[1]);
    };
 
    ws.onclose = function()
    { 
-      // websocket is closed.
       console.log("Connection closed..."); 
    };
+
 </script>
 

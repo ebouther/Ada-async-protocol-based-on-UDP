@@ -3,6 +3,7 @@ with Text_IO.Unbounded_IO;
 with Ada.Strings.Unbounded;
 
 with Base_Udp;
+with Web_Interface;
 
 package body Output_Data is
    use type Interfaces.Unsigned_64;
@@ -35,12 +36,19 @@ package body Output_Data is
       Missed               : in Interfaces.Unsigned_64;
       Nb_Packet_Received   : in Interfaces.Unsigned_64;
       Last_Nb              : in Interfaces.Unsigned_64;
-      Nb_Output            : in Natural) is
+      Nb_Output            : in Natural)
+   is
+      use type Long_Float;
 
       Ratio : Long_Float;
+      Pps   : Long_Float;
+      Debit : Interfaces.Unsigned_64;
    begin
 
       Ratio := Long_Float (Missed) / Long_Float (Nb_Packet_Received + Missed);
+      Debit := Base_Udp.Load_Size * 8 * (Nb_Packet_Received -  Last_Nb);
+      Pps   := Long_Float (Nb_Packet_Received) / Long_Float (Elapsed_Time);
+
       Ada.Text_IO.Put_Line ("-- Nb output                     : "
         & Nb_Output'Img);
       Ada.Text_IO.Put_Line ("-- Nb_received                   : "
@@ -50,18 +58,21 @@ package body Output_Data is
       Ada.Text_IO.Put_Line ("-- Dropped                       : "
         & Missed'Img);
       Ada.Text_IO.Put_Line ("-- Delta in bits                 : "
-        & Interfaces.Unsigned_64'Image
-              (Interfaces."*"(Base_Udp.Load_Size,
-              Interfaces."*" (8,
-              (Interfaces."-"(Nb_Packet_Received, Last_Nb))))));
+        & Debit'Img);
       Ada.Text_IO.Put_Line ("-- Ratio (dropped / total_sent)  : "
         & Ratio'Img);
       Ada.Text_IO.Put_Line ("-- Elapsed Time                  : "
         & Duration'Image (Elapsed_Time));
       Ada.Text_IO.Put_Line ("-- Pps                           : "
-        & Long_Float'Image
-              (Long_Float (Nb_Packet_Received) / Long_Float (Elapsed_Time)));
+        & Pps'Img);
       Ada.Text_IO.New_Line;
+
+      --  WebSocket --
+      Web_Interface.Send_To_Client ("debit", Debit'Img);
+      Web_Interface.Send_To_Client ("pps", Pps'Img);
+      Web_Interface.Send_To_Client ("drops", Missed'Img);
+      Web_Interface.Send_To_Client ("uptime", Nb_Output'Img);
+      Web_Interface.Send_To_Client ("total_pkt", Nb_Packet_Received'Img);
 
       if Log then
          Log_CSV (Elapsed_Time,

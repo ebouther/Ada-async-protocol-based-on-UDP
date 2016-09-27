@@ -19,6 +19,7 @@ with Base_Udp;
 with Output_Data;
 with Reliable_Udp;
 with Buffer_Handling;
+with Web_Interface;
 
 
 procedure UDP_Server is
@@ -283,6 +284,7 @@ begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (2));
    end if;
+   Web_Interface.Init_WebServer (4242);
 
    Log_Task.Start;
    Recv_Socket_Task.Start;
