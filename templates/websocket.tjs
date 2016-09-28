@@ -1,0 +1,41 @@
+
+   var ws = new WebSocket('ws://' + window.location.host + '/echo');
+
+   ws.onopen = function()
+   {
+      ws.send("Hello World");
+   };
+
+   ws.onmessage = function (evt) 
+   { 
+      var split = evt.data.split("|");
+      var num = null;
+
+      var elem = $("#" + split[0]);
+      if (elem != null)
+      {
+         if (!isNaN (num = parseFloat(split[1])) && split[0] != "uptime") {
+            elem.html(num.toExponential(5));
+         } else {
+            elem.html(split[1]);
+         }
+      } else {
+         console.log ("Received : " + evt.data);
+      }
+
+      if (split[0] == "debit") {
+         append_Chart (debitChart,
+                       parseFloat(split[1]) / 1000000000.0,
+                       $('#max_labels_debit').val());
+      }
+      if (split[0] == "drops") {
+         append_Chart (dropsChart, split[1], $('#max_labels_drops').val());
+      }
+      //console.log("Id: " + split[0]
+      //   + " data: " + split[1]);
+   };
+
+   ws.onclose = function()
+   { 
+      console.log("Connection closed..."); 
+   };

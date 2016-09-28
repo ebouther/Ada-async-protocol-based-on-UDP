@@ -83,6 +83,7 @@ procedure UDP_Server is
    Log_File             : Ada.Text_IO.File_Type;
    Busy                 : Interfaces.C.int := 50;
    Opt_Return           : Interfaces.C.int;
+   pragma Unreferenced (Opt_Return);
 
 
    -------------------
@@ -125,7 +126,6 @@ procedure UDP_Server is
                                        Optname  => 46,
                                        Optval   => Busy'Address,
                                        Optlen   => 4);
-      Ada.Text_IO.Put_Line ("opt return" & Opt_Return'Img);
       Address.Addr := Any_Inet_Addr;
       Address.Port := 50001;
       Bind_Socket (Server, Address);
@@ -286,6 +286,7 @@ procedure UDP_Server is
       <<HandShake>>
       I := Base_Udp.Pkt_Max + 1;
 
+      Ada.Text_IO.Put_Line ("...Waiting for Client...");
       Wait_Client_HandShake;
       Ada.Text_IO.Put_Line ("Client is ready...");
 
@@ -295,6 +296,7 @@ procedure UDP_Server is
       else
          null;
       end select;
+
       Init_Udp (Server);
 
       loop
