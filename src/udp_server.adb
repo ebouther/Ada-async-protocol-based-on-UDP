@@ -1,4 +1,5 @@
 with Ada.Text_IO;
+with Ada.Exceptions;
 with Ada.Command_Line;
 with Ada.Streams;
 with Ada.Unchecked_Conversion;
@@ -41,7 +42,7 @@ procedure UDP_Server is
    end Recv_Socket;
 
    pragma Warnings (Off);
-   procedure Wait_Client_HandShake (Server   : Socket_Type);
+   procedure Wait_Client_HandShake;
    pragma Warnings (On);
 
    procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
@@ -55,7 +56,8 @@ procedure UDP_Server is
       new Ada.Unchecked_Conversion
          (GNAT.Sockets.Socket_Type, Interfaces.C.int);
 
-   procedure Init_Udp (Server : in out Socket_Type);
+   procedure Init_Udp (Server       : in out Socket_Type;
+                       TimeOut_Opt  : Boolean := True);
 
    pragma Warnings (Off);
    procedure Stop_Server;
@@ -102,7 +104,8 @@ procedure UDP_Server is
    --  Init_Udp  --
    ----------------
 
-   procedure Init_Udp (Server : in out Socket_Type) is
+   procedure Init_Udp (Server     : in out Socket_Type;
+                      TimeOut_Opt : Boolean := True) is
       Address  : Sock_Addr_Type;
    begin
       Create_Socket (Server, Family_Inet, Socket_Datagram);
@@ -110,11 +113,13 @@ procedure UDP_Server is
          (Server,
          Socket_Level,
          (Reuse_Address, True));
-      Set_Socket_Option
-         (Server,
-         Socket_Level,
-         (Receive_Timeout,
-         Timeout => 1.0));
+      if TimeOut_Opt then
+         Set_Socket_Option
+            (Server,
+            Socket_Level,
+            (Receive_Timeout,
+            Timeout => 1.0));
+      end if;
       Opt_Return := Thin.C_Setsockopt (S        => To_Int (Server),
                                        Level    => 1,
                                        Optname  => 46,
@@ -225,22 +230,36 @@ procedure UDP_Server is
    end Process_Packet;
 
 
-   procedure Wait_Client_HandShake (Server   : Socket_Type) is
-      Data  : Base_Udp.Packet_Stream;
-      From  : Sock_Addr_Type;
-      Last  : Ada.Streams.Stream_Element_Offset;
-      Msg   : Interfaces.Unsigned_32;
+   procedure Wait_Client_HandShake is
+      Socket   : Socket_Type;
+      Data     : Base_Udp.Packet_Stream;
+      From     : Sock_Addr_Type;
+      Last     : Ada.Streams.Stream_Element_Offset;
 
-      for Msg'Address use Data'Address;
       use type Interfaces.Unsigned_32;
+      use type Interfaces.C.int;
+      pragma Unreferenced (Last);
    begin
+      Init_Udp (Socket, False);
       loop
-         GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-         pragma Warnings (Off);
-         exit when Msg = 16#DEC000DE#;
-         pragma Warnings (On);
+         GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
+
+         declare
+            Msg   : Interfaces.Unsigned_32;
+            for Msg'Address use Data'Address;
+         begin
+            exit when Msg = 16#DEC000DE#;
+         end;
       end loop;
+      GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
+   exception
+      when E : others =>
+         Ada.Text_IO.Put_Line ("exception : " &
+            Ada.Exceptions.Exception_Name (E) &
+            " message : " &
+            Ada.Exceptions.Exception_Message (E));
    end Wait_Client_HandShake;
+
 
    -------------------
    --  Recv_Socket  --
@@ -252,7 +271,7 @@ procedure UDP_Server is
       Last                 : Ada.Streams.Stream_Element_Offset;
       Watchdog             : Natural := 0;
       Data_Addr            : System.Address;
-      I                    : Interfaces.Unsigned_64 := Base_Udp.Pkt_Max + 1;
+      I                    : Interfaces.Unsigned_64;
 
       use System.Storage_Elements;
       use type Interfaces.C.int;
@@ -260,12 +279,24 @@ procedure UDP_Server is
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (16));
 
-      Init_Udp (Server);
       Buffer_Handling.Init_Buffers;
 
-      --  Wait_Client_HandShake (Server);
-
       accept Start;
+
+      <<HandShake>>
+      I := Base_Udp.Pkt_Max + 1;
+
+      Wait_Client_HandShake;
+      Ada.Text_IO.Put_Line ("Client is ready...");
+
+      --  Would get stuck if Handshake is re-called
+      select
+         Log_Task.Start;
+      else
+         null;
+      end select;
+      Init_Udp (Server);
+
       loop
          select
             accept Stop;
@@ -292,6 +323,7 @@ procedure UDP_Server is
                   Watchdog := Watchdog + 1;
                   Ada.Text_IO.Put_Line ("Socket Error");
                   exit when Watchdog = 10;
+                  goto HandShake;
             end;
          end select;
       end loop;
@@ -314,7 +346,6 @@ begin
 
    Web_Interface.Init_WebServer (4242);
 
-   Log_Task.Start;
    Recv_Socket_Task.Start;
    Release_Buf_Task.Start;
    --  Process_Pkt.Start;

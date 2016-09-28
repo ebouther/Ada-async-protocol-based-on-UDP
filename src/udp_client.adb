@@ -26,31 +26,61 @@ procedure UDP_Client is
    Socket   : GNAT.Sockets.Socket_Type;
    Address  : GNAT.Sockets.Sock_Addr_Type;
 
-   procedure Send_Packet (Packet_Nb : Base_Udp.Packet_Stream);
+   procedure Send_Packet (Payload : Base_Udp.Packet_Stream);
+
    procedure Rcv_Ack;
 
-   --  procedure Server_HandShake;
+   pragma Warnings (Off);
+   procedure Server_HandShake;
+   pragma Warnings (On);
 
    function To_Int is
       new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type,
          Interfaces.C.int);
 
-   --  procedure Server_HandShake is
-   --     Data
-   --  begin
-   --    Send_Packet ();
-   --  end Server_HandShake;
 
-   procedure Send_Packet (Packet_Nb : Base_Udp.Packet_Stream) is
+   ------------------------
+   --  Server_HandShake  --
+   ------------------------
+
+   procedure Server_HandShake is
+      Send_Data, Recv_Data : Base_Udp.Packet_Stream;
+      Send_Msg, Recv_Msg   : Interfaces.Unsigned_32;
+
+      for Send_Msg'Address use Send_Data'Address;
+      for Recv_Msg'Address use Recv_Data'Address;
+   begin
+      Send_Msg := 16#DEC000DE#;
+      loop
+         Send_Packet (Send_Data);
+         delay 0.2;
+         exit when GNAT.Sockets.Thin.C_Recv
+               (To_Int (Socket),
+                Recv_Data (Recv_Data'First)'Address,
+                Recv_Data'Length,
+                64) /= -1 and Recv_Msg = Send_Msg;
+      end loop;
+   end Server_HandShake;
+
+
+   -------------------
+   --  Send_Packet  --
+   -------------------
+
+   procedure Send_Packet (Payload : Base_Udp.Packet_Stream) is
       Offset   : Ada.Streams.Stream_Element_Offset;
       Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
 
-      for Data'Address use Packet_Nb'Address;
+      for Data'Address use Payload'Address;
       pragma Unreferenced (Offset);
    begin
       GNAT.Sockets.Send_Socket (Socket, Data, Offset, Address);
    end Send_Packet;
 
+
+   ---------------
+   --  Rcv_Ack  --
+   ---------------
 
    procedure Rcv_Ack is
       Ack_U8   : Base_Udp.Packet_Stream;
@@ -90,10 +120,16 @@ begin
        GNAT.Sockets.Family_Inet,
        GNAT.Sockets.Socket_Datagram);
 
+   Server_HandShake;
+   delay 0.0001;
+   Ada.Text_IO.Put_Line ("Server ready, start sending packets...");
+
    declare
       Packet   : Base_Udp.Packet_Stream;
 
-      Header   : Reliable_Udp.Header := (Ack => False, Seq_Nb => 0);
+      Header   : Reliable_Udp.Header := (Ack => False,
+                                         Seq_Nb => 0);
+
       Pkt_Data : Interfaces.Unsigned_64 := 0;
 
       for Pkt_Data'Address use Packet (5)'Address;
@@ -104,11 +140,7 @@ begin
 
          Rcv_Ack;
 
-         if Header.Seq_Nb = Base_Udp.Pkt_Max then
-            Header.Seq_Nb := 0;
-         else
-            Header.Seq_Nb := Header.Seq_Nb + 1;
-         end if;
+         Header.Seq_Nb := Header.Seq_Nb + 1;
 
          Pkt_Data := Pkt_Data + 1;
 
