@@ -40,12 +40,16 @@ procedure UDP_Server is
       entry Stop;
    end Recv_Socket;
 
+   pragma Warnings (Off);
+   procedure Wait_Client_HandShake (Server   : Socket_Type);
+   pragma Warnings (On);
 
    procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
                              Header    : in Reliable_Udp.Header;
                              I         : in out Interfaces.Unsigned_64;
                              Data_Addr : in out System.Address;
                              From      : in Sock_Addr_Type);
+
 
    function To_Int is
       new Ada.Unchecked_Conversion
@@ -221,6 +225,23 @@ procedure UDP_Server is
    end Process_Packet;
 
 
+   procedure Wait_Client_HandShake (Server   : Socket_Type) is
+      Data  : Base_Udp.Packet_Stream;
+      From  : Sock_Addr_Type;
+      Last  : Ada.Streams.Stream_Element_Offset;
+      Msg   : Interfaces.Unsigned_32;
+
+      for Msg'Address use Data'Address;
+      use type Interfaces.Unsigned_32;
+   begin
+      loop
+         GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
+         pragma Warnings (Off);
+         exit when Msg = 16#DEC000DE#;
+         pragma Warnings (On);
+      end loop;
+   end Wait_Client_HandShake;
+
    -------------------
    --  Recv_Socket  --
    -------------------
@@ -241,6 +262,8 @@ procedure UDP_Server is
 
       Init_Udp (Server);
       Buffer_Handling.Init_Buffers;
+
+      --  Wait_Client_HandShake (Server);
 
       accept Start;
       loop
@@ -288,6 +311,7 @@ begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (2));
    end if;
+
    Web_Interface.Init_WebServer (4242);
 
    Log_Task.Start;

@@ -23,54 +23,41 @@ procedure UDP_Client is
 
    use type Reliable_Udp.Pkt_Nb;
 
-   type Jumbo_U8 is
-      array (1 .. Base_Udp.Load_Size) of Interfaces.Unsigned_8;
-
-   Address  : GNAT.Sockets.Sock_Addr_Type;
    Socket   : GNAT.Sockets.Socket_Type;
+   Address  : GNAT.Sockets.Sock_Addr_Type;
 
-   Packet   : Jumbo_U8 := (others => 0);
-   Header   : Reliable_Udp.Header;
-   Pkt_Data : Interfaces.Unsigned_64 := 0;
-
-   for Pkt_Data'Address use Packet (5)'Address;
-   for Header'Address use Packet'Address;
-
-   procedure Send_Packet (Packet_Nb : Jumbo_U8;
-                          Ack       : Boolean);
+   procedure Send_Packet (Packet_Nb : Base_Udp.Packet_Stream);
    procedure Rcv_Ack;
 
+   --  procedure Server_HandShake;
 
    function To_Int is
       new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type,
          Interfaces.C.int);
 
-   procedure Send_Packet (Packet_Nb : Jumbo_U8;
-                          Ack : Boolean) is
+   --  procedure Server_HandShake is
+   --     Data
+   --  begin
+   --    Send_Packet ();
+   --  end Server_HandShake;
+
+   procedure Send_Packet (Packet_Nb : Base_Udp.Packet_Stream) is
       Offset   : Ada.Streams.Stream_Element_Offset;
       Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
-      Head     : Reliable_Udp.Header;
 
       for Data'Address use Packet_Nb'Address;
-      for Head'Address use Data'Address;
       pragma Unreferenced (Offset);
    begin
-      if Ack then
-         Head.Ack := True;
-      else
-         Head.Ack := False;
-      end if;
       GNAT.Sockets.Send_Socket (Socket, Data, Offset, Address);
    end Send_Packet;
 
 
    procedure Rcv_Ack is
-      Ack_U8   : Jumbo_U8 := (others => 0);
+      Ack_U8   : Base_Udp.Packet_Stream;
       Head     : Reliable_Udp.Header;
       Ack      : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
       Data     : Ada.Streams.Stream_Element_Array (1 .. 64);
       Res      : Interfaces.C.int;
-      Send     : Boolean := True;
 
       for Ack'Address use Ack_U8'Address;
       for Data'Address use Ack'Address;
@@ -80,52 +67,51 @@ procedure UDP_Client is
          Res := GNAT.Sockets.Thin.C_Recv
             (To_Int (Socket), Data (Data'First)'Address, Data'Length, 64);
          exit when Res = -1;
-         ---------- DBG -----------
-         Ada.Text_IO.Put_Line ("ACK [" & Res'Img
-            & " ]: Dropped :" & Head.Seq_Nb'Img);
-         --------------------------
-         --  Fake Ack loss
-         if Send then
-            Send_Packet (Ack_U8, True);
-            Send := False;
-         else
-            Send := True;
-         end if;
+         Head.Ack := True;
+         Send_Packet (Ack_U8);
       end loop;
    end Rcv_Ack;
 
 begin
-   if Ada.Command_Line.Argument_Count = 0 then
-      Address.Addr := GNAT.Sockets.Inet_Addr ("127.0.0.1");
+   if Ada.Command_Line.Argument_Count /= 2 then
+      Ada.Text_IO.Put_Line ("Usage : "
+         & Ada.Command_Line.Command_Name
+         & " [udp_server_ip] [port]");
+      return;
    else
       Address.Addr := GNAT.Sockets.Inet_Addr
                         (Ada.Command_Line.Argument (1));
+      Address.Port := GNAT.Sockets.Port_Type'Value
+                        (Ada.Command_Line.Argument (2));
    end if;
 
-   Address.Port := 50001;
-   Header.Seq_Nb := 0;
+   GNAT.Sockets.Create_Socket
+      (Socket,
+       GNAT.Sockets.Family_Inet,
+       GNAT.Sockets.Socket_Datagram);
 
-   GNAT.Sockets.Create_Socket (Socket,
-                               GNAT.Sockets.Family_Inet,
-                               GNAT.Sockets.Socket_Datagram);
-   loop
-      Send_Packet (Packet, False);
-      Rcv_Ack;
-      if Header.Seq_Nb = Base_Udp.Pkt_Max then
-         Header.Seq_Nb := 0;
-      else
-         Header.Seq_Nb := Header.Seq_Nb + 1;
+   declare
+      Packet   : Base_Udp.Packet_Stream;
 
-         --  Stress test (Simulate Drops)
+      Header   : Reliable_Udp.Header := (Ack => False, Seq_Nb => 0);
+      Pkt_Data : Interfaces.Unsigned_64 := 0;
 
-         --  if Header.Seq_Nb = 4242 then
-         --     Header.Seq_Nb := Header.Seq_Nb + 2;
-         --  end if;
-      end if;
-      Pkt_Data := Pkt_Data + 1;
+      for Pkt_Data'Address use Packet (5)'Address;
+      for Header'Address use Packet'Address;
+   begin
+      loop
+         Send_Packet (Packet);
 
-      --  DBG  --
-      --  delay 0.000000001;
-      ---------
-   end loop;
+         Rcv_Ack;
+
+         if Header.Seq_Nb = Base_Udp.Pkt_Max then
+            Header.Seq_Nb := 0;
+         else
+            Header.Seq_Nb := Header.Seq_Nb + 1;
+         end if;
+
+         Pkt_Data := Pkt_Data + 1;
+
+      end loop;
+   end;
 end UDP_Client;

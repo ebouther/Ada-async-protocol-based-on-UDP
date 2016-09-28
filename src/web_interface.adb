@@ -1,3 +1,4 @@
+with Ada.Text_IO;
 with AWS.Server;
 with AWS.Messages;
 with AWS.MIME;
@@ -10,14 +11,14 @@ package body Web_Interface is
    WS  : AWS.Server.HTTP;
 
    Rcp : constant AWS.Net.WebSocket.Registry.Recipient :=
-           AWS.Net.WebSocket.Registry.Create (URI => "/echo");
+            AWS.Net.WebSocket.Registry.Create (URI => "/echo");
 
    function Create
      (Socket  : AWS.Net.Socket_Access;
       Request : AWS.Status.Data) return AWS.Net.WebSocket.Object'Class
    is
    begin
-      return MySocket'
+      return Object'
         (AWS.Net.WebSocket.Object
           (AWS.Net.WebSocket.Create (Socket, Request)) with null record);
    end Create;
@@ -44,8 +45,8 @@ package body Web_Interface is
    begin
       AWS.Server.Start
         (WS, "RATP Interface", Callback => HW_CB'Unrestricted_Access, Port => Port);
-      AWS.Net.WebSocket.Registry.Register ("/echo", WebSocket.Create'Access);
       AWS.Net.WebSocket.Registry.Control.Start;
+      AWS.Net.WebSocket.Registry.Register ("/echo", WebSocket.Create'Access);
    end  Init_WebServer;
 
 
@@ -54,5 +55,32 @@ package body Web_Interface is
    begin
       AWS.Net.WebSocket.Registry.Send (Rcp, Id & "|" & Data);
    end Send_To_Client;
+
+   overriding procedure On_Message
+     (Socket  : in out Object;
+      Message : in     String)
+   is
+   begin
+      Socket.Send ("Server Received :" & Message);
+      Ada.Text_IO.Put_Line ("==== Server Received :" & Message);
+   end On_Message;
+
+   overriding procedure On_Open
+     (Socket  : in out Object;
+      Message : in     String)
+   is
+   begin
+      Socket.Send ("New client :" & Message);
+      Ada.Text_IO.Put_Line ("===> New client :" & Message);
+   end On_Open;
+
+   overriding procedure On_Close
+     (Socket  : in out Object;
+      Message : in     String)
+   is
+      pragma Unreferenced (Socket);
+   begin
+      Ada.Text_IO.Put_Line ("<=== Client left :" & Message);
+   end On_Close;
 
 end Web_Interface;
