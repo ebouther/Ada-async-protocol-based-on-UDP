@@ -4,6 +4,8 @@ with AWS.MIME;
 with AWS.Templates;
 with AWS.Messages;
 
+with Reliable_Udp;
+
 package body WebSocket is
    use Ada;
    use AWS;
@@ -50,9 +52,14 @@ package body WebSocket is
    ----------------
 
    overriding procedure On_Message
-     (Socket : in out Object; Message : Ada.Strings.Unbounded.Unbounded_String) is
+     (Socket : in out Object; Message : String) is
       use type AWS.Net.WebSocket.Kind_Type;
    begin
+      if Message = "START_ACQ" then
+         Reliable_Udp.Send_Cmd_Client (1);
+      elsif Message = "STOP_ACQ" then
+         Reliable_Udp.Send_Cmd_Client (2);
+      end if;
       Socket.Send (Message, Is_Binary => Socket.Kind = Net.WebSocket.Binary);
    end On_Message;
 

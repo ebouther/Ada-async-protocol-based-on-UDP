@@ -1,6 +1,7 @@
 with Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Streams;
+with Ada.Calendar;
 with Interfaces;
 with Interfaces.C;
 with Ada.Unchecked_Conversion;
@@ -23,8 +24,9 @@ procedure UDP_Client is
 
    use type Reliable_Udp.Pkt_Nb;
 
-   Socket   : GNAT.Sockets.Socket_Type;
-   Address  : GNAT.Sockets.Sock_Addr_Type;
+   Socket            : GNAT.Sockets.Socket_Type;
+   Address           : GNAT.Sockets.Sock_Addr_Type;
+   Acquisition       : Boolean := True;
 
    procedure Send_Packet (Payload : Base_Udp.Packet_Stream);
 
@@ -45,12 +47,12 @@ procedure UDP_Client is
 
    procedure Server_HandShake is
       Send_Data, Recv_Data : Base_Udp.Packet_Stream;
-      Send_Msg, Recv_Msg   : Interfaces.Unsigned_32;
+      Send_Head, Recv_Head : Reliable_Udp.Header;
 
-      for Send_Msg'Address use Send_Data'Address;
-      for Recv_Msg'Address use Recv_Data'Address;
+      for Send_Head'Address use Send_Data'Address;
+      for Recv_Head'Address use Recv_Data'Address;
    begin
-      Send_Msg := 16#DEC000DE#;
+      Send_Head.Seq_Nb := 0;
       loop
          Send_Packet (Send_Data);
          delay 0.2;
@@ -58,7 +60,9 @@ procedure UDP_Client is
                (To_Int (Socket),
                 Recv_Data (Recv_Data'First)'Address,
                 Recv_Data'Length,
-                64) /= -1 and Recv_Msg = Send_Msg;
+                64) /= -1
+               and Recv_Head.Ack = False
+               and Recv_Head.Seq_Nb = Send_Head.Seq_Nb; -- Should rename Seq_Nb by Msg in this case.
       end loop;
    end Server_HandShake;
 
@@ -83,22 +87,37 @@ procedure UDP_Client is
    ---------------
 
    procedure Rcv_Ack is
-      Ack_U8   : Base_Udp.Packet_Stream;
+      Payload  : Base_Udp.Packet_Stream;
       Head     : Reliable_Udp.Header;
       Ack      : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
       Data     : Ada.Streams.Stream_Element_Array (1 .. 64);
       Res      : Interfaces.C.int;
 
-      for Ack'Address use Ack_U8'Address;
+      for Ack'Address use Payload'Address;
       for Data'Address use Ack'Address;
       for Head'Address use Ack'Address;
    begin
       loop
          Res := GNAT.Sockets.Thin.C_Recv
             (To_Int (Socket), Data (Data'First)'Address, Data'Length, 64);
+
          exit when Res = -1;
-         Head.Ack := True;
-         Send_Packet (Ack_U8);
+
+         if Head.Ack = False then
+            if Head.Seq_Nb = 2 then
+               Ada.Text_IO.Put_Line ("...Server asked to STOP ACQUISITION...");
+               Ada.Text_IO.Put_Line ("Client stopped sending data.");
+               Acquisition := False;
+               return;
+            elsif Head.Seq_Nb = 1 then
+               Ada.Text_IO.Put_Line ("...Server asked to START ACQUISITION...");
+               Acquisition := True;
+               return;
+            end if;
+         else
+            Head.Ack := True;
+            Send_Packet (Payload);
+         end if;
       end loop;
    end Rcv_Ack;
 
@@ -120,6 +139,7 @@ begin
        GNAT.Sockets.Family_Inet,
        GNAT.Sockets.Socket_Datagram);
 
+   <<HandShake>>
    Server_HandShake;
    delay 0.0001;
    Ada.Text_IO.Put_Line ("Server ready, start sending packets...");
@@ -136,13 +156,30 @@ begin
       for Header'Address use Packet'Address;
    begin
       loop
-         Send_Packet (Packet);
+         if Acquisition then
+            Rcv_Ack;
 
-         Rcv_Ack;
+            Send_Packet (Packet);
 
-         Header.Seq_Nb := Header.Seq_Nb + 1;
+            Header.Seq_Nb := Header.Seq_Nb + 1;
 
-         Pkt_Data := Pkt_Data + 1;
+            Pkt_Data := Pkt_Data + 1;
+         else
+            declare
+               Start_Time  : constant Ada.Calendar.Time := Ada.Calendar.Clock;
+               Cur_Time    : Ada.Calendar.Time;
+               use type Ada.Calendar.Time;
+            begin
+               loop
+                  Rcv_Ack; -- Give server 2s to be sure it has all packets
+
+                  Cur_Time := Ada.Calendar.Clock;
+                  if Cur_Time - Start_Time > 2.0 then
+                     goto HandShake;
+                  end if;
+               end loop;
+            end;
+         end if;
 
       end loop;
    end;

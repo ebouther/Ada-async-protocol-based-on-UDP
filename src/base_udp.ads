@@ -1,10 +1,13 @@
 with Interfaces;
 with System;
 with Ada.Streams;
+with GNAT.Sockets;
 
 package Base_Udp is
 
    use type Interfaces.Unsigned_64;
+
+   Client_Addr : GNAT.Sockets.Sock_Addr_Type;
 
    --  8 or 16 otherwise it's too big for Set_Used_Bytes parameter (Integer)
    subtype Header is Interfaces.Unsigned_16;
@@ -16,7 +19,7 @@ package Base_Udp is
    Load_Size      : constant := 8972;
 
    --  Round Time Trip maximum value in micro seconds
-   RTT_US_Max     : constant := 150;
+   RTT_US_Max     : Integer := 150;
 
    --  Size of header in Bytes
    Header_Size    : constant := Header'Size / System.Storage_Unit;
@@ -28,12 +31,20 @@ package Base_Udp is
    Pkt_Max        : constant := Sequence_Size - 1;
 
    --  Used by Buffers' Set_Name
-   Buffer_Name    : constant String := "toto";
+   Buffer_Name    : String := "toto";
 
-   Buffer_Size    : constant Integer := ((Integer (Sequence_Size
+   --  Buffer Size, has to be a multiple of 4096
+   Buffer_Size    : Integer := ((Integer (Sequence_Size
                                  * Load_Size) / 4096) + 1) * 4096;
 
-   End_Point      : constant String := "http://stare-2:5678";
+   --  Consumer Addr
+   End_Point      : String := "http://127.0.0.1:5678";
+
+   --  WebServer Port
+   AWS_Port       : Integer := 80;
+
+   --  Server socket Port
+   UDP_Port       : GNAT.Sockets.Port_Type := 50001;
 
 
    type Packet_Payload is

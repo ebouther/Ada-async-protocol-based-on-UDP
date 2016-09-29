@@ -4,8 +4,25 @@ with Ada.Text_IO;
 
 package body Reliable_Udp is
 
-   Ack_Mgr      : Ack_Management;
+   Ack_Mgr        : Ack_Management;
 
+   Socket         : GNAT.Sockets.Socket_Type;
+
+   -----------------------
+   --  Send_Cmd_Client  --
+   -----------------------
+
+   procedure Send_Cmd_Client (Cmd : Reliable_Udp.Pkt_Nb) is
+      Data        : Ada.Streams.Stream_Element_Array (1 .. Reliable_Udp.Header'Size);
+      Head        : Reliable_Udp.Header;
+      Offset      : Ada.Streams.Stream_Element_Offset;
+      for Head'Address use Data'Address;
+      pragma Unreferenced (Offset);
+   begin
+      Head.Seq_Nb := Cmd;
+      Head.Ack    := False;
+      GNAT.Sockets.Send_Socket (Socket, Data, Offset, Client_Address);
+   end Send_Cmd_Client;
 
    ------------------
    --  Append_Ack  --
@@ -83,7 +100,6 @@ package body Reliable_Udp is
    --  Issue: Prevent from receiving packets when two much aks
    --  which create even more acks...
    task body Ack_Task is
-      Socket      : GNAT.Sockets.Socket_Type;
       Ack_Array   : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
       Head        : Reliable_Udp.Header;
       Data        : Ada.Streams.Stream_Element_Array (1 .. 64);
@@ -117,6 +133,7 @@ package body Reliable_Udp is
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Ack_Mgr.Set (Index, Element);
                   Head.Seq_Nb := Pkt_Nb (Index);
+                  Head.Ack := True;
                   GNAT.Sockets.Send_Socket (Socket, Data, Offset, Element.From);
                end if;
             end if;

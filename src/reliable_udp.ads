@@ -18,6 +18,8 @@ package Reliable_Udp is
    use type Interfaces.Unsigned_32;
    use type Interfaces.Unsigned_64;
 
+   Client_Address    : GNAT.Sockets.Sock_Addr_Type;
+
    --  Stored in packet header to identify which packet was lost
    type Pkt_Nb is mod 2 ** (Base_Udp.Header'Size - 1);
 
@@ -60,7 +62,10 @@ package Reliable_Udp is
       end record;
 
    package Sync_Queue is new Queue (Append_Ack_Type);
+
    Fifo  : Sync_Queue.Synchronized_Queue;
+
+   procedure Send_Cmd_Client (Cmd : Pkt_Nb);
 
    procedure Append_Ack (First_D          : in Reliable_Udp.Pkt_Nb;
                          Last_D           : in Reliable_Udp.Pkt_Nb;

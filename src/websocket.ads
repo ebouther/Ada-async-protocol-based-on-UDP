@@ -1,5 +1,3 @@
-with Ada.Strings.Unbounded;
-
 with AWS.Net.WebSocket;
 with AWS.Response;
 with AWS.Status;
@@ -16,7 +14,7 @@ package WebSocket is
       Request : AWS.Status.Data) return AWS.Net.WebSocket.Object'Class;
 
    overriding procedure On_Message
-     (Socket : in out Object; Message : Ada.Strings.Unbounded.Unbounded_String);
+     (Socket : in out Object; Message : String);
    overriding procedure On_Open (Socket : in out Object; Message : String);
    overriding procedure On_Close (Socket : in out Object; Message : String);
 

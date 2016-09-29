@@ -1,6 +1,6 @@
 with Ada.Text_IO;
-with Ada.Exceptions;
 with Ada.Command_Line;
+with Ada.Exceptions;
 with Ada.Streams;
 with Ada.Unchecked_Conversion;
 with Ada.Calendar;
@@ -9,6 +9,7 @@ with System.Multiprocessors.Dispatching_Domains;
 with System.Storage_Elements;
 with Ada.Real_Time;
 
+with GNAT.Command_Line;
 with GNAT.Traceback.Symbolic;
 with System;
 
@@ -56,6 +57,8 @@ procedure UDP_Server is
       new Ada.Unchecked_Conversion
          (GNAT.Sockets.Socket_Type, Interfaces.C.int);
 
+   procedure Parse_Arguments;
+
    procedure Init_Udp (Server       : in out Socket_Type;
                        TimeOut_Opt  : Boolean := True);
 
@@ -101,6 +104,50 @@ procedure UDP_Server is
    end Stop_Server;
 
 
+   -----------------------
+   --  Parse_Arguments  --
+   -----------------------
+
+   procedure Parse_Arguments is
+      use GNAT.Command_Line;
+      use Ada.Command_Line;
+      use Ada.Text_IO;
+   begin
+      loop
+         if Getopt ("-end-point= -aws-port= -buf-name= -rtt-us-max= -udp-port= -help") = '-' then
+            if Full_Switch = "-end-point" then
+               Base_Udp.End_Point := Parameter;
+            elsif Full_Switch = "-aws-port" then
+               Base_Udp.AWS_Port := Integer'Value (Parameter);
+            elsif Full_Switch = "-buf-name" then
+               Base_Udp.Buffer_Name := Parameter;
+            elsif Full_Switch = "-rtt-us-max" then
+               Base_Udp.RTT_US_Max := Integer'Value (Parameter);
+            elsif Full_Switch = "-udp-port" then
+               Base_Udp.UDP_Port := GNAT.Sockets.Port_Type'Value (Parameter);
+            elsif Full_Switch = "-help" then
+               New_Line;
+               Put_Line ("Options :");
+               New_Line;
+               Put_Line ("--end-point (default http://127.0.0.1:5678)");
+               Put_Line ("--aws-port (default 80)");
+               Put_Line ("--buf-name (default toto)");
+               Put_Line ("--rtt-us-max (default 150 us)");
+               Put_Line ("--udp-port (default 50001)");
+               Put_Line ("--help");
+               New_Line;
+            else
+               Put_Line ("/!\ Some arguments have not been taken into account. /!\");
+               Put_Line ("Unknown argument :" & Full_Switch);
+               Put_Line ("Use --help to see" & Command_Name & "'s options.");
+               New_Line;
+            end if;
+         else
+            exit;
+         end if;
+      end loop;
+   end Parse_Arguments;
+
    ----------------
    --  Init_Udp  --
    ----------------
@@ -119,7 +166,7 @@ procedure UDP_Server is
             (Server,
             Socket_Level,
             (Receive_Timeout,
-            Timeout => 1.0));
+            Timeout => 2.0));
       end if;
       Opt_Return := Thin.C_Setsockopt (S        => To_Int (Server),
                                        Level    => 1,
@@ -127,7 +174,7 @@ procedure UDP_Server is
                                        Optval   => Busy'Address,
                                        Optlen   => 4);
       Address.Addr := Any_Inet_Addr;
-      Address.Port := 50001;
+      Address.Port := Base_Udp.UDP_Port;
       Bind_Socket (Server, Address);
    end Init_Udp;
 
@@ -233,24 +280,31 @@ procedure UDP_Server is
    procedure Wait_Client_HandShake is
       Socket   : Socket_Type;
       Data     : Base_Udp.Packet_Stream;
+      Head     : Reliable_Udp.Header;
       From     : Sock_Addr_Type;
       Last     : Ada.Streams.Stream_Element_Offset;
 
+      --  Client is waiting for handshake (acquisition was stopped)
+      Acq_Stop : Boolean := (if Nb_Packet_Received /= 0 then True else False);
+
+      for Head'Address use Data'Address;
+
       use type Interfaces.Unsigned_32;
       use type Interfaces.C.int;
+      use type Reliable_Udp.Pkt_Nb;
       pragma Unreferenced (Last);
    begin
       Init_Udp (Socket, False);
       loop
-         GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
+         if Acq_Stop = False then  -- Could fail if packet is lost !!
+            GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
+            Reliable_Udp.Client_Address := From;
+            Acq_Stop := True;
+         end if;
 
-         declare
-            Msg   : Interfaces.Unsigned_32;
-            for Msg'Address use Data'Address;
-         begin
-            exit when Msg = 16#DEC000DE#;
-         end;
+         exit when Head.Seq_Nb = 0;  --  Means client is ready.
       end loop;
+      Head.Ack := False;
       GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
    exception
       when E : others =>
@@ -332,6 +386,7 @@ procedure UDP_Server is
    end Recv_Socket;
 
 begin
+   Parse_Arguments;
 
    Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "log.csv");
    Ada.Text_IO.Put_Line (Log_File,
@@ -341,12 +396,7 @@ begin
    Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "buffers.log");
    Ada.Text_IO.Close (Log_File);
 
-   if Ada.Command_Line.Argument_Count = 1 then
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (2));
-   end if;
-
-   Web_Interface.Init_WebServer (4242);
+   Web_Interface.Init_WebServer (Base_Udp.AWS_Port);
 
    Recv_Socket_Task.Start;
    Release_Buf_Task.Start;

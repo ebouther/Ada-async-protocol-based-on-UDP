@@ -1,5 +1,8 @@
 
    var ws = new WebSocket('ws://' + window.location.host + '/echo');
+   
+   $('#start_acq').click(function() {ws.send ("START_ACQ")});
+   $('#stop_acq').click(function() {ws.send ("STOP_ACQ")});
 
    ws.onopen = function()
    {
@@ -9,11 +12,11 @@
    ws.onmessage = function (evt) 
    { 
       var split = evt.data.split("|");
-      var num = null;
 
       var elem = $("#" + split[0]);
-      if (elem != null)
+      if (elem.data() != null)
       {
+         var num;
          if (!isNaN (num = parseFloat(split[1])) && split[0] != "uptime") {
             elem.html(num.toExponential(5));
          } else {
