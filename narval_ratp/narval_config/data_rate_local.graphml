@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<graphml>
+ <graph edgedefault="directed">
+  <node id="prod">
+   <producer name="prod">
+    <binary_code>data_rate_producer</binary_code>
+    <log_level>info</log_level>
+    <hostname>stare-2</hostname>
+    <buffer mode="producer" name="data">
+     <size>1_048_576</size>
+     <depth>10</depth>
+    </buffer>
+   </producer>
+  </node>
+  <node id="cons">
+   <consumer name="cons">
+    <binary_code>data_rate_consumer</binary_code>
+    <log_level>info</log_level>
+    <hostname>stare-2</hostname>
+    <buffer mode="consumer" name="data">
+     <data_source>prod</data_source>
+    </buffer>
+   </consumer>
+  </node>
+  <edge source="prod" target="cons">
+   <annotation key="buffer_name" value="data"/>
+  </edge>
+ </graph>
+</graphml>

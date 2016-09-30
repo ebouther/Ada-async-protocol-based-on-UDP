@@ -1,0 +1,1 @@
+set library /home/boutherin/libratp_cons.so $1 data_receiver

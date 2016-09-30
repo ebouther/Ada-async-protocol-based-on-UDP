@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<graphml>
+ <graph edgedefault="directed">
+  <node id="data_receiver">
+   <consumer name="data_receiver">
+    <binary_code>data_rate_consumer</binary_code>
+    <log_level>info</log_level>
+    <hostname>stare-2</hostname>
+    <buffer mode="consumer" name="toto" pmh="true"/>
+   </consumer>
+  </node>
+ </graph>
+</graphml>
