@@ -9,6 +9,8 @@ package Base_Udp is
 
    Client_Addr : GNAT.Sockets.Sock_Addr_Type;
 
+   Acquisition : Boolean := True;
+
    --  8 or 16 otherwise it's too big for Set_Used_Bytes parameter (Integer)
    subtype Header is Interfaces.Unsigned_16;
 

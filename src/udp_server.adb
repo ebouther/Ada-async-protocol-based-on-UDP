@@ -198,7 +198,7 @@ procedure UDP_Server is
             exit;
          else
             delay 1.0;
-            Ada.Text_IO.Put_Line ("FIFO Len : " & Reliable_Udp.Fifo.Cur_Count'Img);
+            --  Ada.Text_IO.Put_Line ("FIFO Len : " & Reliable_Udp.Fifo.Cur_Count'Img);
             Elapsed_Time := Ada.Calendar.Clock - Start_Time;
             Output_Data.Display
                (True,
@@ -284,9 +284,6 @@ procedure UDP_Server is
       From     : Sock_Addr_Type;
       Last     : Ada.Streams.Stream_Element_Offset;
 
-      --  Client is waiting for handshake (acquisition was stopped)
-      Acq_Stop : Boolean := (if Nb_Packet_Received /= 0 then True else False);
-
       for Head'Address use Data'Address;
 
       use type Interfaces.Unsigned_32;
@@ -296,13 +293,12 @@ procedure UDP_Server is
    begin
       Init_Udp (Socket, False);
       loop
-         if Acq_Stop = False then  -- Could fail if packet is lost !!
-            GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
-            Reliable_Udp.Client_Address := From;
-            Acq_Stop := True;
-         end if;
+         GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
+         Reliable_Udp.Client_Address := From;
 
-         exit when Head.Seq_Nb = 0;  --  Means client is ready.
+         if Base_Udp.Acquisition and Head.Seq_Nb = 0 then  --  Means client is ready.
+            exit;
+         end if;
       end loop;
       Head.Ack := False;
       GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
@@ -323,9 +319,8 @@ procedure UDP_Server is
       Server               : Socket_Type;
       From                 : Sock_Addr_Type;
       Last                 : Ada.Streams.Stream_Element_Offset;
-      Watchdog             : Natural := 0;
       Data_Addr            : System.Address;
-      I                    : Interfaces.Unsigned_64;
+      I                    : Interfaces.Unsigned_64 := Base_Udp.Pkt_Max + 1;
 
       use System.Storage_Elements;
       use type Interfaces.C.int;
@@ -338,13 +333,11 @@ procedure UDP_Server is
       accept Start;
 
       <<HandShake>>
-      I := Base_Udp.Pkt_Max + 1;
-
       Ada.Text_IO.Put_Line ("...Waiting for Client...");
       Wait_Client_HandShake;
       Ada.Text_IO.Put_Line ("Client is ready...");
 
-      --  Would get stuck if Handshake is re-called
+      --  Prevent busy wait if Handshake is re-called
       select
          Log_Task.Start;
       else
@@ -376,9 +369,7 @@ procedure UDP_Server is
                I := I + 1;
             exception
                when Socket_Error =>
-                  Watchdog := Watchdog + 1;
                   Ada.Text_IO.Put_Line ("Socket Error");
-                  exit when Watchdog = 10;
                   goto HandShake;
             end;
          end select;

@@ -62,7 +62,8 @@ procedure UDP_Client is
                 Recv_Data'Length,
                 64) /= -1
                and Recv_Head.Ack = False
-               and Recv_Head.Seq_Nb = Send_Head.Seq_Nb; -- Should rename Seq_Nb by Msg in this case.
+               and (Recv_Head.Seq_Nb = Send_Head.Seq_Nb);
+               --  Should rename Seq_Nb by Msg in this case.
       end loop;
    end Server_HandShake;
 
@@ -139,11 +140,6 @@ begin
        GNAT.Sockets.Family_Inet,
        GNAT.Sockets.Socket_Datagram);
 
-   <<HandShake>>
-   Server_HandShake;
-   delay 0.0001;
-   Ada.Text_IO.Put_Line ("Server ready, start sending packets...");
-
    declare
       Packet   : Base_Udp.Packet_Stream;
 
@@ -155,6 +151,13 @@ begin
       for Pkt_Data'Address use Packet (5)'Address;
       for Header'Address use Packet'Address;
    begin
+
+      <<HandShake>>
+      Server_HandShake;
+      Acquisition := True;
+      delay 0.0001;
+      Ada.Text_IO.Put_Line ("Server ready, start sending packets...");
+
       loop
          if Acquisition then
             Rcv_Ack;

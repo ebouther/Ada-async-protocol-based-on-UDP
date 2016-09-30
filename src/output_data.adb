@@ -49,23 +49,23 @@ package body Output_Data is
       Debit := Base_Udp.Load_Size * 8 * (Nb_Packet_Received -  Last_Nb);
       Pps   := Long_Float (Nb_Packet_Received) / Long_Float (Elapsed_Time);
 
-      --  Ada.Text_IO.Put_Line ("-- Nb output                     : "
-      --    & Nb_Output'Img);
-      --  Ada.Text_IO.Put_Line ("-- Nb_received                   : "
-      --    & Nb_Packet_Received'Img);
-      --  Ada.Text_IO.Put_Line ("-- Last Packet Received          : "
-      --    & Last_Packet'Img);
-      --  Ada.Text_IO.Put_Line ("-- Dropped                       : "
-      --    & Missed'Img);
-      --  Ada.Text_IO.Put_Line ("-- Delta in bits                 : "
-      --    & Debit'Img);
-      --  Ada.Text_IO.Put_Line ("-- Ratio (dropped / total_sent)  : "
-      --    & Ratio'Img);
-      --  Ada.Text_IO.Put_Line ("-- Elapsed Time                  : "
-      --    & Duration'Image (Elapsed_Time));
-      --  Ada.Text_IO.Put_Line ("-- Pps                           : "
-      --    & Pps'Img);
-      --  Ada.Text_IO.New_Line;
+      Ada.Text_IO.Put_Line ("-- Nb output                     : "
+        & Nb_Output'Img);
+      Ada.Text_IO.Put_Line ("-- Nb_received                   : "
+        & Nb_Packet_Received'Img);
+      Ada.Text_IO.Put_Line ("-- Last Packet Received          : "
+        & Last_Packet'Img);
+      Ada.Text_IO.Put_Line ("-- Dropped                       : "
+        & Missed'Img);
+      Ada.Text_IO.Put_Line ("-- Delta in bits                 : "
+        & Debit'Img);
+      Ada.Text_IO.Put_Line ("-- Ratio (dropped / total_sent)  : "
+        & Ratio'Img);
+      Ada.Text_IO.Put_Line ("-- Elapsed Time                  : "
+        & Duration'Image (Elapsed_Time));
+      Ada.Text_IO.Put_Line ("-- Pps                           : "
+        & Pps'Img);
+      Ada.Text_IO.New_Line;
 
       --  WebSocket --
       Web_Interface.Send_To_Client ("debit", Debit'Img);

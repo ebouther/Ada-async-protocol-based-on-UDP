@@ -147,7 +147,7 @@
    <script type="text/javascript">
       @@INCLUDE@@@ charts.tjs
       @@INCLUDE@@@ websocket.tjs
-      </script>
+   </script>
 
    </html>
 

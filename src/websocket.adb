@@ -5,6 +5,7 @@ with AWS.Templates;
 with AWS.Messages;
 
 with Reliable_Udp;
+with Base_Udp;
 
 package body WebSocket is
    use Ada;
@@ -55,10 +56,16 @@ package body WebSocket is
      (Socket : in out Object; Message : String) is
       use type AWS.Net.WebSocket.Kind_Type;
    begin
-      if Message = "START_ACQ" then
+      if Message = "START_ACQ"
+         and Base_Udp.Acquisition = False
+      then
          Reliable_Udp.Send_Cmd_Client (1);
-      elsif Message = "STOP_ACQ" then
+         Base_Udp.Acquisition := True;
+      elsif Message = "STOP_ACQ"
+         and Base_Udp.Acquisition
+      then
          Reliable_Udp.Send_Cmd_Client (2);
+         Base_Udp.Acquisition := False;
       end if;
       Socket.Send (Message, Is_Binary => Socket.Kind = Net.WebSocket.Binary);
    end On_Message;
