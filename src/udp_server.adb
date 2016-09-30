@@ -304,10 +304,11 @@ procedure UDP_Server is
       GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
    exception
       when E : others =>
-         Ada.Text_IO.Put_Line ("exception : " &
-            Ada.Exceptions.Exception_Name (E) &
-            " message : " &
-            Ada.Exceptions.Exception_Message (E));
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
    end Wait_Client_HandShake;
 
 

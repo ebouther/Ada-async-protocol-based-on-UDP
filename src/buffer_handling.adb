@@ -57,37 +57,32 @@ package body Buffer_Handling is
       Production.Message_Handling.Start (1.0);
       Buffer_Prod.Is_Initialised;
 
-      --  Buffer_Cons.Set_Name (Base_Udp.Buffer_Name);
-      --  Consumption.Message_Handling.Start (1.0);
-
       Buffer_Handler.First := Buffer_Handler.Handlers'First;
 
       --  Current is incremented to First when Recv_Packets asks for new Buf
       Buffer_Handler.Current := Buffer_Handler.Handlers'Last;
 
-      --  Kernel keeps memory as virtual till I write inside.
       for I in Buffer_Handler.Handlers'Range loop
          Buffer_Prod.Get_Free_Buffer (Buffer_Handler.Handlers (I)
             .Handle);
-         declare
-            Message : Base_Udp.Packet_Payload;
-            for Message'Address use Buffer_Handler.Handlers (I)
-               .Handle.Get_Address;
-         begin
-            Message := (others => 16#FA#);
-            --  Ret := mlock (Message'Address, Message'Size);
-            --  if Ret = -1 then
-            --     Perror ("Mlock Error");
-            --  end if;
-         end;
       end loop;
-      Ada.Text_IO.Put_Line ("_Initialization Finished_");
+      Ada.Text_IO.Put_Line (ASCII.ESC & "[32;1m" & "Buffers   [✓]" & ASCII.ESC & "[0m");
+
    exception
       when E : others =>
-         Ada.Text_IO.Put_Line ("exception : " &
-            Ada.Exceptions.Exception_Name (E) &
-            " message : " &
-            Ada.Exceptions.Exception_Message (E));
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31;1m" & "Buffers   [x]" & ASCII.ESC & "[0m");
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[33m"
+            & "Make sure that old buffers were removed"
+            & " and that dcod is running before launching udp_server."
+            & ASCII.LF & " (ex : $> rm -f /dev/shm/* /dev/mqueue/* &&"
+            & " dcod_launch -i -m -l -L $LD_LIBRARY_PATH -v )"
+            & ASCII.ESC & "[0m");
+
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
    end Init_Buffers;
 
 
@@ -184,10 +179,11 @@ package body Buffer_Handling is
       end loop;
    exception
       when E : others =>
-         Ada.Text_IO.Put_Line ("exception : " &
-            Ada.Exceptions.Exception_Name (E) &
-            " message : " &
-            Ada.Exceptions.Exception_Message (E));
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
    end Mark_Empty_Cell;
 
 
@@ -247,7 +243,8 @@ package body Buffer_Handling is
                if Buffer_Handler.Current + 1 = Buffer_Handler.First
                   and not Init
                then
-                  raise Not_Released_Fast_Enough;
+                  Ada.Exceptions.Raise_Exception (Not_Released_Fast_Enough'Identity,
+                     "All buffers are used. Make sure a consumer was launched.");
                end if;
                Buffer_Ptr := Buffer_Handler.Handlers
                                 (Buffer_Handler.Current + 1).
@@ -265,10 +262,12 @@ package body Buffer_Handling is
       end loop;
    exception
       when E : others =>
-         Ada.Text_IO.Put_Line ("exception : " &
-            Ada.Exceptions.Exception_Name (E) &
-            " message : " &
-            Ada.Exceptions.Exception_Message (E));
+
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
    end PMH_Buffer_Addr;
 
 
@@ -428,10 +427,11 @@ package body Buffer_Handling is
 
       exception
          when E : others =>
-            Ada.Text_IO.Put_Line ("exception : " &
-               Ada.Exceptions.Exception_Name (E) &
-               " message : " &
-               Ada.Exceptions.Exception_Message (E));
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
       end;
    end Get_Filled_Buf;
 

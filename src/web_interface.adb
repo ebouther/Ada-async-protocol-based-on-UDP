@@ -1,3 +1,5 @@
+with Ada.Text_IO;
+with Ada.Exceptions;
 with AWS.Server;
 with AWS.Net.WebSocket.Registry.Control;
 
@@ -16,6 +18,20 @@ package body Web_Interface is
         (WS, "RATP Interface", Callback => WebSocket.HW_CB'Unrestricted_Access, Port => Port);
       AWS.Net.WebSocket.Registry.Control.Start;
       AWS.Net.WebSocket.Registry.Register ("/echo", WebSocket.Create'Access);
+      Ada.Text_IO.Put_Line (ASCII.ESC & "[32;1m" & "WebServer [✓]" & ASCII.ESC & "[0m");
+   exception
+      when E : others =>
+      Ada.Text_IO.Put_Line (ASCII.ESC & "[31;1m" & "WebServer [x]" & ASCII.ESC & "[0m");
+      Ada.Text_IO.Put_Line (ASCII.ESC & "[33m"
+         & "Make sure that AWS Port is not used."
+         & ASCII.LF & " (use --aws-port to change)"
+         & ASCII.ESC & "[0m");
+
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
    end  Init_WebServer;
 
 
