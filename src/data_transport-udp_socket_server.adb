@@ -1,7 +1,7 @@
 with Ada.Text_IO;
-with Ada.Command_Line;
 with Ada.Streams;
 with Ada.Calendar;
+with Ada.Exceptions;
 with Interfaces;
 with Interfaces.C;
 with Ada.Unchecked_Conversion;
@@ -13,7 +13,7 @@ pragma Warnings (On);
 with Base_Udp;
 with Reliable_Udp;
 
-procedure UDP_Client is
+package body Data_Transport.Udp_Socket_Server is
 
    use type Interfaces.Unsigned_8;
    use type Interfaces.Unsigned_16;
@@ -39,6 +39,89 @@ procedure UDP_Client is
    function To_Int is
       new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type,
          Interfaces.C.int);
+
+
+   task body Socket_Server_Task is
+      Packet   : Base_Udp.Packet_Stream;
+      Header   : Reliable_Udp.Header := (Ack => False,
+                                         Seq_Nb => 0);
+      Pkt_Data : Interfaces.Unsigned_64 := 0;
+
+      for Pkt_Data'Address use Packet (5)'Address;
+      for Header'Address use Packet'Address;
+   begin
+      select
+         accept Initialise
+           (Network_Interface : String;
+            Port : GNAT.Sockets.Port_Type) do
+
+            Address.Addr := GNAT.Sockets.Addresses
+                            (GNAT.Sockets.Get_Host_By_Name (Network_Interface));
+            Address.Port := Port;
+            GNAT.Sockets.Create_Socket
+               (Socket,
+                GNAT.Sockets.Family_Inet,
+                GNAT.Sockets.Socket_Datagram);
+         end Initialise;
+      or
+         terminate;
+      end select;
+      loop
+         select
+            accept Connect;
+            exit;
+         or
+            terminate;
+         end select;
+      end loop;
+
+      <<HandShake>>
+      Server_HandShake;
+      Acquisition := True;
+      delay 0.0001;
+      Ada.Text_IO.Put_Line ("Consumer ready, start sending packets...");
+
+      loop
+         select
+            accept Disconnect;
+               GNAT.Sockets.Close_Socket (Socket);
+               exit;
+         else
+            if Acquisition then
+               Rcv_Ack;
+
+               Send_Packet (Packet);
+
+               Header.Seq_Nb := Header.Seq_Nb + 1;
+
+               Pkt_Data := Pkt_Data + 1;
+            else
+               declare
+                  Start_Time  : constant Ada.Calendar.Time := Ada.Calendar.Clock;
+                  Cur_Time    : Ada.Calendar.Time;
+                  use type Ada.Calendar.Time;
+               begin
+                  loop
+                     Rcv_Ack; -- Give server 2s to be sure it has all packets
+
+                     Cur_Time := Ada.Calendar.Clock;
+                     if Cur_Time - Start_Time > 2.0 then
+                        goto HandShake;
+                     end if;
+                  end loop;
+               end;
+            end if;
+         end select;
+      end loop;
+
+   exception
+      when E : others =>
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
+   end Socket_Server_Task;
 
 
    ------------------------
@@ -122,68 +205,4 @@ procedure UDP_Client is
       end loop;
    end Rcv_Ack;
 
-begin
-   if Ada.Command_Line.Argument_Count /= 2 then
-      Ada.Text_IO.Put_Line ("Usage : "
-         & Ada.Command_Line.Command_Name
-         & " [udp_server_ip] [port]");
-      return;
-   else
-      Address.Addr := GNAT.Sockets.Inet_Addr
-                        (Ada.Command_Line.Argument (1));
-      Address.Port := GNAT.Sockets.Port_Type'Value
-                        (Ada.Command_Line.Argument (2));
-   end if;
-
-   GNAT.Sockets.Create_Socket
-      (Socket,
-       GNAT.Sockets.Family_Inet,
-       GNAT.Sockets.Socket_Datagram);
-
-   declare
-      Packet   : Base_Udp.Packet_Stream;
-
-      Header   : Reliable_Udp.Header := (Ack => False,
-                                         Seq_Nb => 0);
-
-      Pkt_Data : Interfaces.Unsigned_64 := 0;
-
-      for Pkt_Data'Address use Packet (5)'Address;
-      for Header'Address use Packet'Address;
-   begin
-
-      <<HandShake>>
-      Server_HandShake;
-      Acquisition := True;
-      delay 0.0001;
-      Ada.Text_IO.Put_Line ("Server ready, start sending packets...");
-
-      loop
-         if Acquisition then
-            Rcv_Ack;
-
-            Send_Packet (Packet);
-
-            Header.Seq_Nb := Header.Seq_Nb + 1;
-
-            Pkt_Data := Pkt_Data + 1;
-         else
-            declare
-               Start_Time  : constant Ada.Calendar.Time := Ada.Calendar.Clock;
-               Cur_Time    : Ada.Calendar.Time;
-               use type Ada.Calendar.Time;
-            begin
-               loop
-                  Rcv_Ack; -- Give server 2s to be sure it has all packets
-
-                  Cur_Time := Ada.Calendar.Clock;
-                  if Cur_Time - Start_Time > 2.0 then
-                     goto HandShake;
-                  end if;
-               end loop;
-            end;
-         end if;
-
-      end loop;
-   end;
-end UDP_Client;
+end Data_Transport.Udp_Socket_Server;

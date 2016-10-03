@@ -10,7 +10,6 @@ with System.Storage_Elements;
 with Ada.Real_Time;
 
 with GNAT.Command_Line;
-with GNAT.Traceback.Symbolic;
 with System;
 
 pragma Warnings (Off);
@@ -23,8 +22,8 @@ with Reliable_Udp;
 with Buffer_Handling;
 with Web_Interface;
 
+package body Data_Transport.Udp_Socket_Client is
 
-procedure UDP_Server is
    pragma Optimize (Time);
 
    use GNAT.Sockets;
@@ -37,14 +36,8 @@ procedure UDP_Server is
       entry Stop;
    end Timer;
 
-   task type Recv_Socket is
-      entry Start;
-      entry Stop;
-   end Recv_Socket;
-
-   pragma Warnings (Off);
-   procedure Wait_Client_HandShake;
-   pragma Warnings (On);
+   procedure Wait_Producer_HandShake (Host         : GNAT.Sockets.Inet_Addr_Type;
+                                      Port         : GNAT.Sockets.Port_Type);
 
    procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
                              Header    : in Reliable_Udp.Header;
@@ -59,7 +52,11 @@ procedure UDP_Server is
 
    procedure Parse_Arguments;
 
+   procedure Init_Consumer;
+
    procedure Init_Udp (Server       : in out Socket_Type;
+                       Host         : GNAT.Sockets.Inet_Addr_Type;
+                       Port         : GNAT.Sockets.Port_Type;
                        TimeOut_Opt  : Boolean := True);
 
    pragma Warnings (Off);
@@ -67,26 +64,135 @@ procedure UDP_Server is
    pragma Warnings (On);
 
 
+   Log_Task             : Timer;
+
    Remove_Task          : Reliable_Udp.Remove_Task;
    Ack_Task             : Reliable_Udp.Ack_Task;
-
-   Recv_Socket_Task     : Recv_Socket;
-   Log_Task             : Timer;
 
    Check_Integrity_Task : Buffer_Handling.Check_Buf_Integrity;
    PMH_Buffer_Task      : Buffer_Handling.PMH_Buffer_Addr;
    Release_Buf_Task     : Buffer_Handling.Release_Full_Buf;
 
    Start_Time           : Ada.Calendar.Time;
-   Elapsed_Time         : Duration;
+
    Nb_Packet_Received   : Interfaces.Unsigned_64 := 0;
    Packet_Number        : Reliable_Udp.Pkt_Nb := 0;
    Missed               : Interfaces.Unsigned_64 := 0;
    Nb_Output            : Natural := 0;
-   Log_File             : Ada.Text_IO.File_Type;
-   Busy                 : Interfaces.C.int := 50;
-   Opt_Return           : Interfaces.C.int;
-   pragma Unreferenced (Opt_Return);
+
+
+   task body Socket_Client_Task is
+      Server               : Socket_Type;
+      Cons_Addr            : GNAT.Sockets.Inet_Addr_Type;
+      Cons_Port            : GNAT.Sockets.Port_Type;
+
+      From                 : Sock_Addr_Type;
+      Last                 : Ada.Streams.Stream_Element_Offset;
+      Data_Addr            : System.Address;
+      I                    : Interfaces.Unsigned_64 := Base_Udp.Pkt_Max + 1;
+
+      use System.Storage_Elements;
+      use type Interfaces.C.int;
+   begin
+      System.Multiprocessors.Dispatching_Domains.Set_CPU
+         (System.Multiprocessors.CPU_Range (16));
+      select
+         accept Initialise (Host : String;
+                            Port : GNAT.Sockets.Port_Type) do
+
+            Cons_Addr := GNAT.Sockets.Addresses
+                      (GNAT.Sockets.Get_Host_By_Name (Host));
+            Cons_Port := Port;
+
+            Init_Consumer;
+            Init_Udp (Server, Cons_Addr, Cons_Port);
+
+         end Initialise;
+      or
+         terminate;
+      end select;
+      loop
+         select
+            accept Connect;
+               exit;
+         or
+            terminate;
+         end select;
+      end loop;
+
+      <<HandShake>>
+      Ada.Text_IO.Put_Line ("...Waiting for Client...");
+      Wait_Producer_HandShake (Cons_Addr, Cons_Port);
+      Ada.Text_IO.Put_Line ("Client is ready...");
+
+      loop
+         select
+            accept Disconnect;
+               Ada.Text_IO.Put_Line ("[Disconnect]");
+               --  Send producer stop msg
+               exit;
+         else
+            if I > Base_Udp.Pkt_Max then
+               PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
+               I := I mod Base_Udp.Sequence_Size;
+            end if;
+
+            declare
+               Data     : Base_Udp.Packet_Stream;
+               Header   : Reliable_Udp.Header;
+
+               for Data'Address use Data_Addr + Storage_Offset
+                                                   (I * Base_Udp.Load_Size);
+               for Header'Address use Data'Address;
+            begin
+               GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
+               Process_Packet (Data, Header, I, Data_Addr, From);
+               I := I + 1;
+            exception
+               when Socket_Error =>
+                  Ada.Text_IO.Put_Line ("Socket Timeout");
+                  goto HandShake;
+            end;
+         end select;
+      end loop;
+      exception
+         when E : others =>
+            Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+               Ada.Exceptions.Exception_Name (E)
+               & ASCII.LF & ASCII.ESC & "[33m"
+               & Ada.Exceptions.Exception_Message (E)
+               & ASCII.ESC & "[0m");
+   end Socket_Client_Task;
+
+
+   ---------------------
+   --  Init_Consumer  --
+   ---------------------
+
+   procedure Init_Consumer is
+      Log_File   : Ada.Text_IO.File_Type;
+   begin
+      Parse_Arguments;
+
+      Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "log.csv");
+      Ada.Text_IO.Put_Line (Log_File,
+                  "Nb_Output;Nb_Received;Packet_Nb;Dropped;Elapsed_Time");
+      Ada.Text_IO.Close (Log_File);
+
+      Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "buffers.log");
+      Ada.Text_IO.Close (Log_File);
+
+      Web_Interface.Init_WebServer (Base_Udp.AWS_Port);
+
+      Release_Buf_Task.Start;
+      Ack_Task.Start;
+      Check_Integrity_Task.Start;
+
+      Buffer_Handling.Init_Buffers;
+
+      Log_Task.Start;
+
+   end Init_Consumer;
 
 
    -------------------
@@ -99,7 +205,6 @@ procedure UDP_Server is
       Ack_Task.Stop;
       Remove_Task.Stop;
       PMH_Buffer_Task.Stop;
-      Recv_Socket_Task.Stop;
 
    end Stop_Server;
 
@@ -148,13 +253,18 @@ procedure UDP_Server is
       end loop;
    end Parse_Arguments;
 
+
    ----------------
    --  Init_Udp  --
    ----------------
-
-   procedure Init_Udp (Server     : in out Socket_Type;
-                      TimeOut_Opt : Boolean := True) is
-      Address  : Sock_Addr_Type;
+   procedure Init_Udp (Server       : in out Socket_Type;
+                       Host         : GNAT.Sockets.Inet_Addr_Type;
+                       Port         : GNAT.Sockets.Port_Type;
+                       TimeOut_Opt  : Boolean := True) is
+      Address     : Sock_Addr_Type;
+      Busy        : Interfaces.C.int := 50;
+      Opt_Return  : Interfaces.C.int;
+      pragma Unreferenced (Opt_Return);
    begin
       Create_Socket (Server, Family_Inet, Socket_Datagram);
       Set_Socket_Option
@@ -170,11 +280,11 @@ procedure UDP_Server is
       end if;
       Opt_Return := Thin.C_Setsockopt (S        => To_Int (Server),
                                        Level    => 1,
-                                       Optname  => 46,
+                                       Optname  => 46,  --  BUSY_POLL
                                        Optval   => Busy'Address,
                                        Optlen   => 4);
-      Address.Addr := Any_Inet_Addr;
-      Address.Port := Base_Udp.UDP_Port;
+      Address.Addr := Host;
+      Address.Port := Port;
       Bind_Socket (Server, Address);
    end Init_Udp;
 
@@ -186,8 +296,9 @@ procedure UDP_Server is
    task body Timer is
       use type Ada.Calendar.Time;
 
-      Last_Missed : Interfaces.Unsigned_64 := 0;
-      Last_Nb     : Interfaces.Unsigned_64 := 0;
+      Last_Missed    : Interfaces.Unsigned_64 := 0;
+      Last_Nb        : Interfaces.Unsigned_64 := 0;
+      Elapsed_Time   : Duration;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (14));
@@ -217,12 +328,51 @@ procedure UDP_Server is
    end Timer;
 
 
+   -------------------------------
+   --  Wait_Producer_HandShake  --
+   -------------------------------
+
+   procedure Wait_Producer_HandShake (Host   : GNAT.Sockets.Inet_Addr_Type;
+                                      Port   : GNAT.Sockets.Port_Type) is
+      Socket   : Socket_Type;
+      Data     : Base_Udp.Packet_Stream;
+      Head     : Reliable_Udp.Header;
+      From     : Sock_Addr_Type;
+      Last     : Ada.Streams.Stream_Element_Offset;
+
+      for Head'Address use Data'Address;
+
+      use type Interfaces.Unsigned_32;
+      use type Interfaces.C.int;
+      use type Reliable_Udp.Pkt_Nb;
+      pragma Unreferenced (Last);
+   begin
+      Init_Udp (Socket, Host, Port, False);
+      loop
+         GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
+         Reliable_Udp.Client_Address := From;
+
+         if Base_Udp.Acquisition and Head.Seq_Nb = 0 then  --  Means producer is ready.
+            exit;
+         end if;
+      end loop;
+      Head.Ack := False;
+      GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
+      GNAT.Sockets.Close_Socket (Socket);
+   exception
+      when E : others =>
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
+   end Wait_Producer_HandShake;
+
+
    ----------------------
    --  Process_Packet  --
    ----------------------
 
-   --  0.000007
-   --  7.25E-05 ratio
    procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
                              Header    : in Reliable_Udp.Header;
                              I         : in out Interfaces.Unsigned_64;
@@ -277,129 +427,4 @@ procedure UDP_Server is
    end Process_Packet;
 
 
-   procedure Wait_Client_HandShake is
-      Socket   : Socket_Type;
-      Data     : Base_Udp.Packet_Stream;
-      Head     : Reliable_Udp.Header;
-      From     : Sock_Addr_Type;
-      Last     : Ada.Streams.Stream_Element_Offset;
-
-      for Head'Address use Data'Address;
-
-      use type Interfaces.Unsigned_32;
-      use type Interfaces.C.int;
-      use type Reliable_Udp.Pkt_Nb;
-      pragma Unreferenced (Last);
-   begin
-      Init_Udp (Socket, False);
-      loop
-         GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
-         Reliable_Udp.Client_Address := From;
-
-         if Base_Udp.Acquisition and Head.Seq_Nb = 0 then  --  Means client is ready.
-            exit;
-         end if;
-      end loop;
-      Head.Ack := False;
-      GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
-   exception
-      when E : others =>
-         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
-            Ada.Exceptions.Exception_Name (E)
-            & ASCII.LF & ASCII.ESC & "[33m"
-            & Ada.Exceptions.Exception_Message (E)
-            & ASCII.ESC & "[0m");
-   end Wait_Client_HandShake;
-
-
-   -------------------
-   --  Recv_Socket  --
-   -------------------
-
-   task body Recv_Socket is
-      Server               : Socket_Type;
-      From                 : Sock_Addr_Type;
-      Last                 : Ada.Streams.Stream_Element_Offset;
-      Data_Addr            : System.Address;
-      I                    : Interfaces.Unsigned_64 := Base_Udp.Pkt_Max + 1;
-
-      use System.Storage_Elements;
-      use type Interfaces.C.int;
-   begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (16));
-
-      Buffer_Handling.Init_Buffers;
-
-      accept Start;
-
-      <<HandShake>>
-      Ada.Text_IO.Put_Line ("...Waiting for Client...");
-      Wait_Client_HandShake;
-      Ada.Text_IO.Put_Line ("Client is ready...");
-
-      --  Prevent busy wait if Handshake is re-called
-      select
-         Log_Task.Start;
-      else
-         null;
-      end select;
-
-      Init_Udp (Server);
-
-      loop
-         select
-            accept Stop;
-               exit;
-         else
-            if I > Base_Udp.Pkt_Max then
-               PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
-               I := I mod Base_Udp.Sequence_Size;
-            end if;
-
-            declare
-               Data     : Base_Udp.Packet_Stream;
-               Header   : Reliable_Udp.Header;
-
-               for Data'Address use Data_Addr + Storage_Offset
-                                                   (I * Base_Udp.Load_Size);
-               for Header'Address use Data'Address;
-            begin
-               GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-               Process_Packet (Data, Header, I, Data_Addr, From);
-               I := I + 1;
-            exception
-               when Socket_Error =>
-                  Ada.Text_IO.Put_Line ("Socket Error");
-                  goto HandShake;
-            end;
-         end select;
-      end loop;
-   end Recv_Socket;
-
-begin
-   Parse_Arguments;
-
-   Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "log.csv");
-   Ada.Text_IO.Put_Line (Log_File,
-               "Nb_Output;Nb_Received;Packet_Nb;Dropped;Elapsed_Time");
-   Ada.Text_IO.Close (Log_File);
-
-   Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "buffers.log");
-   Ada.Text_IO.Close (Log_File);
-
-   Web_Interface.Init_WebServer (Base_Udp.AWS_Port);
-
-   Recv_Socket_Task.Start;
-   Release_Buf_Task.Start;
-   --  Process_Pkt.Start;
-   Ack_Task.Start;
-   Check_Integrity_Task.Start;
-
-   --  delay 40.0;
-   --  Stop_Server;
-
-exception
-   when E : others =>
-      Ada.Text_IO.Put_Line (GNAT.Traceback.Symbolic.Symbolic_Traceback (E));
-end UDP_Server;
+end Data_Transport.Udp_Socket_Client;

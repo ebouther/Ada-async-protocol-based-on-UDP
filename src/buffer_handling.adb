@@ -209,7 +209,7 @@ package body Buffer_Handling is
                   (Buffer_Handler.First).Handle);
 
             Buffer_Handler.First := Buffer_Handler.First + 1;
-            Ada.Text_IO.Put_Line ("First : " & Buffer_Handler.First'Img);
+            --  Ada.Text_IO.Put_Line ("First : " & Buffer_Handler.First'Img);
 
             --  Get_Filled_Buf;
          end if;
@@ -255,8 +255,8 @@ package body Buffer_Handling is
                                                       State := Near_Full;
                end if;
                Buffer_Handler.Current := Buffer_Handler.Current + 1;
-               Ada.Text_IO.Put_Line ("Current : "
-                  & Buffer_Handler.Current'Img);
+               --  Ada.Text_IO.Put_Line ("Current : "
+               --     & Buffer_Handler.Current'Img);
                Init := False;
          end select;
       end loop;
