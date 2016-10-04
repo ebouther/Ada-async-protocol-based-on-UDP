@@ -190,7 +190,7 @@ package body Data_Transport.Udp_Socket_Server is
 
       First : Ada.Streams.Stream_Element_Offset := Payload'First;
       Index : Ada.Streams.Stream_Element_Offset := First - 1;
-      Max : constant Ada.Streams.Stream_Element_Offset := Payload'Last;
+      Last  : Ada.Streams.Stream_Element_Offset;
    begin
       loop
          Rcv_Ack;
@@ -200,11 +200,19 @@ package body Data_Transport.Udp_Socket_Server is
                                                 Seq_Nb => Packet_Number);
             for Header'Address use Data'Address;
          begin
-            GNAT.Sockets.Send_Socket (Socket, Data & Payload (First .. Max), Index, Address);
+            Last := First + (Base_Udp.Load_Size - Base_Udp.Header_Size) - 1;
+            GNAT.Sockets.Send_Socket (Socket, Data & Payload
+               (First ..  (if Last > Payload'Last then
+                              Payload'Last
+                           else
+                              Last)),
+               Index, Address);
          end;
          Packet_Number := Packet_Number + 1;
-         exit when Index < First or else Index = Max;
-         First := Index + 1;
+         Ada.Text_IO.Put_Line ("Index" & Index'Img);
+         Ada.Text_IO.Put_Line ("First" & First'Img);
+         First := Last + 1;
+         exit when First > Payload'Last;
       end loop;
    end Send_Packet;
 
