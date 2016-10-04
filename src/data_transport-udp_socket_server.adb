@@ -27,8 +27,13 @@ package body Data_Transport.Udp_Socket_Server is
    Socket            : GNAT.Sockets.Socket_Type;
    Address           : GNAT.Sockets.Sock_Addr_Type;
    Acquisition       : Boolean := True;
+   Packet_Number     : Reliable_Udp.Pkt_Nb := 0;
 
-   procedure Send_Packet (Payload : Base_Udp.Packet_Stream);
+
+   procedure Send_Buffer_Data (Buffer_Set : Buffers.Buffer_Consume_Access);
+
+
+   procedure Send_Packet (Payload : Ada.Streams.Stream_Element_Array);
 
    procedure Rcv_Ack;
 
@@ -42,13 +47,6 @@ package body Data_Transport.Udp_Socket_Server is
 
 
    task body Socket_Server_Task is
-      Packet   : Base_Udp.Packet_Stream;
-      Header   : Reliable_Udp.Header := (Ack => False,
-                                         Seq_Nb => 0);
-      Pkt_Data : Interfaces.Unsigned_64 := 0;
-
-      for Pkt_Data'Address use Packet (5)'Address;
-      for Header'Address use Packet'Address;
    begin
       select
          accept Initialise
@@ -89,12 +87,12 @@ package body Data_Transport.Udp_Socket_Server is
          else
             if Acquisition then
                Rcv_Ack;
-
-               Send_Packet (Packet);
-
-               Header.Seq_Nb := Header.Seq_Nb + 1;
-
-               Pkt_Data := Pkt_Data + 1;
+               select
+                  Buffer_Set.Block_Full;
+                  Send_Buffer_Data (Buffer_Set);
+               else
+                  null;
+               end select;
             else
                declare
                   Start_Time  : constant Ada.Calendar.Time := Ada.Calendar.Clock;
@@ -150,19 +148,63 @@ package body Data_Transport.Udp_Socket_Server is
       end loop;
    end Server_HandShake;
 
+   ------------------------
+   --  Send_Buffer_Data  --
+   ------------------------
+
+   procedure Send_Buffer_Data (Buffer_Set : Buffers.Buffer_Consume_Access) is
+   begin
+      declare
+         Buffer_Handle : Buffers.Buffer_Handle_Type;
+      begin
+         Buffer_Set.Get_Full_Buffer (Buffer_Handle);
+         declare
+            Data_Size : constant Ada.Streams.Stream_Element_Offset :=
+              Ada.Streams.Stream_Element_Offset
+              (Buffers.Get_Used_Bytes (Buffer_Handle));
+            Data : Ada.Streams.Stream_Element_Array (1 .. Data_Size);
+            for Data'Address use Buffers.Get_Address (Buffer_Handle);
+         begin
+            Send_Packet (Data);
+         exception
+            when E : others =>
+               Ada.Text_IO.Put_Line
+                 ("data transmit unattended exception : " &
+                    Ada.Exceptions.Exception_Name (E) & "," &
+                    Ada.Exceptions.Exception_Message (E));
+               raise;
+         end;
+         Buffer_Set.Release_Full_Buffer (Buffer_Handle);
+      end;
+
+   end Send_Buffer_Data;
+
 
    -------------------
    --  Send_Packet  --
    -------------------
 
-   procedure Send_Packet (Payload : Base_Udp.Packet_Stream) is
-      Offset   : Ada.Streams.Stream_Element_Offset;
-      Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
+   procedure Send_Packet (Payload : Ada.Streams.Stream_Element_Array) is
+      use type Ada.Streams.Stream_Element_Array;
 
-      for Data'Address use Payload'Address;
-      pragma Unreferenced (Offset);
+      First : Ada.Streams.Stream_Element_Offset := Payload'First;
+      Index : Ada.Streams.Stream_Element_Offset := First - 1;
+      Max : constant Ada.Streams.Stream_Element_Offset := Payload'Last;
    begin
-      GNAT.Sockets.Send_Socket (Socket, Data, Offset, Address);
+      loop
+         Rcv_Ack;
+         declare
+            Data     : Ada.Streams.Stream_Element_Array (1 .. 2);
+            Header   : Reliable_Udp.Header := (Ack => False,
+                                                Seq_Nb => Packet_Number);
+            for Header'Address use Data'Address;
+         begin
+            GNAT.Sockets.Send_Socket (Socket, Data & Payload (First .. Max), Index, Address);
+         end;
+         Packet_Number := Packet_Number + 1;
+         exit when Index < First or else Index = Max;
+         First := Index + 1;
+      end loop;
    end Send_Packet;
 
 

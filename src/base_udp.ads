@@ -43,7 +43,7 @@ package Base_Udp is
    End_Point      : String := "http://127.0.0.1:5678";
 
    --  WebServer Port
-   AWS_Port       : Integer := 80;
+   AWS_Port       : Integer := 8080;
 
    --  Server socket Port
    UDP_Port       : GNAT.Sockets.Port_Type := 50001;

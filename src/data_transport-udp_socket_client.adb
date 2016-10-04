@@ -100,8 +100,11 @@ package body Data_Transport.Udp_Socket_Client is
          accept Initialise (Host : String;
                             Port : GNAT.Sockets.Port_Type) do
 
-            Cons_Addr := GNAT.Sockets.Addresses
-                      (GNAT.Sockets.Get_Host_By_Name (Host));
+            --  Cons_Addr := GNAT.Sockets.Addresses
+            --            (GNAT.Sockets.Get_Host_By_Name (Host));
+            pragma Unreferenced (Host);
+
+            Cons_Addr := Any_Inet_Addr;
             Cons_Port := Port;
 
             Init_Consumer;
