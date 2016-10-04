@@ -34,6 +34,7 @@ package body Data_Transport.Udp_Socket_Server is
 
 
    procedure Send_Packet (Payload : Ada.Streams.Stream_Element_Array);
+   procedure Send (Payload : Base_Udp.Packet_Stream);
 
    procedure Rcv_Ack;
 
@@ -135,7 +136,7 @@ package body Data_Transport.Udp_Socket_Server is
    begin
       Send_Head.Seq_Nb := 0;
       loop
-         Send_Packet (Send_Data);
+         Send (Send_Data);
          delay 0.2;
          exit when GNAT.Sockets.Thin.C_Recv
                (To_Int (Socket),
@@ -207,6 +208,20 @@ package body Data_Transport.Udp_Socket_Server is
       end loop;
    end Send_Packet;
 
+   ------------
+   --  Send  --
+   ------------
+
+   procedure Send (Payload : Base_Udp.Packet_Stream) is
+      Offset   : Ada.Streams.Stream_Element_Offset;
+      Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
+
+      for Data'Address use Payload'Address;
+      pragma Unreferenced (Offset);
+   begin
+      GNAT.Sockets.Send_Socket (Socket, Data, Offset, Address);
+   end Send;
+
 
    ---------------
    --  Rcv_Ack  --
@@ -242,7 +257,7 @@ package body Data_Transport.Udp_Socket_Server is
             end if;
          else
             Head.Ack := True;
-            Send_Packet (Payload);
+            Send (Payload);
          end if;
       end loop;
    end Rcv_Ack;

@@ -8,6 +8,7 @@ with Ada.Text_IO;
 with Utiles_Task;
 
 procedure Udp_Producer is
+   use type Buffers.Buffer_Size_Type;
    Buffer : aliased Buffers.Local.Local_Buffer_Type;
    Server : Data_Transport.Udp_Socket_Server.Socket_Server_Task
      (Buffer'Unchecked_Access);
@@ -44,8 +45,6 @@ begin
    Ada.Text_IO.Put_Line ("Connect done");
    loop
       exit when A_Task_Communication.Stop_Enabled;
-      Ada.Text_IO.Put_Line ("filling buffer loop");
-      Ada.Text_IO.Put_Line ("status " & Buffer.Get_State);
       declare
          Buffer_Handle : Buffers.Buffer_Handle_Type;
       begin
@@ -62,7 +61,6 @@ begin
          end;
          Buffers.Set_Used_Bytes (Buffer_Handle, 4096);
          Buffer.Release_Free_Buffer (Buffer_Handle);
-         delay 1.0;
       end;
    end loop;
    Ada.Text_IO.Put_Line ("out of filling buffer loop");
