@@ -408,9 +408,6 @@ package body Data_Transport.Udp_Socket_Client is
                Nb_Missed := Interfaces.Unsigned_64 (Header.Seq_Nb
                               + (Base_Udp.Pkt_Max - Packet_Number)) + 1;
                Missed := Missed + Nb_Missed;
-               Ada.Text_IO.Put_Line ("Append From "
-                              & Packet_Number'Img & " To"
-                              & Integer ((Header.Seq_Nb - 1))'Img);
             end if;
 
             Reliable_Udp.Fifo.Append_Wait ((From, Packet_Number, Header.Seq_Nb - 1));

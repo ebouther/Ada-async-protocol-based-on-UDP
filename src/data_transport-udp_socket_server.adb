@@ -1,17 +1,10 @@
 with Ada.Text_IO;
-with Ada.Streams;
 with Ada.Calendar;
 with Ada.Exceptions;
-with Interfaces;
-with Interfaces.C;
-with Ada.Unchecked_Conversion;
 
 pragma Warnings (Off);
 with GNAT.Sockets.Thin;
 pragma Warnings (On);
-
-with Base_Udp;
-with Reliable_Udp;
 
 package body Data_Transport.Udp_Socket_Server is
 
@@ -27,27 +20,11 @@ package body Data_Transport.Udp_Socket_Server is
    Socket            : GNAT.Sockets.Socket_Type;
    Address           : GNAT.Sockets.Sock_Addr_Type;
    Acquisition       : Boolean := True;
-   Packet_Number     : Reliable_Udp.Pkt_Nb := 0;
-
-
-   procedure Send_Buffer_Data (Buffer_Set : Buffers.Buffer_Consume_Access);
-
-
-   procedure Send_Packet (Payload : Ada.Streams.Stream_Element_Array);
-   procedure Send (Payload : Base_Udp.Packet_Stream);
-
-   procedure Rcv_Ack;
-
-   pragma Warnings (Off);
-   procedure Server_HandShake;
-   pragma Warnings (On);
-
-   function To_Int is
-      new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type,
-         Interfaces.C.int);
-
+   Last_Packets      : array (Reliable_Udp.Pkt_Nb)
+                        of Base_Udp.Packet_Stream;
 
    task body Socket_Server_Task is
+      Packet_Number : Reliable_Udp.Pkt_Nb := 0;
    begin
       select
          accept Initialise
@@ -90,7 +67,7 @@ package body Data_Transport.Udp_Socket_Server is
                Rcv_Ack;
                select
                   Buffer_Set.Block_Full;
-                  Send_Buffer_Data (Buffer_Set);
+                  Send_Buffer_Data (Buffer_Set, Packet_Number);
                else
                   null;
                end select;
@@ -153,7 +130,8 @@ package body Data_Transport.Udp_Socket_Server is
    --  Send_Buffer_Data  --
    ------------------------
 
-   procedure Send_Buffer_Data (Buffer_Set : Buffers.Buffer_Consume_Access) is
+   procedure Send_Buffer_Data (Buffer_Set    : Buffers.Buffer_Consume_Access;
+                               Packet_Number : in out Reliable_Udp.Pkt_Nb) is
    begin
       declare
          Buffer_Handle : Buffers.Buffer_Handle_Type;
@@ -166,7 +144,7 @@ package body Data_Transport.Udp_Socket_Server is
             Data : Ada.Streams.Stream_Element_Array (1 .. Data_Size);
             for Data'Address use Buffers.Get_Address (Buffer_Handle);
          begin
-            Send_Packet (Data);
+            Send_Packet (Data, Packet_Number);
          exception
             when E : others =>
                Ada.Text_IO.Put_Line
@@ -185,7 +163,8 @@ package body Data_Transport.Udp_Socket_Server is
    --  Send_Packet  --
    -------------------
 
-   procedure Send_Packet (Payload : Ada.Streams.Stream_Element_Array) is
+   procedure Send_Packet (Payload         : Ada.Streams.Stream_Element_Array;
+                          Packet_Number   : in out Reliable_Udp.Pkt_Nb) is
       use type Ada.Streams.Stream_Element_Array;
 
       First : Ada.Streams.Stream_Element_Offset := Payload'First;
@@ -195,22 +174,32 @@ package body Data_Transport.Udp_Socket_Server is
       loop
          Rcv_Ack;
          declare
-            Data     : Ada.Streams.Stream_Element_Array (1 .. 2);
+            Head     : Ada.Streams.Stream_Element_Array (1 .. 2);
             Header   : Reliable_Udp.Header := (Ack => False,
-                                                Seq_Nb => Packet_Number);
-            for Header'Address use Data'Address;
+                                               Seq_Nb => Packet_Number);
+
+            for Header'Address use Head'Address;
          begin
             Last := First + (Base_Udp.Load_Size - Base_Udp.Header_Size) - 1;
-            GNAT.Sockets.Send_Socket (Socket, Data & Payload
-               (First ..  (if Last > Payload'Last then
-                              Payload'Last
-                           else
-                              Last)),
-               Index, Address);
+
+            if Last > Payload'Last then
+               declare
+                  Pad   : constant Ada.Streams.Stream_Element_Array
+                           (1 .. Last - Payload'Last) := (others => 0);
+               begin
+                  Last_Packets (Packet_Number) := Head & Payload
+                        (First .. Payload'Last) & Pad;
+               end;
+            else
+               Last_Packets (Packet_Number) := Head & Payload
+                     (First .. Last);
+            end if;
+
+            GNAT.Sockets.Send_Socket (Socket, Last_Packets (Packet_Number),
+                                       Index, Address);
+
+            Packet_Number := Packet_Number + 1;
          end;
-         Packet_Number := Packet_Number + 1;
-         Ada.Text_IO.Put_Line ("Index" & Index'Img);
-         Ada.Text_IO.Put_Line ("First" & First'Img);
          First := Last + 1;
          exit when First > Payload'Last;
       end loop;
@@ -238,7 +227,7 @@ package body Data_Transport.Udp_Socket_Server is
    procedure Rcv_Ack is
       Payload  : Base_Udp.Packet_Stream;
       Head     : Reliable_Udp.Header;
-      Ack      : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
+      Ack      : array (1 .. 64) of Interfaces.Unsigned_8;
       Data     : Ada.Streams.Stream_Element_Array (1 .. 64);
       Res      : Interfaces.C.int;
 
@@ -264,8 +253,13 @@ package body Data_Transport.Udp_Socket_Server is
                return;
             end if;
          else
-            Head.Ack := True;
-            Send (Payload);
+            declare
+               Ack_Header  : Reliable_Udp.Header;
+               for Ack_Header'Address use Last_Packets (Head.Seq_Nb)'Address;
+            begin
+               Ack_Header.Ack := True;
+               Send (Last_Packets (Head.Seq_Nb));
+            end;
          end if;
       end loop;
    end Rcv_Ack;

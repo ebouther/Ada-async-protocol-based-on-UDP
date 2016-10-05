@@ -1,6 +1,14 @@
 with Ada.Unchecked_Deallocation;
+with Ada.Unchecked_Conversion;
+with Ada.Streams;
 with GNAT.Sockets;
+with Interfaces;
+with Interfaces.C;
+
 with Buffers;
+
+with Reliable_Udp;
+with Base_Udp;
 
 package Data_Transport.Udp_Socket_Server is
 
@@ -15,5 +23,24 @@ package Data_Transport.Udp_Socket_Server is
 
    procedure Free is new Ada.Unchecked_Deallocation (Socket_Server_Task,
                                                      Socket_Server_Access);
+
+
+   procedure Send_Buffer_Data (Buffer_Set    : Buffers.Buffer_Consume_Access;
+                               Packet_Number : in out Reliable_Udp.Pkt_Nb);
+
+
+   procedure Send_Packet (Payload         : Ada.Streams.Stream_Element_Array;
+                          Packet_Number   : in out Reliable_Udp.Pkt_Nb);
+   procedure Send (Payload : Base_Udp.Packet_Stream);
+
+   procedure Rcv_Ack;
+
+   pragma Warnings (Off);
+   procedure Server_HandShake;
+   pragma Warnings (On);
+
+   function To_Int is
+      new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type,
+         Interfaces.C.int);
 
 end Data_Transport.Udp_Socket_Server;
