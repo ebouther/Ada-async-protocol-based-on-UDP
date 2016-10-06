@@ -39,11 +39,11 @@ package body Data_Transport.Udp_Socket_Client is
    procedure Wait_Producer_HandShake (Host         : GNAT.Sockets.Inet_Addr_Type;
                                       Port         : GNAT.Sockets.Port_Type);
 
-   procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
-                             Header    : in Reliable_Udp.Header;
-                             I         : in out Interfaces.Unsigned_64;
-                             Data_Addr : in out System.Address;
-                             From      : in Sock_Addr_Type);
+   procedure Process_Packet (Data         : in Base_Udp.Packet_Stream;
+                             Header       : in Reliable_Udp.Header;
+                             Recv_Offset  : in out Interfaces.Unsigned_64;
+                             Data_Addr    : in out System.Address;
+                             From         : in Sock_Addr_Type);
 
 
    function To_Int is
@@ -77,7 +77,7 @@ package body Data_Transport.Udp_Socket_Client is
 
    Nb_Packet_Received   : Interfaces.Unsigned_64 := 0;
    Packet_Number        : Reliable_Udp.Pkt_Nb := 0;
-   Missed               : Interfaces.Unsigned_64 := 0;
+   Total_Missed         : Interfaces.Unsigned_64 := 0;
    Nb_Output            : Natural := 0;
 
 
@@ -89,7 +89,7 @@ package body Data_Transport.Udp_Socket_Client is
       From                 : Sock_Addr_Type;
       Last                 : Ada.Streams.Stream_Element_Offset;
       Data_Addr            : System.Address;
-      I                    : Interfaces.Unsigned_64 := Base_Udp.Pkt_Max + 1;
+      Recv_Offset          : Interfaces.Unsigned_64 := Base_Udp.Pkt_Max + 1;
 
       use System.Storage_Elements;
       use type Interfaces.C.int;
@@ -124,9 +124,9 @@ package body Data_Transport.Udp_Socket_Client is
       end loop;
 
       <<HandShake>>
-      Ada.Text_IO.Put_Line ("...Waiting for Client...");
+      Ada.Text_IO.Put_Line ("...Waiting for Producer...");
       Wait_Producer_HandShake (Cons_Addr, Cons_Port);
-      Ada.Text_IO.Put_Line ("Client is ready...");
+      Ada.Text_IO.Put_Line ("Producer is ready...");
 
       loop
          select
@@ -135,9 +135,9 @@ package body Data_Transport.Udp_Socket_Client is
                --  Send producer stop msg
                exit;
          else
-            if I > Base_Udp.Pkt_Max then
+            if Recv_Offset > Base_Udp.Pkt_Max then
                PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
-               I := I mod Base_Udp.Sequence_Size;
+               Recv_Offset := Recv_Offset mod Base_Udp.Sequence_Size;
             end if;
 
             declare
@@ -145,12 +145,12 @@ package body Data_Transport.Udp_Socket_Client is
                Header   : Reliable_Udp.Header;
 
                for Data'Address use Data_Addr + Storage_Offset
-                                                   (I * Base_Udp.Load_Size);
+                                                   (Recv_Offset * Base_Udp.Load_Size);
                for Header'Address use Data'Address;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-               Process_Packet (Data, Header, I, Data_Addr, From);
-               I := I + 1;
+               Process_Packet (Data, Header, Recv_Offset, Data_Addr, From);
+               Recv_Offset := Recv_Offset + 1;
             exception
                when Socket_Error =>
                   Ada.Text_IO.Put_Line ("Socket Timeout");
@@ -279,7 +279,7 @@ package body Data_Transport.Udp_Socket_Client is
             (Server,
             Socket_Level,
             (Receive_Timeout,
-            Timeout => 2.0));
+            Timeout => 1.0));
       end if;
       Opt_Return := Thin.C_Setsockopt (S        => To_Int (Server),
                                        Level    => 1,
@@ -318,13 +318,13 @@ package body Data_Transport.Udp_Socket_Client is
                (True,
                Elapsed_Time,
                Packet_Number,
-               Missed,
+               Total_Missed,
                Last_Missed,
                Nb_Packet_Received,
                Last_Nb,
                Nb_Output);
             Last_Nb := Nb_Packet_Received;
-            Last_Missed := Missed;
+            Last_Missed := Total_Missed;
             Nb_Output := Nb_Output + 1;
          end select;
       end loop;
@@ -376,11 +376,11 @@ package body Data_Transport.Udp_Socket_Client is
    --  Process_Packet  --
    ----------------------
 
-   procedure Process_Packet (Data      : in Base_Udp.Packet_Stream;
-                             Header    : in Reliable_Udp.Header;
-                             I         : in out Interfaces.Unsigned_64;
-                             Data_Addr : in out System.Address;
-                             From      : in Sock_Addr_Type)
+   procedure Process_Packet (Data         : in Base_Udp.Packet_Stream;
+                             Header       : in Reliable_Udp.Header;
+                             Recv_Offset  : in out Interfaces.Unsigned_64;
+                             Data_Addr    : in out System.Address;
+                             From         : in Sock_Addr_Type)
    is
       Last_Addr            : System.Address;
       Nb_Missed            : Interfaces.Unsigned_64;
@@ -392,7 +392,7 @@ package body Data_Transport.Udp_Socket_Client is
       if Header.Ack then
          Buffer_Handling.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
          Remove_Task.Remove (Header.Seq_Nb);
-         I := I - 1;
+         Recv_Offset := Recv_Offset - 1;
       else
          Nb_Packet_Received := Nb_Packet_Received + 1;
          if Nb_Packet_Received = 1 then
@@ -403,23 +403,23 @@ package body Data_Transport.Udp_Socket_Client is
             if Header.Seq_Nb > Packet_Number then
                Nb_Missed := Interfaces.Unsigned_64
                               (Header.Seq_Nb - Packet_Number);
-               Missed := Missed + Nb_Missed;
+               Total_Missed := Total_Missed + Nb_Missed;
             else
                Nb_Missed := Interfaces.Unsigned_64 (Header.Seq_Nb
                               + (Base_Udp.Pkt_Max - Packet_Number)) + 1;
-               Missed := Missed + Nb_Missed;
+               Total_Missed := Total_Missed + Nb_Missed;
             end if;
 
             Reliable_Udp.Fifo.Append_Wait ((From, Packet_Number, Header.Seq_Nb - 1));
             Packet_Number := Header.Seq_Nb;
             Last_Addr := Data_Addr;
-            if I + Nb_Missed >= Base_Udp.Sequence_Size then
+            if Recv_Offset + Nb_Missed >= Base_Udp.Sequence_Size then
                PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
             end if;
             Buffer_Handling.Copy_To_Correct_Location
-                                          (I, Nb_Missed, Data, Data_Addr);
-            Buffer_Handling.Mark_Empty_Cell (I, Data_Addr, Last_Addr, Nb_Missed);
-            I := I + Nb_Missed;
+                                          (Recv_Offset, Nb_Missed, Data, Data_Addr);
+            Buffer_Handling.Mark_Empty_Cell (Recv_Offset, Data_Addr, Last_Addr, Nb_Missed);
+            Recv_Offset := Recv_Offset + Nb_Missed;
          end if;
          --  mod type (doesn't need to be set to 0 on max value)
          Packet_Number := Packet_Number + 1;

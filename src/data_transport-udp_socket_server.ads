@@ -29,9 +29,9 @@ package Data_Transport.Udp_Socket_Server is
                                Packet_Number : in out Reliable_Udp.Pkt_Nb);
 
 
-   procedure Send_Packet (Payload         : Ada.Streams.Stream_Element_Array;
-                          Packet_Number   : in out Reliable_Udp.Pkt_Nb);
-   procedure Send (Payload : Base_Udp.Packet_Stream);
+   procedure Send_All_Stream (Payload         : Ada.Streams.Stream_Element_Array;
+                              Packet_Number   : in out Reliable_Udp.Pkt_Nb);
+   procedure Send_Packet (Payload : Base_Udp.Packet_Stream);
 
    procedure Rcv_Ack;
 

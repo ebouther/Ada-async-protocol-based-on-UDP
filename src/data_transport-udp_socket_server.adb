@@ -6,6 +6,8 @@ pragma Warnings (Off);
 with GNAT.Sockets.Thin;
 pragma Warnings (On);
 
+--  with Network_Utils;
+
 package body Data_Transport.Udp_Socket_Server is
 
    use type Interfaces.Unsigned_8;
@@ -74,14 +76,12 @@ package body Data_Transport.Udp_Socket_Server is
             else
                declare
                   Start_Time  : constant Ada.Calendar.Time := Ada.Calendar.Clock;
-                  Cur_Time    : Ada.Calendar.Time;
                   use type Ada.Calendar.Time;
                begin
                   loop
                      Rcv_Ack; -- Give server 2s to be sure it has all packets
 
-                     Cur_Time := Ada.Calendar.Clock;
-                     if Cur_Time - Start_Time > 2.0 then
+                     if Ada.Calendar.Clock - Start_Time > 2.0 then
                         goto HandShake;
                      end if;
                   end loop;
@@ -113,7 +113,7 @@ package body Data_Transport.Udp_Socket_Server is
    begin
       Send_Head.Seq_Nb := 0;
       loop
-         Send (Send_Data);
+         Send_Packet (Send_Data);
          delay 0.2;
          exit when GNAT.Sockets.Thin.C_Recv
                (To_Int (Socket),
@@ -125,6 +125,7 @@ package body Data_Transport.Udp_Socket_Server is
                --  Should rename Seq_Nb by Msg in this case.
       end loop;
    end Server_HandShake;
+
 
    ------------------------
    --  Send_Buffer_Data  --
@@ -141,10 +142,21 @@ package body Data_Transport.Udp_Socket_Server is
             Data_Size : constant Ada.Streams.Stream_Element_Offset :=
               Ada.Streams.Stream_Element_Offset
               (Buffers.Get_Used_Bytes (Buffer_Handle));
+
+            Buffer_Size : constant Interfaces.Unsigned_32 :=
+               --  Network_Utils.To_Network (Interfaces.Unsigned_32 (Buffer_Set.Full_Size));
+               Interfaces.Unsigned_32 (Buffer_Set.Full_Size);
+
             Data : Ada.Streams.Stream_Element_Array (1 .. Data_Size);
             for Data'Address use Buffers.Get_Address (Buffer_Handle);
+
+            Size_Stream : Ada.Streams.Stream_Element_Array (1 .. 4);
+            --  Offset      : Ada.Streams.Stream_Element_Offset;
+            for Size_Stream'Address use Buffer_Size'Address;
          begin
-            Send_Packet (Data, Packet_Number);
+            --  Ada.Text_IO.Put_Line ("send data" & Buffer_Set.Full_Size'Img);
+            --  GNAT.Sockets.Send_Socket (Socket, Size_Stream, Offset, Address);
+            Send_All_Stream (Data, Packet_Number);
          exception
             when E : others =>
                Ada.Text_IO.Put_Line
@@ -159,12 +171,12 @@ package body Data_Transport.Udp_Socket_Server is
    end Send_Buffer_Data;
 
 
-   -------------------
-   --  Send_Packet  --
-   -------------------
+   -----------------------
+   --  Send_All_Stream  --
+   -----------------------
 
-   procedure Send_Packet (Payload         : Ada.Streams.Stream_Element_Array;
-                          Packet_Number   : in out Reliable_Udp.Pkt_Nb) is
+   procedure Send_All_Stream (Payload        : Ada.Streams.Stream_Element_Array;
+                              Packet_Number  : in out Reliable_Udp.Pkt_Nb) is
       use type Ada.Streams.Stream_Element_Array;
 
       First : Ada.Streams.Stream_Element_Offset := Payload'First;
@@ -203,13 +215,14 @@ package body Data_Transport.Udp_Socket_Server is
          First := Last + 1;
          exit when First > Payload'Last;
       end loop;
-   end Send_Packet;
+   end Send_All_Stream;
 
-   ------------
-   --  Send  --
-   ------------
 
-   procedure Send (Payload : Base_Udp.Packet_Stream) is
+   -------------------
+   --  Send_Packet  --
+   -------------------
+
+   procedure Send_Packet (Payload : Base_Udp.Packet_Stream) is
       Offset   : Ada.Streams.Stream_Element_Offset;
       Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
 
@@ -217,7 +230,7 @@ package body Data_Transport.Udp_Socket_Server is
       pragma Unreferenced (Offset);
    begin
       GNAT.Sockets.Send_Socket (Socket, Data, Offset, Address);
-   end Send;
+   end Send_Packet;
 
 
    ---------------
@@ -243,14 +256,13 @@ package body Data_Transport.Udp_Socket_Server is
 
          if Head.Ack = False then
             if Head.Seq_Nb = 2 then
-               Ada.Text_IO.Put_Line ("...Server asked to STOP ACQUISITION...");
-               Ada.Text_IO.Put_Line ("Client stopped sending data.");
+               Ada.Text_IO.Put_Line ("...Consumer asked to STOP ACQUISITION...");
                Acquisition := False;
-               return;
+               exit;
             elsif Head.Seq_Nb = 1 then
-               Ada.Text_IO.Put_Line ("...Server asked to START ACQUISITION...");
+               Ada.Text_IO.Put_Line ("...Consumer asked to START ACQUISITION...");
                Acquisition := True;
-               return;
+               exit;
             end if;
          else
             declare
@@ -258,7 +270,7 @@ package body Data_Transport.Udp_Socket_Server is
                for Ack_Header'Address use Last_Packets (Head.Seq_Nb)'Address;
             begin
                Ack_Header.Ack := True;
-               Send (Last_Packets (Head.Seq_Nb));
+               Send_Packet (Last_Packets (Head.Seq_Nb));
             end;
          end if;
       end loop;

@@ -45,7 +45,7 @@ package body Buffer_Handling is
 
       --  Need a "+ 1" otherwise it cannot get a
       --  free buffer in Release_Full_Buf
-      Dcod_Pmh_Service.Client.Provide_Buffer (Name => "toto",
+      Dcod_Pmh_Service.Client.Provide_Buffer (Name => Base_Udp.Buffer_Name,
                                               Size => Base_Udp.Buffer_Size,
                                               Depth => Base_Udp.PMH_Buf_Nb + 1,
                                               Endpoint => Base_Udp.End_Point);
@@ -197,7 +197,7 @@ package body Buffer_Handling is
          (System.Multiprocessors.CPU_Range (11));
       accept Start;
       loop
-         delay 0.0; -- Doesn't work without rescheduling;
+         delay 0.0; -- Doesn't work without rescheduling; -- edit: Might not be needed anymore
          if Buffer_Handler.Handlers (Buffer_Handler.First).State = Full then
 
             Release_Free_Buffer_At (Buffer_Handler.First);
@@ -209,9 +209,6 @@ package body Buffer_Handling is
                   (Buffer_Handler.First).Handle);
 
             Buffer_Handler.First := Buffer_Handler.First + 1;
-            --  Ada.Text_IO.Put_Line ("First : " & Buffer_Handler.First'Img);
-
-            --  Get_Filled_Buf;
          end if;
       end loop;
    exception
@@ -255,8 +252,6 @@ package body Buffer_Handling is
                                                       State := Near_Full;
                end if;
                Buffer_Handler.Current := Buffer_Handler.Current + 1;
-               --  Ada.Text_IO.Put_Line ("Current : "
-               --     & Buffer_Handler.Current'Img);
                Init := False;
          end select;
       end loop;
@@ -320,8 +315,6 @@ package body Buffer_Handling is
       use type Reliable_Udp.Pkt_Nb;
       pragma Unreferenced (Packet_Number);
    begin
-      --  Parsing from Buffer_Handler.First to Last should be sufficient
-      --  but it raises Location_Not_Found at buffer 15
       if Buffer_Handler.First > Buffer_Handler.Current then
 
          if Search_Empty_Mark (Buffer_Handler.First,

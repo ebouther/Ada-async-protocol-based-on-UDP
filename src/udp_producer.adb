@@ -18,7 +18,7 @@ procedure Udp_Producer is
    Buffer_Name : Unbounded_String := To_Unbounded_String ("blue");
    Network_Interface : Unbounded_String := To_Unbounded_String ("lo");
    Buffer_Number : Integer := 1;
-   Options : constant String := "buffer_name= port= interface=";
+   Options : constant String := "buffer_name= port= hostname=";
    A_Task_Communication : aliased Utiles_Task.Task_Communication;
    A_Terminate_Task : Utiles_Task.Terminate_Task (A_Task_Communication'Access);
 begin
@@ -28,7 +28,7 @@ begin
             exit;
          when 'b' =>
             Buffer_Name := To_Unbounded_String (GNAT.Command_Line.Parameter);
-         when 'i' =>
+         when 'h' =>
             Network_Interface :=
               To_Unbounded_String (GNAT.Command_Line.Parameter);
          when 'p' =>
@@ -38,7 +38,7 @@ begin
       end case;
    end loop;
    Buffer.Set_Name (To_String (Buffer_Name));
-   Buffer.Initialise (10, Size => 1024 * 30);
+   Buffer.Initialise (10, Size => 1024 * 2000);
    Server.Initialise (To_String (Network_Interface), Port);
    Ada.Text_IO.Put_Line ("Get port :" & Port'Img);
    Server.Connect;
@@ -59,7 +59,7 @@ begin
             Data (Data'First) := Buffer_Number;
             Buffer_Number := Buffer_Number + 1;
          end;
-         Buffers.Set_Used_Bytes (Buffer_Handle, 1024 * 30);
+         Buffers.Set_Used_Bytes (Buffer_Handle, 1024 * 1234);
          Buffer.Release_Free_Buffer (Buffer_Handle);
       end;
    end loop;
