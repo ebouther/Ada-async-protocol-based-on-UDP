@@ -147,10 +147,15 @@ package body Data_Transport.Udp_Socket_Client is
                for Data'Address use Data_Addr + Storage_Offset
                                                    (Recv_Offset * Base_Udp.Load_Size);
                for Header'Address use Data'Address;
+               use type Ada.Streams.Stream_Element_Offset;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-               Process_Packet (Data, Header, Recv_Offset, Data_Addr, From);
-               Recv_Offset := Recv_Offset + 1;
+               if Last = 4 then
+                  Buffer_Handling.Save_Size (Data);
+               else
+                  Process_Packet (Data, Header, Recv_Offset, Data_Addr, From);
+                  Recv_Offset := Recv_Offset + 1;
+               end if;
             exception
                when Socket_Error =>
                   Ada.Text_IO.Put_Line ("Socket Timeout");

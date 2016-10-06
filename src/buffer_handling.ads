@@ -1,4 +1,5 @@
 with System;
+with Ada.Streams;
 with Interfaces.C;
 
 with Reliable_Udp;
@@ -14,29 +15,30 @@ package Buffer_Handling is
 
    --  Index Type for "Handlers" array
    --  "is mod type" enables a circular parsing
-   type Handle_Index is mod Base_Udp.PMH_Buf_Nb;
+   type Handle_Index_Type is mod Base_Udp.PMH_Buf_Nb;
 
    --  State of Buffer:
    --  Empty =>  Buf is released
    --  Near_Full => Buf is waiting for acks
    --  Full => Ready to be Released
-   type State_Enum is (Empty, Near_Full, Full);
+   type State_Enum_Type is (Empty, Near_Full, Full);
 
-   type Handler is limited
+   type Handler_Type is limited
       record
          Handle    : Buffers.Buffer_Handle_Type;
-         State     : State_Enum := Empty;
+         Size      : Interfaces.Unsigned_32 := 0;
+         State     : State_Enum_Type := Empty;
          Missing   : Base_Udp.Header := 0;
       end record;
 
    --  Contains all the Handlers
-   type Handle_Array is array (Handle_Index) of Handler;
+   type Handle_Array_Type is array (Handle_Index_Type) of Handler_Type;
 
-   type Buf_Handler is
+   type Buffer_Handler_Type is
       record
-         Handlers          : Handle_Array;
-         First             : Handle_Index;
-         Current           : Handle_Index;
+         Handlers          : Handle_Array_Type;
+         First             : Handle_Index_Type;
+         Current           : Handle_Index_Type;
       end record;
 
    procedure Perror (Message : String);
@@ -56,7 +58,7 @@ package Buffer_Handling is
    procedure Init_Buffers;
 
    --  Release Buffer at Handlers (Index) and change its State to Empty
-   procedure Release_Free_Buffer_At (Index : in Handle_Index);
+   procedure Release_Free_Buffer_At (Index : in Handle_Index_Type);
 
    --  Get Content of Released Buffers and Log it to File (buffers.log)
    --  or Display it. Depends on To_File Boolean.
@@ -66,7 +68,7 @@ package Buffer_Handling is
    --  Search position of ack received in current and previous buffers
    --  and then store content in it.
    function Search_Empty_Mark
-                        (First, Last            : Handle_Index;
+                        (First, Last            : Handle_Index_Type;
                          Data                   : in Base_Udp.Packet_Stream;
                          Seq_Nb                 : Reliable_Udp.Pkt_Nb) return Boolean;
 
@@ -105,5 +107,8 @@ package Buffer_Handling is
       entry Start;
    end Check_Buf_Integrity;
 
+   --  Save Buffer Size in Buffer_Handler record
+   procedure Save_Size (Data  : Ada.Streams.Stream_Element_Array);
+   pragma Inline (Save_Size);
 
 end Buffer_Handling;

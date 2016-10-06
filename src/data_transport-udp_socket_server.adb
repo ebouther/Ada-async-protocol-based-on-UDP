@@ -151,11 +151,11 @@ package body Data_Transport.Udp_Socket_Server is
             for Data'Address use Buffers.Get_Address (Buffer_Handle);
 
             Size_Stream : Ada.Streams.Stream_Element_Array (1 .. 4);
-            --  Offset      : Ada.Streams.Stream_Element_Offset;
+            Offset      : Ada.Streams.Stream_Element_Offset;
             for Size_Stream'Address use Buffer_Size'Address;
          begin
             --  Ada.Text_IO.Put_Line ("send data" & Buffer_Set.Full_Size'Img);
-            --  GNAT.Sockets.Send_Socket (Socket, Size_Stream, Offset, Address);
+            GNAT.Sockets.Send_Socket (Socket, Size_Stream, Offset, Address);
             Send_All_Stream (Data, Packet_Number);
          exception
             when E : others =>

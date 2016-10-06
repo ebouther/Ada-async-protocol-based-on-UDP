@@ -16,7 +16,7 @@ package body Buffer_Handling is
    use type Interfaces.Unsigned_64;
 
 
-   Buffer_Handler    : Buf_Handler;
+   Buffer_Handler    : Buffer_Handler_Type;
 
    Production        : Buffers.Shared.Produce.Produce_Couple_Type;
    Buffer_Prod       : Buffers.Shared.Produce.Produce_Type
@@ -90,7 +90,7 @@ package body Buffer_Handling is
    --  Release_Free_Buffer_At  --
    ------------------------------
 
-   procedure Release_Free_Buffer_At (Index : in Handle_Index) is
+   procedure Release_Free_Buffer_At (Index : in Handle_Index_Type) is
 
    begin
 
@@ -102,6 +102,7 @@ package body Buffer_Handling is
                            (Index).Handle);
 
       Buffer_Handler.Handlers (Index).State := Empty;
+      Buffer_Handler.Handlers (Index).Size := 0;
 
    end Release_Free_Buffer_At;
 
@@ -111,7 +112,7 @@ package body Buffer_Handling is
   ---------------------------
 
    task body Check_Buf_Integrity is
-      Index : Handle_Index := Handle_Index'First;
+      Index : Handle_Index_Type := Handle_Index_Type'First;
       Addr  : System.Address;
       N     : Integer;
       use System.Storage_Elements;
@@ -271,7 +272,7 @@ package body Buffer_Handling is
    -------------------------
 
    function Search_Empty_Mark
-                        (First, Last           : Handle_Index;
+                        (First, Last           : Handle_Index_Type;
                          Data                  : in Base_Udp.Packet_Stream;
                          Seq_Nb                : Reliable_Udp.Pkt_Nb) return Boolean
    is
@@ -279,7 +280,7 @@ package body Buffer_Handling is
       use Packet_Buffers;
       use System.Storage_Elements;
       use type Reliable_Udp.Pkt_Nb;
-      use type Handle_Index;
+      use type Handle_Index_Type;
    begin
       for N in First .. Last loop
          declare
@@ -303,6 +304,17 @@ package body Buffer_Handling is
    end Search_Empty_Mark;
 
 
+   -----------------
+   --  Save_Size  --
+   -----------------
+
+   procedure Save_Size (Data  : Ada.Streams.Stream_Element_Array) is
+      Size  : Interfaces.Unsigned_32;
+      for Size'Address use Data'Address;
+   begin
+      Buffer_Handler.Handlers (Buffer_Handler.Current).Size := Size;
+   end Save_Size;
+
    ----------------
    --  Save_Ack  --
    ----------------
@@ -318,11 +330,11 @@ package body Buffer_Handling is
       if Buffer_Handler.First > Buffer_Handler.Current then
 
          if Search_Empty_Mark (Buffer_Handler.First,
-                               Handle_Index'Last,
+                               Handle_Index_Type'Last,
                                Data,
                                Seq_Nb)
          or
-            Search_Empty_Mark (Handle_Index'First,
+            Search_Empty_Mark (Handle_Index_Type'First,
                                Buffer_Handler.Current,
                                Data,
                                Seq_Nb)
