@@ -91,11 +91,23 @@ package body Buffer_Handling is
    ------------------------------
 
    procedure Release_Free_Buffer_At (Index : in Handle_Index_Type) is
-
+      Unknown_Buffer_Size  : exception;
+      Buf                  : Handler_Type
+                              renames Buffer_Handler.Handlers (Index);
+      use Base_Udp;
    begin
-
-      Buffers.Set_Used_Bytes (Buffer_Handler.Handlers (Index).Handle,
-               Packet_Buffers.To_Bytes (Integer (Base_Udp.Sequence_Size)));
+      if Buf.Size = 0 then
+         Ada.Exceptions.Raise_Exception (Unknown_Buffer_Size'Identity,
+            "Attempting to release a buffer with unknown size. Cannot Set_Used_Bytes.");
+      end if;
+      Buffers.Set_Used_Bytes
+         (Buf.Handle,
+            Buffers.Buffer_Size_Type
+               (Buf.Size +
+               (Buf.Size / Load_Size
+                  + (if Buf.Size rem Load_Size /= 0 then
+                     1 else 0))
+               * Header'Size));
 
       Buffer_Prod.Release_Free_Buffer
                         (Buffer_Handler.Handlers
@@ -104,6 +116,13 @@ package body Buffer_Handling is
       Buffer_Handler.Handlers (Index).State := Empty;
       Buffer_Handler.Handlers (Index).Size := 0;
 
+   exception
+      when E : others =>
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
    end Release_Free_Buffer_At;
 
 
