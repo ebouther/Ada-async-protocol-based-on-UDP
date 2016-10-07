@@ -102,6 +102,13 @@ package body Buffer_Handling is
          Ada.Exceptions.Raise_Exception (Unknown_Buffer_Size'Identity,
             "Attempting to release a buffer with unknown size. Cannot Set_Used_Bytes.");
       end if;
+      Ada.Text_IO.Put_Line ("Recv_Buf Size : " & Buf.Size'Img);
+      Ada.Text_IO.Put_Line ("Set_Used_Bytes : " & Integer (Buf.Size +
+               (Buf.Size / Load_Size
+                  + (if Buf.Size rem Load_Size /= 0 then
+                     1 else 0))
+               * Header_Size)'Img);
+
       Buffers.Set_Used_Bytes
          (Buf.Handle,
             Buffers.Buffer_Size_Type
@@ -109,7 +116,7 @@ package body Buffer_Handling is
                (Buf.Size / Load_Size
                   + (if Buf.Size rem Load_Size /= 0 then
                      1 else 0))
-               * Header'Size));
+               * Header_Size));
 
       Buffer_Prod.Release_Free_Buffer
                         (Buffer_Handler.Handlers
@@ -411,7 +418,7 @@ package body Buffer_Handling is
                                              (Buffers.Get_Available_Bytes (Dest_Handle)));
 
                Src_Index          : Stream_Element_Offset := Base_Udp.Header_Size;
-               Dest_Index         : Stream_Element_Offset := 1;
+               Dest_Index         : Stream_Element_Offset := 0;
 
                Dest_Size          : Integer := 0;
 
@@ -423,13 +430,20 @@ package body Buffer_Handling is
                   --  There might be a better alternative than byte copy.
                   for I in Stream_Element_Offset range 1 .. Base_Udp.Load_Size - Base_Udp.Header_Size loop
                      exit when Src_Index + I > Src_Data_Stream'Last;
-                     if Dest_Index + I > Dest_Data_Stream'Last then
+                     if (Dest_Index + I) > Dest_Data_Stream'Last then
+                        Ada.Text_IO.Put_Line ("Dest Last : " & Dest_Data_Stream'Last'Img);
+                        Ada.Text_IO.Put_Line ("Dest_Index + I : " & Integer (Dest_Index + I)'Img);
+                        Ada.Text_IO.Put_Line ("Src Last : " & Src_Data_Stream'Last'Img);
+                        Ada.Text_IO.Put_Line ("Src_Index + I : " & Integer (Src_Index + I)'Img);
                         raise Dest_Buffer_Too_Small
                            with "Cannot store all received data in buffer. Increase its size.";
                      end if;
-                     Dest_Data_Stream (Dest_Index + I - 1) := Src_Data_Stream (Src_Index + I);
+                     Dest_Data_Stream (Dest_Index + I) := Src_Data_Stream (Src_Index + I);
+                     Ada.Text_IO.Put_Line ("Copy Src (" & Integer (Src_Index + I)'Img & ") In : "
+                        & Integer (Dest_Index + I)'Img);
                      Dest_Size := Dest_Size + 1;
                   end loop;
+                  Ada.Text_IO.Put_Line ("*********************************************");
                   Src_Index := Src_Index + Base_Udp.Load_Size;
                   Dest_Index := Dest_Index + (Base_Udp.Load_Size - Base_Udp.Header_Size);
                end loop;
