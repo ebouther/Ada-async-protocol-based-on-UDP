@@ -334,6 +334,7 @@ package body Buffer_Handling is
       Buffer_Handler.Handlers (Buffer_Handler.Current).Size := Size;
    end Save_Size;
 
+
    ----------------
    --  Save_Ack  --
    ----------------
@@ -374,6 +375,67 @@ package body Buffer_Handling is
    end Save_Ack;
 
 
+   ------------------------
+   --  Handle_Data_Task  --
+   ------------------------
+
+   task body Handle_Data_Task is
+         Dest_Buffer : Buffers.Buffer_Produce_Access;
+
+         Src_Handle  : Buffers.Buffer_Handle_Type;
+         Dest_Handle : Buffers.Buffer_Handle_Type;
+         Dest_Buffer_Too_Small   : exception;
+         use Ada.Streams;
+   begin
+      accept Start (Buffer_Set : Buffers.Buffer_Produce_Access)
+      do
+         Dest_Buffer := Buffer_Set;
+      end Start;
+      loop
+         Ada.Text_IO.Put_Line ("************* WAITING  ************");
+         Dest_Buffer.Get_Free_Buffer (Dest_Handle);
+         Ada.Text_IO.Put_Line ("************* Got Buffer_Set FREE Buf ************");
+         Buffer_Cons.Get_Full_Buffer (Src_Handle);
+         Ada.Text_IO.Put_Line ("************* Got Buffer_Cons FULL Buf ************");
+         declare
+            Src_Data_Stream    : Stream_Element_Array
+                                  (1 .. Stream_Element_Offset
+                                          (Buffers.Get_Used_Bytes (Src_Handle)));
+            Dest_Data_Stream   : Stream_Element_Array
+                                  (1 .. Stream_Element_Offset
+                                          (Buffers.Get_Used_Bytes (Dest_Handle)));
+
+            Src_Index          : Stream_Element_Offset := Base_Udp.Header_Size;
+            Dest_Index         : Stream_Element_Offset := 1;
+
+            Dest_Size          : Integer := 0;
+
+            for Src_Data_Stream'Address use Buffers.Get_Address (Src_Handle);
+            for Dest_Data_Stream'Address use Buffers.Get_Address (Dest_Handle);
+         begin
+            loop
+               exit when Src_Index > Src_Data_Stream'Last;
+               --  There might be a better alternative than byte copy.
+               for I in Stream_Element_Offset range 1 .. Base_Udp.Load_Size - Base_Udp.Header_Size loop
+                  exit when Src_Index + I > Src_Data_Stream'Last;
+                  if Dest_Index + I > Dest_Data_Stream'Last then
+                     raise Dest_Buffer_Too_Small
+                        with "Cannot store all received data in buffer. Increase its size.";
+                  end if;
+                  Dest_Data_Stream (Dest_Index + I - 1) := Src_Data_Stream (Src_Index + I);
+                  Dest_Size := Dest_Size + 1;
+               end loop;
+               Src_Index := Src_Index + Base_Udp.Load_Size;
+               Dest_Index := Dest_Index + (Base_Udp.Load_Size - Base_Udp.Header_Size);
+            end loop;
+            Buffers.Set_Used_Bytes (Dest_Handle,
+                                    Buffers.Buffer_Size_Type (Dest_Size));
+            Dest_Buffer.Release_Free_Buffer (Dest_Handle);
+         end;
+      end loop;
+   end Handle_Data_Task;
+
+
    ----------------------
    --  Get_Filled_Buf  --
    ----------------------
@@ -382,7 +444,7 @@ package body Buffer_Handling is
       Log_File : Ada.Text_IO.File_Type;
    begin
       declare
-         Handle  : Buffers.Buffer_Handle_Type;
+         Handle         : Buffers.Buffer_Handle_Type;
 
          use Packet_Buffers;
       begin
@@ -440,6 +502,7 @@ package body Buffer_Handling is
                            Pkt_Nb'Img & Content'Img);
                      end if;
                   end if;
+
                end;
             end loop;
          end;

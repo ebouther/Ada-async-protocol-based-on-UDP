@@ -111,4 +111,8 @@ package Buffer_Handling is
    procedure Save_Size (Data  : Ada.Streams.Stream_Element_Array);
    pragma Inline (Save_Size);
 
+   task type Handle_Data_Task is
+      entry Start (Buffer_Set : Buffers.Buffer_Produce_Access);
+   end Handle_Data_Task;
+
 end Buffer_Handling;

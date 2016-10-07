@@ -2,67 +2,22 @@ with Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Exceptions;
 with Ada.Streams;
-with Ada.Unchecked_Conversion;
 with Ada.Calendar;
-with Interfaces.C;
 with System.Multiprocessors.Dispatching_Domains;
 with System.Storage_Elements;
 with Ada.Real_Time;
 
 with GNAT.Command_Line;
-with System;
 
 pragma Warnings (Off);
 with GNAT.Sockets.Thin;
 pragma Warnings (On);
 
-with Base_Udp;
 with Output_Data;
-with Reliable_Udp;
 with Buffer_Handling;
 with Web_Interface;
 
 package body Data_Transport.Udp_Socket_Client is
-
-   pragma Optimize (Time);
-
-   use GNAT.Sockets;
-
-   use type Base_Udp.Header;
-   use type Interfaces.Unsigned_64;
-
-   task type Timer is
-      entry Start;
-      entry Stop;
-   end Timer;
-
-   procedure Wait_Producer_HandShake (Host         : GNAT.Sockets.Inet_Addr_Type;
-                                      Port         : GNAT.Sockets.Port_Type);
-
-   procedure Process_Packet (Data         : in Base_Udp.Packet_Stream;
-                             Header       : in Reliable_Udp.Header;
-                             Recv_Offset  : in out Interfaces.Unsigned_64;
-                             Data_Addr    : in out System.Address;
-                             From         : in Sock_Addr_Type);
-
-
-   function To_Int is
-      new Ada.Unchecked_Conversion
-         (GNAT.Sockets.Socket_Type, Interfaces.C.int);
-
-   procedure Parse_Arguments;
-
-   procedure Init_Consumer;
-
-   procedure Init_Udp (Server       : in out Socket_Type;
-                       Host         : GNAT.Sockets.Inet_Addr_Type;
-                       Port         : GNAT.Sockets.Port_Type;
-                       TimeOut_Opt  : Boolean := True);
-
-   pragma Warnings (Off);
-   procedure Stop_Server;
-   pragma Warnings (On);
-
 
    Log_Task             : Timer;
 
@@ -82,6 +37,8 @@ package body Data_Transport.Udp_Socket_Client is
 
 
    task body Socket_Client_Task is
+      Handle_Data          : Buffer_Handling.Handle_Data_Task;
+
       Server               : Socket_Type;
       Cons_Addr            : GNAT.Sockets.Inet_Addr_Type;
       Cons_Port            : GNAT.Sockets.Port_Type;
@@ -109,6 +66,8 @@ package body Data_Transport.Udp_Socket_Client is
 
             Init_Consumer;
             Init_Udp (Server, Cons_Addr, Cons_Port);
+
+            Handle_Data.Start (Buffer_Set);
 
          end Initialise;
       or
