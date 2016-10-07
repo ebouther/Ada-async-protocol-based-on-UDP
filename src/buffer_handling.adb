@@ -237,7 +237,6 @@ package body Buffer_Handling is
                   (Buffer_Handler.First).Handle);
 
             Buffer_Handler.First := Buffer_Handler.First + 1;
-            Ada.Text_IO.Put_Line ("First : " & Buffer_Handler.First'Img);
          end if;
       end loop;
    exception
@@ -282,7 +281,6 @@ package body Buffer_Handling is
                end if;
                Buffer_Handler.Current := Buffer_Handler.Current + 1;
                Init := False;
-               Ada.Text_IO.Put_Line ("Current : " & Buffer_Handler.Current'Img);
          end select;
       end loop;
    exception
@@ -431,19 +429,12 @@ package body Buffer_Handling is
                   for I in Stream_Element_Offset range 1 .. Base_Udp.Load_Size - Base_Udp.Header_Size loop
                      exit when Src_Index + I > Src_Data_Stream'Last;
                      if (Dest_Index + I) > Dest_Data_Stream'Last then
-                        Ada.Text_IO.Put_Line ("Dest Last : " & Dest_Data_Stream'Last'Img);
-                        Ada.Text_IO.Put_Line ("Dest_Index + I : " & Integer (Dest_Index + I)'Img);
-                        Ada.Text_IO.Put_Line ("Src Last : " & Src_Data_Stream'Last'Img);
-                        Ada.Text_IO.Put_Line ("Src_Index + I : " & Integer (Src_Index + I)'Img);
                         raise Dest_Buffer_Too_Small
                            with "Cannot store all received data in buffer. Increase its size.";
                      end if;
                      Dest_Data_Stream (Dest_Index + I) := Src_Data_Stream (Src_Index + I);
-                     Ada.Text_IO.Put_Line ("Copy Src (" & Integer (Src_Index + I)'Img & ") In : "
-                        & Integer (Dest_Index + I)'Img);
                      Dest_Size := Dest_Size + 1;
                   end loop;
-                  Ada.Text_IO.Put_Line ("*********************************************");
                   Src_Index := Src_Index + Base_Udp.Load_Size;
                   Dest_Index := Dest_Index + (Base_Udp.Load_Size - Base_Udp.Header_Size);
                end loop;

@@ -36,7 +36,7 @@ begin
       end case;
    end loop;
    Buffer.Set_Name (To_String (Buffer_Name));
-   Buffer.Initialise (10, Size => 4096);
+   Buffer.Initialise (10, Size => 102400);
    Client.Initialise (To_String (Host_Name), Port);
    Client.Connect;
    loop
