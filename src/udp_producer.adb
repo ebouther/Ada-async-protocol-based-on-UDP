@@ -38,7 +38,7 @@ begin
       end case;
    end loop;
    Buffer.Set_Name (To_String (Buffer_Name));
-   Buffer.Initialise (10, Size => 102400);
+   Buffer.Initialise (10, Size => 10240);
    Server.Initialise (To_String (Network_Interface), Port);
    Ada.Text_IO.Put_Line ("Get port :" & Port'Img);
    Server.Connect;
@@ -59,7 +59,7 @@ begin
             Data (Data'First) := Buffer_Number;
             Buffer_Number := Buffer_Number + 1;
          end;
-         Buffers.Set_Used_Bytes (Buffer_Handle, 102400);
+         Buffers.Set_Used_Bytes (Buffer_Handle, 10240);
          Buffer.Release_Free_Buffer (Buffer_Handle);
       end;
    end loop;

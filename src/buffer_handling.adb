@@ -237,6 +237,7 @@ package body Buffer_Handling is
                   (Buffer_Handler.First).Handle);
 
             Buffer_Handler.First := Buffer_Handler.First + 1;
+            Ada.Text_IO.Put_Line ("First : " & Buffer_Handler.First'Img);
          end if;
       end loop;
    exception
@@ -281,6 +282,7 @@ package body Buffer_Handling is
                end if;
                Buffer_Handler.Current := Buffer_Handler.Current + 1;
                Init := False;
+               Ada.Text_IO.Put_Line ("Current : " & Buffer_Handler.Current'Img);
          end select;
       end loop;
    exception
@@ -335,11 +337,56 @@ package body Buffer_Handling is
    --  Save_Size  --
    -----------------
 
-   procedure Save_Size (Data  : Ada.Streams.Stream_Element_Array) is
-      Size  : Interfaces.Unsigned_32;
+   procedure Save_Size (Data           : Ada.Streams.Stream_Element_Array;
+                        Recv_Offset    : in out Interfaces.Unsigned_64) is
+
+      Prod_Buf_Too_Big  : exception;
+
+      Size     : Interfaces.Unsigned_32;
+      Max_Size : Interfaces.Unsigned_64;
+      Index    : Handle_Index_Type := Buffer_Handler.Current;
       for Size'Address use Data'Address;
+
+      Offset   : Handle_Index_Type := 1;
    begin
-      Buffer_Handler.Handlers (Buffer_Handler.Current).Size := Size;
+      Max_Size := Base_Udp.Sequence_Size * (Base_Udp.Load_Size - Base_Udp.Header_Size);
+
+      --  Producer has bigger buffer than the one used to receive packets.
+      --  It may overlap several buffers
+      if Buffer_Handler.Handlers (Buffer_Handler.Current).Size /= 0 then
+         --  Would mean that several size informations were received for the same buffer
+         Ada.Text_IO.Put_Line ("? Should not HAPPEN ?");
+         Index := Buffer_Handler.Current + 1;
+      end if;
+
+      if Size > Max_Size then
+         --  If it's not already a new buffer.
+         if Recv_Offset /= 0 then
+            --  Forces to use a new buffer for the next packets.
+            Recv_Offset := Base_Udp.Pkt_Max + 1;
+         end if;
+         --  Store a size that exceed max_size to know that next packet(s)
+         --  belong to the same buffer
+         Buffer_Handler.Handlers (Index).Size := Size;
+         while Size > 0 loop
+            Size := Size - Max_Size;
+            if Index + Offset = Buffer_Handler.Current then
+               raise Prod_Buf_Too_Big
+                  with "Unable to store all producer's buffer data."
+                  & "Consider initializing more buffers with less data per buffer"
+                  & "or incrementing Base_Udp.PMH_Buf_Nb constant.";
+            end if;
+            Buffer_Handler.Handlers (Index + Offset).Size := Size;
+            Offset := Offset + 1;
+         end loop;
+      end if;
+   exception
+      when E : others =>
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
    end Save_Size;
 
 
@@ -422,19 +469,31 @@ package body Buffer_Handling is
 
                for Src_Data_Stream'Address use Buffers.Get_Address (Src_Handle);
                for Dest_Data_Stream'Address use Buffers.Get_Address (Dest_Handle);
+
+               First              : Integer;
+               for First'Address use Src_Data_Stream (3)'Address;
+
             begin
+               Ada.Text_IO.Put_Line ("FIRST : " & First'Img);
                loop
                   exit when Src_Index > Src_Data_Stream'Last;
                   --  There might be a better alternative than byte copy.
                   for I in Stream_Element_Offset range 1 .. Base_Udp.Load_Size - Base_Udp.Header_Size loop
                      exit when Src_Index + I > Src_Data_Stream'Last;
                      if (Dest_Index + I) > Dest_Data_Stream'Last then
+                        Ada.Text_IO.Put_Line ("Dest Last : " & Dest_Data_Stream'Last'Img);
+                        Ada.Text_IO.Put_Line ("Dest_Index + I : " & Integer (Dest_Index + I)'Img);
+                        Ada.Text_IO.Put_Line ("Src Last : " & Src_Data_Stream'Last'Img);
+                        Ada.Text_IO.Put_Line ("Src_Index + I : " & Integer (Src_Index + I)'Img);
                         raise Dest_Buffer_Too_Small
                            with "Cannot store all received data in buffer. Increase its size.";
                      end if;
                      Dest_Data_Stream (Dest_Index + I) := Src_Data_Stream (Src_Index + I);
+                     Ada.Text_IO.Put_Line ("Copy Src (" & Integer (Src_Index + I)'Img & ") In : "
+                        & Integer (Dest_Index + I)'Img);
                      Dest_Size := Dest_Size + 1;
                   end loop;
+                  Ada.Text_IO.Put_Line ("*********************************************");
                   Src_Index := Src_Index + Base_Udp.Load_Size;
                   Dest_Index := Dest_Index + (Base_Udp.Load_Size - Base_Udp.Header_Size);
                end loop;

@@ -110,7 +110,7 @@ package body Data_Transport.Udp_Socket_Client is
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
                if Last = 4 then
-                  Buffer_Handling.Save_Size (Data);
+                  Buffer_Handling.Save_Size (Data, Recv_Offset);
                else
                   Process_Packet (Data, Header, Recv_Offset, Data_Addr, From);
                   Recv_Offset := Recv_Offset + 1;

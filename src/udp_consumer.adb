@@ -36,7 +36,7 @@ begin
       end case;
    end loop;
    Buffer.Set_Name (To_String (Buffer_Name));
-   Buffer.Initialise (10, Size => 102400);
+   Buffer.Initialise (10, Size => 10240);
    Client.Initialise (To_String (Host_Name), Port);
    Client.Connect;
    loop
@@ -67,7 +67,9 @@ begin
             for Data'Address use Buffers.Get_Address (Buffer_Handle);
          begin
             Ada.Text_IO.Put_Line (Buffers.Get_Used_Bytes (Buffer_Handle)'Img);
-            Ada.Text_IO.Put_Line (Data (1)'Img & ":" & Data (1024)'Img);
+            Ada.Text_IO.Put_Line ("FIRST : " & Data (1)'Img &
+                                  "SECOND : " & Data (2)'Img &
+                                  "LAST : " & Data (1024)'Img);
          end;
          Buffer.Release_Full_Buffer (Buffer_Handle);
       end;
