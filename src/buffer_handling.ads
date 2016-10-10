@@ -108,7 +108,8 @@ package Buffer_Handling is
    end Check_Buf_Integrity;
 
    --  Save Buffer Size in Buffer_Handler record
-   procedure Save_Size (Data  : Ada.Streams.Stream_Element_Array);
+   procedure Save_Size (Data           : Ada.Streams.Stream_Element_Array;
+                        Recv_Offset    : in out Interfaces.Unsigned_64);
    pragma Inline (Save_Size);
 
    task type Handle_Data_Task is
