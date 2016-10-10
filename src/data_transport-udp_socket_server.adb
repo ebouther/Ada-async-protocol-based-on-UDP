@@ -143,19 +143,25 @@ package body Data_Transport.Udp_Socket_Server is
               Ada.Streams.Stream_Element_Offset
               (Buffers.Get_Used_Bytes (Buffer_Handle));
 
-            Buffer_Size : constant Interfaces.Unsigned_32 :=
+            Buffer_Size : Interfaces.Unsigned_32 :=
                --  Network_Utils.To_Network (Interfaces.Unsigned_32 (Buffer_Set.Full_Size));
                Interfaces.Unsigned_32 (Buffer_Set.Full_Size);
 
             Data : Ada.Streams.Stream_Element_Array (1 .. Data_Size);
-            for Data'Address use Buffers.Get_Address (Buffer_Handle);
 
-            Size_Stream : Ada.Streams.Stream_Element_Array (1 .. 4);
+            Size_Stream : Ada.Streams.Stream_Element_Array (1 .. 6);
             Offset      : Ada.Streams.Stream_Element_Offset;
-            for Size_Stream'Address use Buffer_Size'Address;
+            Header      : Reliable_Udp.Header := (Ack => False,
+                                                   Seq_Nb => Packet_Number);
+
+            for Data'Address use Buffers.Get_Address (Buffer_Handle);
+            for Buffer_Size'Address use Size_Stream (3)'Address;
+            for Header'Address use Size_Stream'Address;
          begin
             --  Ada.Text_IO.Put_Line ("send data" & Buffer_Set.Full_Size'Img);
             GNAT.Sockets.Send_Socket (Socket, Size_Stream, Offset, Address);
+            Ada.Text_IO.Put_Line ("Sent : " & Buffer_Size'Img);
+            Packet_Number := Packet_Number + 1;
             Send_All_Stream (Data, Packet_Number);
          exception
             when E : others =>

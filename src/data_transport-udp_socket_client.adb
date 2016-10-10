@@ -109,11 +109,13 @@ package body Data_Transport.Udp_Socket_Client is
                use type Ada.Streams.Stream_Element_Offset;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-               if Last = 4 then
-                  Buffer_Handling.Save_Size (Data, Recv_Offset);
+               Process_Packet (Data, Header, Recv_Offset, Data_Addr, From);
+               Recv_Offset := Recv_Offset + 1;
+               if Last = 6 then
+                  --  Buffer_Handling.Save_Size_Pos (Header.Seq_Nb);
+                  Header.Ack := True; --  Activate Ack to differenciate from "normal" packets.
                else
-                  Process_Packet (Data, Header, Recv_Offset, Data_Addr, From);
-                  Recv_Offset := Recv_Offset + 1;
+                  Header.Ack := False; --  Disable Ack to differenciate from "size" packets.
                end if;
             exception
                when Socket_Error =>
@@ -276,7 +278,6 @@ package body Data_Transport.Udp_Socket_Client is
             exit;
          else
             delay 1.0;
-            --  Ada.Text_IO.Put_Line ("FIFO Len : " & Reliable_Udp.Fifo.Cur_Count'Img);
             Elapsed_Time := Ada.Calendar.Clock - Start_Time;
             Output_Data.Display
                (True,
