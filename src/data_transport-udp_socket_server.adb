@@ -149,18 +149,18 @@ package body Data_Transport.Udp_Socket_Server is
 
             Data : Ada.Streams.Stream_Element_Array (1 .. Data_Size);
 
-            Size_Stream : Ada.Streams.Stream_Element_Array (1 .. 6);
-            Offset      : Ada.Streams.Stream_Element_Offset;
-            Header      : Reliable_Udp.Header := (Ack => False,
-                                                   Seq_Nb => Packet_Number);
+            Header      : Reliable_Udp.Header;
 
             for Data'Address use Buffers.Get_Address (Buffer_Handle);
-            for Buffer_Size'Address use Size_Stream (3)'Address;
-            for Header'Address use Size_Stream'Address;
+            for Header'Address use Last_Packets (Packet_Number).Data'Address;
+            for Buffer_Size'Address use Last_Packets (Packet_Number).Data
+                                          (Base_Udp.Header_Size + 1)'Address;
          begin
-            --  DO NOT FORGET TO APPEND SIZE TO LAST_PACKETS VECTOR
-            GNAT.Sockets.Send_Socket (Socket, Size_Stream, Offset, Address);
             Ada.Text_IO.Put_Line ("Sent : " & Buffer_Size'Img);
+            Header := (Ack => False,
+                       Seq_Nb => Packet_Number);
+            Last_Packets (Packet_Number).Is_Buffer_Size := True;
+            Send_Packet (Last_Packets (Packet_Number).Data, True);
             Packet_Number := Packet_Number + 1;
             Send_All_Stream (Data, Packet_Number);
          exception
