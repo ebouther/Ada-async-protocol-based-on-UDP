@@ -9,10 +9,13 @@ with Utiles_Task;
 
 procedure Udp_Producer is
    use type Buffers.Buffer_Size_Type;
+
+   Used_Bytes  : constant Integer := 40960;
+
    Buffer : aliased Buffers.Local.Local_Buffer_Type;
    Server : Data_Transport.Udp_Socket_Server.Socket_Server_Task
      (Buffer'Unchecked_Access);
-   type Data_Array is array (1 .. 1024) of Integer;
+   type Data_Array is array (1 .. Used_Bytes / (Integer'Size / 8)) of Integer;
    Port : GNAT.Sockets.Port_Type := 8042;
    use Ada.Strings.Unbounded;
    Buffer_Name : Unbounded_String := To_Unbounded_String ("blue");
@@ -37,7 +40,7 @@ begin
       end case;
    end loop;
    Buffer.Set_Name (To_String (Buffer_Name));
-   Buffer.Initialise (10, Size => 4096);
+   Buffer.Initialise (10, Size => Used_Bytes);
    Server.Initialise (To_String (Network_Interface), Port);
    Ada.Text_IO.Put_Line ("Get port :" & Port'Img);
    Server.Connect;
@@ -56,7 +59,7 @@ begin
                Data (I) := I;
             end loop;
          end;
-         Buffers.Set_Used_Bytes (Buffer_Handle, 4096);
+         Buffers.Set_Used_Bytes (Buffer_Handle, 40960);
          Buffer.Release_Free_Buffer (Buffer_Handle);
       end;
    end loop;

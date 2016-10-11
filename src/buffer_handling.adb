@@ -425,8 +425,6 @@ package body Buffer_Handling is
 
          begin
             loop
-               exit when Src_Index > Src_Data_Stream'Last;
-               --  There might be a better alternative than byte copy.
                declare
                   Header      : Reliable_Udp.Header;
                   Size        : Interfaces.Unsigned_32;
@@ -462,25 +460,42 @@ package body Buffer_Handling is
                      for I in Stream_Element_Offset range 1 .. Base_Udp.Load_Size - Base_Udp.Header_Size loop
                         --  exit when Src_Index + I - 1 > Src_Data_Stream'Last;
                         exit when Interfaces.Unsigned_32 (Dest_Size) >= Buffer_Size;
-
+                        if Dest_Index + I > Dest_Data_Stream'Last or
+                           Dest_Index + I < Dest_Data_Stream'First
+                        then
+                           Ada.Text_IO.Put_Line ("!!!!!!!!!!!!!!! Dest_Index + I :"
+                              & Interfaces.Unsigned_64 (Dest_Index + I)'Img);
+                           Ada.Text_IO.Put_Line ("!!!!!!!!!!!!!!! Last :"
+                              & Dest_Data_Stream'Last'Img);
+                        end if;
                         Dest_Data_Stream (Dest_Index + I) :=
                            Src_Data_Stream (Src_Index) (Base_Udp.Header_Size + I);
                         Dest_Size := Dest_Size + 1;
                      end loop;
                      Src_Index := Src_Index + 1;
+                     --  Wait for a new Src Buffer
+                     if Src_Index > Src_Data_Stream'Last then
+                        Buffer_Cons.Release_Full_Buffer (Src_Handle.all);
+                        Buffers.Free (Src_Handle);
+                        Src_Handle := new Buffers.Buffer_Handle_Type;
+                        Buffer_Cons.Get_Full_Buffer (Src_Handle.all);
+                        Src_Index := 1;
+
+                        Ada.Text_IO.Put_Line ("Released");
+                     end if;
                      Dest_Index := Dest_Index + (Base_Udp.Load_Size - Base_Udp.Header_Size);
                   end;
                end;
             end loop;
 
-            Buffers.Set_Used_Bytes (Dest_Handle.all,
-                                    Buffers.Buffer_Size_Type (Dest_Size));
-            Dest_Buffer.Release_Free_Buffer (Dest_Handle.all);
-            Buffers.Free (Dest_Handle);
+            --  Buffers.Set_Used_Bytes (Dest_Handle.all,
+            --                          Buffers.Buffer_Size_Type (Dest_Size));
+            --  Dest_Buffer.Release_Free_Buffer (Dest_Handle.all);
+            --  Buffers.Free (Dest_Handle);
 
-            Buffer_Cons.Release_Full_Buffer (Src_Handle.all);
-            Buffers.Free (Src_Handle);
-            Ada.Text_IO.Put_Line ("Released");
+            --  Buffer_Cons.Release_Full_Buffer (Src_Handle.all);
+            --  Buffers.Free (Src_Handle);
+            --  Ada.Text_IO.Put_Line ("Released");
 
          exception
             when E : others =>
