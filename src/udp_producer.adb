@@ -17,7 +17,6 @@ procedure Udp_Producer is
    use Ada.Strings.Unbounded;
    Buffer_Name : Unbounded_String := To_Unbounded_String ("blue");
    Network_Interface : Unbounded_String := To_Unbounded_String ("lo");
-   Buffer_Number : Integer := 1;
    Options : constant String := "buffer_name= port= hostname=";
    A_Task_Communication : aliased Utiles_Task.Task_Communication;
    A_Terminate_Task : Utiles_Task.Terminate_Task (A_Task_Communication'Access);
@@ -56,8 +55,6 @@ begin
             for I in Data'Range loop
                Data (I) := I;
             end loop;
-            Data (Data'First) := Buffer_Number;
-            Buffer_Number := Buffer_Number + 1;
          end;
          Buffers.Set_Used_Bytes (Buffer_Handle, 4096);
          Buffer.Release_Free_Buffer (Buffer_Handle);

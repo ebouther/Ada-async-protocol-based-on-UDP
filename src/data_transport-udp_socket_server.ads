@@ -31,7 +31,8 @@ package Data_Transport.Udp_Socket_Server is
 
    procedure Send_All_Stream (Payload         : Ada.Streams.Stream_Element_Array;
                               Packet_Number   : in out Reliable_Udp.Pkt_Nb);
-   procedure Send_Packet (Payload : Base_Udp.Packet_Stream);
+   procedure Send_Packet (Payload         : Base_Udp.Packet_Stream;
+                          Is_Buffer_Size  : Boolean := False);
 
    procedure Rcv_Ack;
 
@@ -42,5 +43,11 @@ package Data_Transport.Udp_Socket_Server is
    function To_Int is
       new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type,
          Interfaces.C.int);
+
+   type History_Type is
+      record
+         Data           : Base_Udp.Packet_Stream;
+         Is_Buffer_Size : Boolean := False;
+      end record;
 
 end Data_Transport.Udp_Socket_Server;

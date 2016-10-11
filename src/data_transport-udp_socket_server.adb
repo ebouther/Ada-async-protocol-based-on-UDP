@@ -23,7 +23,7 @@ package body Data_Transport.Udp_Socket_Server is
    Address           : GNAT.Sockets.Sock_Addr_Type;
    Acquisition       : Boolean := True;
    Last_Packets      : array (Reliable_Udp.Pkt_Nb)
-                        of Base_Udp.Packet_Stream;
+                        of History_Type;
 
    task body Socket_Server_Task is
       Packet_Number : Reliable_Udp.Pkt_Nb := 0;
@@ -205,15 +205,14 @@ package body Data_Transport.Udp_Socket_Server is
                   Pad   : constant Ada.Streams.Stream_Element_Array
                            (1 .. Last - Payload'Last) := (others => 0);
                begin
-                  Last_Packets (Packet_Number) := Head & Payload
+                  Last_Packets (Packet_Number).Data := Head & Payload
                         (First .. Payload'Last) & Pad;
                end;
             else
-               Last_Packets (Packet_Number) := Head & Payload
+               Last_Packets (Packet_Number).Data := Head & Payload
                      (First .. Last);
             end if;
-
-            GNAT.Sockets.Send_Socket (Socket, Last_Packets (Packet_Number),
+            GNAT.Sockets.Send_Socket (Socket, Last_Packets (Packet_Number).Data,
                                        Index, Address);
 
             Packet_Number := Packet_Number + 1;
@@ -228,9 +227,11 @@ package body Data_Transport.Udp_Socket_Server is
    --  Send_Packet  --
    -------------------
 
-   procedure Send_Packet (Payload : Base_Udp.Packet_Stream) is
+   procedure Send_Packet (Payload : Base_Udp.Packet_Stream;
+                          Is_Buffer_Size : Boolean := False) is
       Offset   : Ada.Streams.Stream_Element_Offset;
-      Data     : Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
+      Data     : Ada.Streams.Stream_Element_Array
+                     (1 .. (if Is_Buffer_Size then 6 else Base_Udp.Load_Size));
 
       for Data'Address use Payload'Address;
       pragma Unreferenced (Offset);
@@ -273,10 +274,11 @@ package body Data_Transport.Udp_Socket_Server is
          else
             declare
                Ack_Header  : Reliable_Udp.Header;
-               for Ack_Header'Address use Last_Packets (Head.Seq_Nb)'Address;
+               for Ack_Header'Address use Last_Packets (Head.Seq_Nb).Data'Address;
             begin
                Ack_Header.Ack := True;
-               Send_Packet (Last_Packets (Head.Seq_Nb));
+               Send_Packet (Last_Packets (Head.Seq_Nb).Data,
+                            Last_Packets (Head.Seq_Nb).Is_Buffer_Size);
             end;
          end if;
       end loop;

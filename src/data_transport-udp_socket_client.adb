@@ -347,8 +347,8 @@ package body Data_Transport.Udp_Socket_Client is
       use type Reliable_Udp.Pkt_Nb;
       use type Ada.Real_Time.Time;
       use type Ada.Streams.Stream_Element_Offset;
-   begin
 
+   begin
       if Header.Ack then
          --  Activate Ack to differenciate size packets from "normal" packets.
          pragma Warnings (Off);

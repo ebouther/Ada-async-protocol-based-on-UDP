@@ -413,10 +413,6 @@ package body Buffer_Handling is
          Buffer_Cons.Get_Full_Buffer (Src_Handle.all);
          declare
 
-            --  Src_Data_Stream    : Stream_Element_Array
-            --                        (1 .. Stream_Element_Offset
-            --                                (Buffers.Get_Used_Bytes (Src_Handle.all)));
-
             Src_Data_Stream    : array (1 .. Base_Udp.Sequence_Size) of Base_Udp.Packet_Stream;
 
             Src_Index          : Interfaces.Unsigned_64 := 1;
@@ -428,8 +424,6 @@ package body Buffer_Handling is
             for Src_Data_Stream'Address use Buffers.Get_Address (Src_Handle.all);
 
          begin
-
-
             loop
                exit when Src_Index > Src_Data_Stream'Last;
                --  There might be a better alternative than byte copy.
@@ -438,15 +432,11 @@ package body Buffer_Handling is
                   Size        : Interfaces.Unsigned_32;
                   for Header'Address use Src_Data_Stream (Src_Index)'Address;
                   for Size'Address use Src_Data_Stream (Src_Index) (Base_Udp.Header_Size + 1)'Address;
-                  --  New_Buffer  : Boolean renames Header.Ack;
+                  New_Buffer  : Boolean renames Header.Ack;
                   use type Buffers.Buffer_Handle_Access;
 
                begin
-                  Ada.Text_IO.Put_Line ("++Seq Nb : " & Header.Seq_Nb'Img);
-                  if Header.Ack then  --  New_Buffer then
-                     if Size = 0 then
-                        Ada.Text_IO.Put_Line ("!!!!!!!!!!!  UNABLE TO READ SUB BUFFER SIZE  !!!!!!!!!");
-                     end if;
+                  if New_Buffer then
                      Buffer_Size := Size;
                      Ada.Text_IO.Put_Line ("New Buffer");
                      if Dest_Handle /= null then
@@ -465,19 +455,12 @@ package body Buffer_Handling is
                      Dest_Data_Stream   : Stream_Element_Array
                                            (1 .. Stream_Element_Offset
                                               (Buffers.Get_Available_Bytes (Dest_Handle.all)));
+
                      for Dest_Data_Stream'Address use Buffers.Get_Address (Dest_Handle.all);
 
                   begin
                      for I in Stream_Element_Offset range 1 .. Base_Udp.Load_Size - Base_Udp.Header_Size loop
                         --  exit when Src_Index + I - 1 > Src_Data_Stream'Last;
-                        if (Dest_Index + I) > Dest_Data_Stream'Last
-                           or (Dest_Index + I) < Dest_Data_Stream'First
-                        then
-                           Ada.Text_IO.Put_Line ("//////***********\\\\\\\ DEST INDEX ERROR:"
-                              & Ada.Streams.Stream_Element_Offset'Image (Dest_Index + I));
-                           Ada.Text_IO.Put_Line ("//////***********\\\\\\\ BUFFER SIZE:"
-                              & Buffer_Size'Img);
-                        end if;
                         exit when Interfaces.Unsigned_32 (Dest_Size) >= Buffer_Size;
 
                         Dest_Data_Stream (Dest_Index + I) :=
@@ -498,8 +481,6 @@ package body Buffer_Handling is
             Buffer_Cons.Release_Full_Buffer (Src_Handle.all);
             Buffers.Free (Src_Handle);
             Ada.Text_IO.Put_Line ("Released");
-
-
 
          exception
             when E : others =>
