@@ -1,5 +1,6 @@
 with Ada.Unchecked_Deallocation;
 with Ada.Unchecked_Conversion;
+with Ada.Streams;
 with GNAT.Sockets;
 with Interfaces.C;
 with System;
@@ -7,7 +8,6 @@ with System;
 with Buffers;
 
 with Base_Udp;
-with Reliable_Udp;
 
 package Data_Transport.Udp_Socket_Client is
    pragma Optimize (Time);
@@ -46,7 +46,7 @@ package Data_Transport.Udp_Socket_Client is
 
    --  Main part of algorithm, does all the processing once a packet is receive
    procedure Process_Packet (Data         : in Base_Udp.Packet_Stream;
-                             Header       : in Reliable_Udp.Header;
+                             Last         : in Ada.Streams.Stream_Element_Offset;
                              Recv_Offset  : in out Interfaces.Unsigned_64;
                              Data_Addr    : in out System.Address;
                              From         : in Sock_Addr_Type);

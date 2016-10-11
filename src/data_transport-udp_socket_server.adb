@@ -158,7 +158,7 @@ package body Data_Transport.Udp_Socket_Server is
             for Buffer_Size'Address use Size_Stream (3)'Address;
             for Header'Address use Size_Stream'Address;
          begin
-            --  Ada.Text_IO.Put_Line ("send data" & Buffer_Set.Full_Size'Img);
+            --  DO NOT FORGET TO APPEND SIZE TO LAST_PACKETS VECTOR
             GNAT.Sockets.Send_Socket (Socket, Size_Stream, Offset, Address);
             Ada.Text_IO.Put_Line ("Sent : " & Buffer_Size'Img);
             Packet_Number := Packet_Number + 1;

@@ -1,7 +1,6 @@
 with Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Exceptions;
-with Ada.Streams;
 with Ada.Calendar;
 with System.Multiprocessors.Dispatching_Domains;
 with System.Storage_Elements;
@@ -14,6 +13,7 @@ with GNAT.Sockets.Thin;
 pragma Warnings (On);
 
 with Output_Data;
+with Reliable_Udp;
 with Buffer_Handling;
 with Web_Interface;
 
@@ -101,22 +101,14 @@ package body Data_Transport.Udp_Socket_Client is
 
             declare
                Data     : Base_Udp.Packet_Stream;
-               Header   : Reliable_Udp.Header;
 
                for Data'Address use Data_Addr + Storage_Offset
                                                    (Recv_Offset * Base_Udp.Load_Size);
-               for Header'Address use Data'Address;
                use type Ada.Streams.Stream_Element_Offset;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-               Process_Packet (Data, Header, Recv_Offset, Data_Addr, From);
+               Process_Packet (Data, Last, Recv_Offset, Data_Addr, From);
                Recv_Offset := Recv_Offset + 1;
-               if Last = 6 then
-                  --  Buffer_Handling.Save_Size_Pos (Header.Seq_Nb);
-                  Header.Ack := True; --  Activate Ack to differenciate from "normal" packets.
-               else
-                  Header.Ack := False; --  Disable Ack to differenciate from "size" packets.
-               end if;
             exception
                when Socket_Error =>
                   Ada.Text_IO.Put_Line ("Socket Timeout");
@@ -342,23 +334,36 @@ package body Data_Transport.Udp_Socket_Client is
    ----------------------
 
    procedure Process_Packet (Data         : in Base_Udp.Packet_Stream;
-                             Header       : in Reliable_Udp.Header;
+                             Last         : in Ada.Streams.Stream_Element_Offset;
                              Recv_Offset  : in out Interfaces.Unsigned_64;
                              Data_Addr    : in out System.Address;
                              From         : in Sock_Addr_Type)
    is
       Last_Addr            : System.Address;
       Nb_Missed            : Interfaces.Unsigned_64;
+      Header               : Reliable_Udp.Header;
 
+      for Header'Address use Data'Address;
       use type Reliable_Udp.Pkt_Nb;
       use type Ada.Real_Time.Time;
+      use type Ada.Streams.Stream_Element_Offset;
    begin
 
       if Header.Ack then
+         --  Activate Ack to differenciate size packets from "normal" packets.
+         pragma Warnings (Off);
+         Header.Ack := (if Last = 6 then True else False);
+         pragma Warnings (On);
+
          Buffer_Handling.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
          Remove_Task.Remove (Header.Seq_Nb);
          Recv_Offset := Recv_Offset - 1;
       else
+         --  Activate Ack to differenciate size packets from "normal" packets.
+         pragma Warnings (Off);
+         Header.Ack := (if Last = 6 then True else False);
+         pragma Warnings (On);
+
          Nb_Packet_Received := Nb_Packet_Received + 1;
          if Nb_Packet_Received = 1 then
             Start_Time := Ada.Calendar.Clock;
