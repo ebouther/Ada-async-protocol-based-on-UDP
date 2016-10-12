@@ -1,6 +1,7 @@
 with Ada.Text_IO;
 with Ada.Streams;
 with Ada.Exceptions;
+with Ada.Calendar;
 with System.Multiprocessors.Dispatching_Domains;
 with System.Storage_Elements;
 
@@ -397,10 +398,11 @@ package body Buffer_Handling is
    ------------------------
 
    task body Handle_Data_Task is
-         Dest_Buffer : Buffers.Buffer_Produce_Access;
+         Dest_Buffer    : Buffers.Buffer_Produce_Access;
+         Zero_Buf_Size  : exception;
 
-         Src_Handle  : Buffers.Buffer_Handle_Access := null;
-         Dest_Handle : Buffers.Buffer_Handle_Access := null;
+         Src_Handle     : Buffers.Buffer_Handle_Access := null;
+         Dest_Handle    : Buffers.Buffer_Handle_Access := null;
          use Ada.Streams;
    begin
       accept Start (Buffer_Set : Buffers.Buffer_Produce_Access)
@@ -421,6 +423,11 @@ package body Buffer_Handling is
             Dest_Size          : Integer := 0;
             Buffer_Size        : Interfaces.Unsigned_32 := 0;
 
+            Start_Time         : Ada.Calendar.Time := Ada.Calendar.Clock;
+            Start_Time_2       : Ada.Calendar.Time := Ada.Calendar.Clock;
+            Elapsed_Time       : Duration;
+            use type Ada.Calendar.Time;
+
             for Src_Data_Stream'Address use Buffers.Get_Address (Src_Handle.all);
 
          begin
@@ -435,16 +442,27 @@ package body Buffer_Handling is
 
                begin
                   if New_Buffer then
+                     if Size = 0 then
+                        raise Zero_Buf_Size with "Buffer Size = 0";
+                     end if;
                      Buffer_Size := Size;
                      Ada.Text_IO.Put_Line ("New Buffer");
                      if Dest_Handle /= null then
                         Buffers.Set_Used_Bytes (Dest_Handle.all,
                                                 Buffers.Buffer_Size_Type (Dest_Size));
                         Dest_Buffer.Release_Free_Buffer (Dest_Handle.all);
+                        Elapsed_Time := Ada.Calendar.Clock - Start_Time;
+                        Ada.Text_IO.Put_Line ("Took " & Elapsed_Time'Img & "To Fill Dest_Buffer");
                         Buffers.Free (Dest_Handle);
                      end if;
                      Dest_Handle := new Buffers.Buffer_Handle_Type;
-                     Dest_Buffer.Get_Free_Buffer (Dest_Handle.all);
+                     Start_Time := Ada.Calendar.Clock;
+                     select
+                        Dest_Buffer.Get_Free_Buffer (Dest_Handle.all);
+                     or
+                        delay 2.0;
+                        Ada.Text_IO.Put_Line ("Timeout Get_Free_Buffer (Dest_Handle.all)");
+                     end select;
                      Dest_Size := 0;
                      Dest_Index := 0;
                      Src_Index := Src_Index + 1;
@@ -458,7 +476,6 @@ package body Buffer_Handling is
 
                   begin
                      for I in Stream_Element_Offset range 1 .. Base_Udp.Load_Size - Base_Udp.Header_Size loop
-                        --  exit when Src_Index + I - 1 > Src_Data_Stream'Last;
                         exit when Interfaces.Unsigned_32 (Dest_Size) >= Buffer_Size;
                         if Dest_Index + I > Dest_Data_Stream'Last or
                            Dest_Index + I < Dest_Data_Stream'First
@@ -467,6 +484,10 @@ package body Buffer_Handling is
                               & Interfaces.Unsigned_64 (Dest_Index + I)'Img);
                            Ada.Text_IO.Put_Line ("!!!!!!!!!!!!!!! Last :"
                               & Dest_Data_Stream'Last'Img);
+                           Ada.Text_IO.Put_Line ("!!!!!!!!!!!!!!! Dest_Size:"
+                              & Dest_Size'Img);
+                           Ada.Text_IO.Put_Line ("!!!!!!!!!!!!!!! Buffer_Size :"
+                              & Buffer_Size'Img);
                         end if;
                         Dest_Data_Stream (Dest_Index + I) :=
                            Src_Data_Stream (Src_Index) (Base_Udp.Header_Size + I);
@@ -476,9 +497,19 @@ package body Buffer_Handling is
                      --  Wait for a new Src Buffer
                      if Src_Index > Src_Data_Stream'Last then
                         Buffer_Cons.Release_Full_Buffer (Src_Handle.all);
+
+                        Elapsed_Time := Ada.Calendar.Clock - Start_Time_2;
+                        Ada.Text_IO.Put_Line ("Took " & Elapsed_Time'Img & "To Release Src_Buffer");
+
                         Buffers.Free (Src_Handle);
                         Src_Handle := new Buffers.Buffer_Handle_Type;
-                        Buffer_Cons.Get_Full_Buffer (Src_Handle.all);
+                        Start_Time_2 := Ada.Calendar.Clock;
+                        select
+                           Buffer_Cons.Get_Full_Buffer (Src_Handle.all);
+                        or
+                           delay 2.0;
+                           Ada.Text_IO.Put_Line ("Timeout Get_Full_Buffer (Src_Handle.all)");
+                        end select;
                         Src_Index := 1;
 
                         Ada.Text_IO.Put_Line ("Released");
@@ -487,15 +518,6 @@ package body Buffer_Handling is
                   end;
                end;
             end loop;
-
-            --  Buffers.Set_Used_Bytes (Dest_Handle.all,
-            --                          Buffers.Buffer_Size_Type (Dest_Size));
-            --  Dest_Buffer.Release_Free_Buffer (Dest_Handle.all);
-            --  Buffers.Free (Dest_Handle);
-
-            --  Buffer_Cons.Release_Full_Buffer (Src_Handle.all);
-            --  Buffers.Free (Src_Handle);
-            --  Ada.Text_IO.Put_Line ("Released");
 
          exception
             when E : others =>

@@ -10,7 +10,8 @@ with Utiles_Task;
 procedure Udp_Producer is
    use type Buffers.Buffer_Size_Type;
 
-   Used_Bytes  : constant Integer := 40960;
+   Used_Bytes  : constant Integer := 40960000;
+   Buf_Num     : Integer := 0;
 
    Buffer : aliased Buffers.Local.Local_Buffer_Type;
    Server : Data_Transport.Udp_Socket_Server.Socket_Server_Task
@@ -40,7 +41,8 @@ begin
       end case;
    end loop;
    Buffer.Set_Name (To_String (Buffer_Name));
-   Buffer.Initialise (10, Size => Used_Bytes);
+
+   Buffer.Initialise (10, Size => Buffers.Buffer_Size_Type (Used_Bytes));
    Server.Initialise (To_String (Network_Interface), Port);
    Ada.Text_IO.Put_Line ("Get port :" & Port'Img);
    Server.Connect;
@@ -58,8 +60,10 @@ begin
             for I in Data'Range loop
                Data (I) := I;
             end loop;
+            Data (1) := Buf_Num;
+            Buf_Num := Buf_Num + 1;
          end;
-         Buffers.Set_Used_Bytes (Buffer_Handle, 40960);
+         Buffers.Set_Used_Bytes (Buffer_Handle, Buffers.Buffer_Size_Type (Used_Bytes));
          Buffer.Release_Free_Buffer (Buffer_Handle);
       end;
    end loop;
