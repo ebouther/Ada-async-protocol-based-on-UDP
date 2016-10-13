@@ -398,6 +398,7 @@ package body Buffer_Handling is
    task body Handle_Data_Task is
          Dest_Buffer    : Buffers.Buffer_Produce_Access;
          Zero_Buf_Size  : exception;
+         Bad_Index      : exception;
 
          Src_Handle     : Buffers.Buffer_Handle_Access := null;
          Dest_Handle    : Buffers.Buffer_Handle_Access := null;
@@ -415,8 +416,7 @@ package body Buffer_Handling is
          Src_Handle := new Buffers.Buffer_Handle_Type;
          Buffer_Cons.Get_Full_Buffer (Src_Handle.all);
          declare
-
-            Packet_Nb          : Interfaces.Unsigned_64 := 0;
+            --  Packet_Nb          : Interfaces.Unsigned_64 := 0;
 
             Src_Index          : Interfaces.Unsigned_64 := 1;
             Dest_Index         : Stream_Element_Offset := 0;
@@ -431,6 +431,7 @@ package body Buffer_Handling is
 
          begin
             loop
+               <<Loop_Start>>
                declare
 
                   Src_Data_Stream    : array (1 .. Base_Udp.Sequence_Size) of Base_Udp.Packet_Stream;
@@ -445,11 +446,16 @@ package body Buffer_Handling is
                   use Interfaces;
 
                begin
-                  Packet_Nb := Packet_Nb + 1;
+                  --  Packet_Nb := Packet_Nb + 1;
                   if New_Buffer then
-                     Packet_Nb := 0;
+                     --  Ada.Text_IO.Put_Line ("Packet_Nb :" & Packet_Nb'Img);
+                     --  Packet_Nb := 0;
                      if Size = 0 then
                         raise Zero_Buf_Size with "Buffer Size = 0";
+                     end if;
+                     if Size /= 16384 then
+                        Ada.Text_IO.Put_Line ("^^^^^^^^^^^^^^^^^^^^^^^   Size : "
+                           & Size'Img & "^^^^^^^^^^^^^^^^^^^^^^^^^^^");
                      end if;
                      Buffer_Size := Size;
                      if Dest_Handle /= null then
@@ -466,6 +472,15 @@ package body Buffer_Handling is
                      Dest_Size := 0;
                      Dest_Index := 0;
                      Src_Index := Src_Index + 1;
+                     if Src_Index > Src_Data_Stream'Last then
+                        Buffer_Cons.Release_Full_Buffer (Src_Handle.all);
+
+                        Buffers.Free (Src_Handle);
+                        Src_Handle := new Buffers.Buffer_Handle_Type;
+                        Buffer_Cons.Get_Full_Buffer (Src_Handle.all);
+                        Src_Index := 1;
+                        goto Loop_Start;
+                     end if;
                   end if;
                   declare
                      Dest_Data_Stream   : Stream_Element_Array
@@ -476,12 +491,37 @@ package body Buffer_Handling is
                      Offset             : Unsigned_64 :=
                         Base_Udp.Load_Size - Base_Udp.Header_Size;
                   begin
-
-                     if Unsigned_64 (Dest_Index + 1) + Offset > Unsigned_64 (Buffer_Size) then
+                     if Buffer_Size < Unsigned_32 (Dest_Index + 1)
+                     then
+                        raise Bad_Index with "Buffer_Size (" & Buffer_Size'Img
+                           & ") < Index (" & Ada.Streams.Stream_Element_Offset (Dest_Index + 1)'Img & ")";
+                     end if;
+                     if Unsigned_64 (Dest_Index) + Offset > Unsigned_64 (Buffer_Size) then
                         Offset := Unsigned_64 (Buffer_Size - Unsigned_32 (Dest_Index));
-                        Ada.Text_IO.Put_Line ("End Of Dest Buffer : " & Offset'Img);
+                        --  Ada.Text_IO.Put_Line ("End Of Dest Buffer : " & Offset'Img);
                      end if;
 
+                     if Dest_Index + Stream_Element_Offset (Offset) > Dest_Data_Stream'Last
+                        or Dest_Index + Stream_Element_Offset (Offset) < Dest_Data_Stream'First
+                        or Dest_Index + 1 > Dest_Data_Stream'Last
+                        or Dest_Index + 1 < Dest_Data_Stream'First
+                     then
+                        Ada.Text_IO.Put_Line ("Dest_Index : " & Dest_Index'Img);
+                        Ada.Text_IO.Put_Line ("Offset : " & Offset'Img);
+                        Ada.Text_IO.Put_Line ("Dest_Data_Stream'Last : " & Dest_Data_Stream'Last'Img);
+                     end if;
+                     if Base_Udp.Header_Size + Stream_Element_Offset (Offset) > Src_Data_Stream (1)'Last
+                        or Base_Udp.Header_Size + Stream_Element_Offset (Offset) < Src_Data_Stream (1)'First
+                        or Src_Index > Src_Data_Stream'Last
+                        or Src_Index < Src_Data_Stream'First
+                     then
+                        Ada.Text_IO.Put_Line ("*** Src_Data_Stream ***  Src_Index : " & Src_Index'Img);
+                        Ada.Text_IO.Put_Line ("*** Src_Data_Stream ***  Src_Stream_Last : " & Src_Data_Stream'Last'Img);
+                        Ada.Text_IO.Put_Line ("*** Src_Data_Stream ***  Offset : " & Offset'Img);
+                     end if;
+
+                     --  Ada.Text_IO.Put_Line ("Copy from Dest_Index (: "
+                     --     & Dest_Index'Img & ") + 1 To Dest_Index + " & Offset'Img);
                      Dest_Data_Stream (Dest_Index + 1 .. Dest_Index + Stream_Element_Offset (Offset)) :=
                         Src_Data_Stream
                            (Src_Index)
@@ -489,21 +529,18 @@ package body Buffer_Handling is
 
                      Dest_Size := Dest_Size + Offset;
                      Src_Index := Src_Index + 1;
-                     --  Wait for a new Src Buffer
+
                      if Src_Index > Src_Data_Stream'Last then
                         Buffer_Cons.Release_Full_Buffer (Src_Handle.all);
 
-                        --  Elapsed_Time := Ada.Calendar.Clock - Start_Time_2;
-                        --  Ada.Text_IO.Put_Line ("Took " & Elapsed_Time'Img & "To Release Src_Buffer");
-
                         Buffers.Free (Src_Handle);
                         Src_Handle := new Buffers.Buffer_Handle_Type;
-                        --  Start_Time_2 := Ada.Calendar.Clock;
                         Buffer_Cons.Get_Full_Buffer (Src_Handle.all);
                         Src_Index := 1;
-
                      end if;
+
                      Dest_Index := Dest_Index + (Base_Udp.Load_Size - Base_Udp.Header_Size);
+                     --  Ada.Text_IO.Put_Line ("Dest_Index " & Dest_Index'Img);
                   end;
                end;
             end loop;

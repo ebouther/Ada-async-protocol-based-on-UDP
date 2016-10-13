@@ -1,4 +1,5 @@
 with Ada.Streams;
+with Ada.Exceptions;
 with System.Multiprocessors.Dispatching_Domains;
 with Ada.Text_IO;
 
@@ -47,6 +48,13 @@ package body Reliable_Udp is
          end if;
          Ack_Mgr.Set (Loss_Index (I), Packet_Lost);
       end loop;
+   exception
+      when E : others =>
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
    end Append_Ack;
 
 

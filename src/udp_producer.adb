@@ -10,7 +10,7 @@ with Utiles_Task;
 procedure Udp_Producer is
    use type Buffers.Buffer_Size_Type;
 
-   Used_Bytes  : constant Integer := 40960000;
+   Used_Bytes  : constant Integer := 16384;
    Buf_Num     : Integer := 0;
 
    Buffer : aliased Buffers.Local.Local_Buffer_Type;

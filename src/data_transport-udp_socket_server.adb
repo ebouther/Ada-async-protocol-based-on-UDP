@@ -160,7 +160,9 @@ package body Data_Transport.Udp_Socket_Server is
             Header := (Ack => False,
                        Seq_Nb => Packet_Number);
             Last_Packets (Packet_Number).Is_Buffer_Size := True;
+            --  if Packet_Number mod 2 = 0 then -- STRESS TEST !!
             Send_Packet (Last_Packets (Packet_Number).Data, True);
+            --  end if;
             Packet_Number := Packet_Number + 1;
             Send_All_Stream (Data, Packet_Number);
          exception
