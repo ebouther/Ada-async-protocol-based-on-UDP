@@ -160,9 +160,9 @@ package body Data_Transport.Udp_Socket_Server is
             Header := (Ack => False,
                        Seq_Nb => Packet_Number);
             Last_Packets (Packet_Number).Is_Buffer_Size := True;
-            --  if Packet_Number mod 2 = 0 then -- STRESS TEST !!
-            Send_Packet (Last_Packets (Packet_Number).Data, True);
-            --  end if;
+            if Packet_Number mod 2 = 0 then -- STRESS TEST !!
+               Send_Packet (Last_Packets (Packet_Number).Data, True);
+            end if;
             Packet_Number := Packet_Number + 1;
             Send_All_Stream (Data, Packet_Number);
          exception
@@ -214,6 +214,7 @@ package body Data_Transport.Udp_Socket_Server is
                Last_Packets (Packet_Number).Data := Head & Payload
                      (First .. Last);
             end if;
+            Last_Packets (Packet_Number).Is_Buffer_Size := False;
             GNAT.Sockets.Send_Socket (Socket, Last_Packets (Packet_Number).Data,
                                        Index, Address);
 
@@ -281,6 +282,15 @@ package body Data_Transport.Udp_Socket_Server is
                Ack_Header.Ack := True;
                Send_Packet (Last_Packets (Head.Seq_Nb).Data,
                             Last_Packets (Head.Seq_Nb).Is_Buffer_Size);
+               --  DBG
+               if Last_Packets (Head.Seq_Nb).Is_Buffer_Size then
+                  declare
+                     Msg   : Interfaces.Unsigned_32;
+                     for Msg'Address use Last_Packets (Head.Seq_Nb).Data (3)'Address;
+                  begin
+                     Ada.Text_IO.Put_Line ("+++++++ Ack : " & Msg'Img);
+                  end;
+               end if;
             end;
          end if;
       end loop;

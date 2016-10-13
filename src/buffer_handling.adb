@@ -452,10 +452,9 @@ package body Buffer_Handling is
                      --  Packet_Nb := 0;
                      if Size = 0 then
                         raise Zero_Buf_Size with "Buffer Size = 0";
-                     end if;
-                     if Size /= 16384 then
+                     elsif Size /= 32768 then
                         Ada.Text_IO.Put_Line ("^^^^^^^^^^^^^^^^^^^^^^^   Size : "
-                           & Size'Img & "^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+                           & Size'Img & "    ^^^^^^^^^^^^^^^^^^^^^^^^^^^");
                      end if;
                      Buffer_Size := Size;
                      if Dest_Handle /= null then

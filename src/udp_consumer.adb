@@ -9,7 +9,7 @@ procedure Udp_Consumer is
    Buffer : aliased Buffers.Local.Local_Buffer_Type;
    Client : Data_Transport.Udp_Socket_Client.Socket_Client_Task
      (Buffer'Unchecked_Access);
-   type Data_Array is array (1 .. 1024) of Integer;
+   --  type Data_Array is array (1 .. 1024) of Integer;
    Options : constant String := "buffer_name= host_name= port= watchdog=";
    use Ada.Strings.Unbounded;
    Host_Name : Unbounded_String := To_Unbounded_String ("localhost");
@@ -36,7 +36,7 @@ begin
       end case;
    end loop;
    Buffer.Set_Name (To_String (Buffer_Name));
-   Buffer.Initialise (10, Size => 16384);
+   Buffer.Initialise (10, Size => 16384 * 2);
    Client.Initialise (To_String (Host_Name), Port);
    Client.Connect;
    loop
@@ -62,15 +62,16 @@ begin
          Buffer_Handle : Buffers.Buffer_Handle_Type;
       begin
          Buffer.Get_Full_Buffer (Buffer_Handle);
-         declare
-            Data : Data_Array;
-            for Data'Address use Buffers.Get_Address (Buffer_Handle);
-         begin
-            Ada.Text_IO.Put_Line (Buffers.Get_Used_Bytes (Buffer_Handle)'Img);
-            --  Ada.Text_IO.Put_Line ("FIRST : " & Data (1)'Img &
-            --                        "SECOND : " & Data (2)'Img &
-            --                        "LAST : " & Data (1024)'Img);
-         end;
+         --  declare
+         --     Data : Data_Array;
+         --     for Data'Address use Buffers.Get_Address (Buffer_Handle);
+         --  begin
+         --     Ada.Text_IO.Put_Line ("Used Bytes :"
+         --        & Buffers.Get_Used_Bytes (Buffer_Handle)'Img);
+         --     Ada.Text_IO.Put_Line ("FIRST : " & Data (1)'Img &
+         --                           "SECOND : " & Data (2)'Img &
+         --                           "LAST : " & Data (1024)'Img);
+         --  end;
          Buffer.Release_Full_Buffer (Buffer_Handle);
       end;
    end loop;
