@@ -1,3 +1,4 @@
+with Ada.Streams;
 with System;
 with Interfaces.C;
 
@@ -87,6 +88,34 @@ package Buffer_Handling is
                               Data_Addr   :  System.Address;
                               Last_Addr   :  System.Address;
                               Nb_Missed   :  Interfaces.Unsigned_64);
+
+   function New_Dest_Buffer (Dest_Buffer     : Buffers.Buffer_Produce_Access;
+                             Size            : Interfaces.Unsigned_32;
+                             Buffer_Size     : in out Interfaces.Unsigned_32;
+                             Packet_Nb       : in out Interfaces.Unsigned_64;
+                             Src_Index       : in out Interfaces.Unsigned_64;
+                             Src_Handle      : in out Buffers.Buffer_Handle_Access;
+                             Dest_Size       : in out Interfaces.Unsigned_64;
+                             Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
+                             Dest_Handle     : in out Buffers.Buffer_Handle_Access;
+                             Src_Data_Stream : Base_Udp.Sequence_Type) return Integer;
+
+   --  Src_Handle get a new Src_Buffer if it's necessary returns 1 otherwise 0
+   function New_Src_Buffer (Src_Index       : in out Interfaces.Unsigned_64;
+                            Src_Handle      : in out Buffers.Buffer_Handle_Access;
+                            Src_Data_Stream : Base_Udp.Sequence_Type) return Integer;
+
+   procedure  New_Src_Buffer (Src_Index       : in out Interfaces.Unsigned_64;
+                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
+                              Src_Data_Stream : Base_Udp.Sequence_Type);
+
+   procedure Copy_Packet_Data_To_Dest (Buffer_Size     : Interfaces.Unsigned_32;
+                                       Src_Index       : in out Interfaces.Unsigned_64;
+                                       Src_Handle      : in out Buffers.Buffer_Handle_Access;
+                                       Dest_Handle     : Buffers.Buffer_Handle_Access;
+                                       Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
+                                       Dest_Size       : in out Interfaces.Unsigned_64;
+                                       Src_Data_Stream : Base_Udp.Sequence_Type);
 
    --  Release Buffer and Reuse Handler only if Buffer State is "Full"
    task type Release_Full_Buf is

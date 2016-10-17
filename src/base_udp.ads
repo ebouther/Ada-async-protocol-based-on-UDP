@@ -55,6 +55,8 @@ package Base_Udp is
    subtype Packet_Stream is
       Ada.Streams.Stream_Element_Array (1 .. Base_Udp.Load_Size);
 
+   type Sequence_Type is array (1 .. Base_Udp.Sequence_Size) of Packet_Stream;
+
    type Packet_Stream_Access is access all Packet_Stream;
 
 end Base_Udp;

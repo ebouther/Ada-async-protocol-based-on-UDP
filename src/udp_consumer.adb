@@ -2,10 +2,12 @@ with Data_Transport.Udp_Socket_Client;
 with Buffers.Local;
 with GNAT.Sockets;
 with GNAT.Command_Line;
+with Interfaces;
 with Ada.Text_IO;
 with Ada.Strings.Unbounded;
 
 procedure Udp_Consumer is
+   Total_Bytes_Received : Interfaces.Unsigned_64 := 0;
    Buffer : aliased Buffers.Local.Local_Buffer_Type;
    Client : Data_Transport.Udp_Socket_Client.Socket_Client_Task
      (Buffer'Unchecked_Access);
@@ -18,7 +20,26 @@ procedure Udp_Consumer is
    Watchdog_Counter : Natural;
    Watchdog_Limit : Positive := 10;
    use type Buffers.Buffer_Size_Type;
+
+   task type Timer_Task is
+      entry Start;
+   end Timer_Task;
+
+   task body Timer_Task is
+      Elapsed_Sec   : Integer := 0;
+   begin
+      accept Start;
+      loop
+         Ada.Text_IO.Put_Line ("////////////\\\// DEBIT : "
+            & Long_Float'Image (Long_Float (Total_Bytes_Received) / Long_Float (Elapsed_Sec) * 8.0));
+         delay 5.0;
+         Elapsed_Sec := Elapsed_Sec + 5;
+      end loop;
+   end Timer_Task;
+
+   Timer : Timer_Task;
 begin
+
    loop
       case GNAT.Command_Line.Getopt (Options) is
          when ASCII.NUL =>
@@ -36,7 +57,7 @@ begin
       end case;
    end loop;
    Buffer.Set_Name (To_String (Buffer_Name));
-   Buffer.Initialise (10, Size => 16384 * 2);
+   Buffer.Initialise (10, Size => 40960000);
    Client.Initialise (To_String (Host_Name), Port);
    Client.Connect;
    loop
@@ -45,6 +66,11 @@ begin
       loop
          select
             Buffer.Block_Full;
+            select
+               Timer.Start;
+            else
+               null;
+            end select;
             --  Ada.Text_IO.Put_Line ("block full seen");
             exit;
          or
@@ -60,8 +86,13 @@ begin
       end loop;
       declare
          Buffer_Handle : Buffers.Buffer_Handle_Type;
+         use type Interfaces.Unsigned_64;
       begin
          Buffer.Get_Full_Buffer (Buffer_Handle);
+
+         Total_Bytes_Received := Total_Bytes_Received
+                                    + Interfaces.Unsigned_64
+                                       (Buffers.Get_Used_Bytes (Buffer_Handle));
          --  declare
          --     Data : Data_Array;
          --     for Data'Address use Buffers.Get_Address (Buffer_Handle);
