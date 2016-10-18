@@ -95,7 +95,6 @@ package Buffer_Handling is
                              Packet_Nb       : in out Interfaces.Unsigned_64;
                              Src_Index       : in out Interfaces.Unsigned_64;
                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
-                             Dest_Size       : in out Interfaces.Unsigned_64;
                              Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
                              Dest_Handle     : in out Buffers.Buffer_Handle_Access;
                              Src_Data_Stream : Base_Udp.Sequence_Type) return Integer;
@@ -114,7 +113,6 @@ package Buffer_Handling is
                                        Src_Handle      : in out Buffers.Buffer_Handle_Access;
                                        Dest_Handle     : Buffers.Buffer_Handle_Access;
                                        Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
-                                       Dest_Size       : in out Interfaces.Unsigned_64;
                                        Src_Data_Stream : Base_Udp.Sequence_Type);
 
    --  Release Buffer and Reuse Handler only if Buffer State is "Full"

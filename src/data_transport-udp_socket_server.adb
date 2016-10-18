@@ -156,7 +156,9 @@ package body Data_Transport.Udp_Socket_Server is
             for Buffer_Size'Address use Last_Packets (Packet_Number).Data
                                           (Base_Udp.Header_Size + 1)'Address;
          begin
-            Ada.Text_IO.Put_Line ("Sent : " & Buffer_Size'Img);
+            if Buffer_Size = 0 then
+               Ada.Text_IO.Put_Line ("ERROR : Sent Buffer_Size 0");
+            end if;
             Header := (Ack => False,
                        Seq_Nb => Packet_Number);
             Last_Packets (Packet_Number).Is_Buffer_Size := True;

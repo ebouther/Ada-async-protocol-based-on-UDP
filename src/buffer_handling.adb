@@ -383,7 +383,6 @@ package body Buffer_Handling is
                              Packet_Nb       : in out Interfaces.Unsigned_64;
                              Src_Index       : in out Interfaces.Unsigned_64;
                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
-                             Dest_Size       : in out Interfaces.Unsigned_64;
                              Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
                              Dest_Handle     : in out Buffers.Buffer_Handle_Access;
                              Src_Data_Stream : Base_Udp.Sequence_Type) return Integer is
@@ -395,16 +394,15 @@ package body Buffer_Handling is
       if Size = 0 then
          raise Zero_Buf_Size with "Buffer Size = 0";
       end if;
-      Buffer_Size := Size;
       if Dest_Handle /= null then
          Buffers.Set_Used_Bytes (Dest_Handle.all,
-                                 Buffers.Buffer_Size_Type (Dest_Size));
+                                 Buffers.Buffer_Size_Type (Buffer_Size));
          Dest_Buffer.Release_Free_Buffer (Dest_Handle.all);
          Buffers.Free (Dest_Handle);
       end if;
       Dest_Handle := new Buffers.Buffer_Handle_Type;
       Dest_Buffer.Get_Free_Buffer (Dest_Handle.all);
-      Dest_Size := 0;
+      Buffer_Size := Size;
       Dest_Index := 0;
       Src_Index := Src_Index + 1;
       return New_Src_Buffer (Src_Index, Src_Handle, Src_Data_Stream);
@@ -456,7 +454,6 @@ package body Buffer_Handling is
                                        Src_Handle      : in out Buffers.Buffer_Handle_Access;
                                        Dest_Handle     : Buffers.Buffer_Handle_Access;
                                        Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
-                                       Dest_Size       : in out Interfaces.Unsigned_64;
                                        Src_Data_Stream : Base_Udp.Sequence_Type) is
       use Ada.Streams;
       use Interfaces;
@@ -472,21 +469,40 @@ package body Buffer_Handling is
    begin
       if Buffer_Size < Unsigned_32 (Dest_Index + 1)
       then
+         Ada.Text_IO.Put_Line ("/!\ Buffer_Size < Dest_Index /!\");
+         Ada.Text_IO.Put_Line ("/!\" & Buffer_Size'Img & " <"
+            & Unsigned_32 (Dest_Index + 1)'Img & " /!\");
          Dest_Index := 0;
-         Ada.Text_IO.Put_Line ("/!\ Dest_Index > Buffer_Size /!\");
       end if;
 
       if Unsigned_64 (Dest_Index) + Offset > Unsigned_64 (Buffer_Size) then
          Offset := Unsigned_64 (Buffer_Size - Unsigned_32 (Dest_Index));
       end if;
-
+         ------------  DBG ----------
+         --  if Dest_Index + Stream_Element_Offset (Offset) > Dest_Data_Stream'Last
+         --     or Dest_Index + Stream_Element_Offset (Offset) < Dest_Data_Stream'First
+         --     or Dest_Index + 1 > Dest_Data_Stream'Last
+         --     or Dest_Index + 1 < Dest_Data_Stream'First
+         --  then
+         --     Ada.Text_IO.Put_Line ("Dest_Index : " & Dest_Index'Img);
+         --     Ada.Text_IO.Put_Line ("Offset : " & Offset'Img);
+         --     Ada.Text_IO.Put_Line ("Dest_Data_Stream'Last : " & Dest_Data_Stream'Last'Img);
+         --  end if;
+         --  if Base_Udp.Header_Size + Stream_Element_Offset (Offset) > Src_Data_Stream (1)'Last
+         --     or Base_Udp.Header_Size + Stream_Element_Offset (Offset) < Src_Data_Stream (1)'First
+         --     or Src_Index > Src_Data_Stream'Last
+         --     or Src_Index < Src_Data_Stream'First
+         --  then
+         --     Ada.Text_IO.Put_Line ("*** Src_Data_Stream ***  Src_Index : " & Src_Index'Img);
+         --     Ada.Text_IO.Put_Line ("*** Src_Data_Stream ***  Src_Stream_Last : " & Src_Data_Stream'Last'Img);
+         --     Ada.Text_IO.Put_Line ("*** Src_Data_Stream ***  Offset : " & Offset'Img);
+         --  end if;
 
       Dest_Data_Stream (Dest_Index + 1 .. Dest_Index + Stream_Element_Offset (Offset)) :=
          Src_Data_Stream
             (Src_Index)
                (Base_Udp.Header_Size + 1 .. Base_Udp.Header_Size + Stream_Element_Offset (Offset));
 
-      Dest_Size := Dest_Size + Offset;
       Src_Index := Src_Index + 1;
       New_Src_Buffer (Src_Index, Src_Handle, Src_Data_Stream);
       Dest_Index := Dest_Index + (Base_Udp.Load_Size - Base_Udp.Header_Size);
@@ -510,7 +526,6 @@ package body Buffer_Handling is
          Src_Index          : Interfaces.Unsigned_64 := 1;
          Dest_Index         : Stream_Element_Offset := 0;
 
-         Dest_Size          : Interfaces.Unsigned_64 := 0;
          Buffer_Size        : Interfaces.Unsigned_32 := 0;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
@@ -524,7 +539,6 @@ package body Buffer_Handling is
       Src_Handle := new Buffers.Buffer_Handle_Type;
       Buffer_Cons.Get_Full_Buffer (Src_Handle.all);
       loop
-         <<Loop_Start>>
          declare
             Src_Data_Stream    : Base_Udp.Sequence_Type;
             for Src_Data_Stream'Address use Buffers.Get_Address (Src_Handle.all);
@@ -537,27 +551,35 @@ package body Buffer_Handling is
          begin
             Packet_Nb := Packet_Nb + 1;
             if New_Buffer then
+               --  Ada.Text_IO.Put_Line ("YEP");
                if New_Dest_Buffer (Dest_Buffer,
                                    Size,
                                    Buffer_Size,
                                    Packet_Nb,
                                    Src_Index,
                                    Src_Handle,
-                                   Dest_Size,
                                    Dest_Index,
                                    Dest_Handle,
-                                   Src_Data_Stream) = 1
+                                   Src_Data_Stream) /= 1
                then
-                  goto Loop_Start;
+                  Copy_Packet_Data_To_Dest (Buffer_Size,
+                          Src_Index,
+                          Src_Handle,
+                          Dest_Handle,
+                          Dest_Index,
+                          Src_Data_Stream);
+
                end if;
+            else
+               Copy_Packet_Data_To_Dest (Buffer_Size,
+                       Src_Index,
+                       Src_Handle,
+                       Dest_Handle,
+                       Dest_Index,
+                       Src_Data_Stream);
+               --  Ada.Text_IO.Put_Line ("NOPE");
             end if;
-            Copy_Packet_Data_To_Dest (Buffer_Size,
-                                      Src_Index,
-                                      Src_Handle,
-                                      Dest_Handle,
-                                      Dest_Index,
-                                      Dest_Size,
-                                      Src_Data_Stream);
+
          end;
       end loop;
       exception
