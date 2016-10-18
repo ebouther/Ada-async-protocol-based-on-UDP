@@ -98,25 +98,6 @@ package body Buffer_Handling is
                               renames Buffer_Handler.Handlers (Index);
       use Base_Udp;
    begin
-      --  if Buf.Size = 0 then
-      --     Ada.Exceptions.Raise_Exception (Unknown_Buffer_Size'Identity,
-      --        "Attempting to release a buffer with unknown size. Cannot Set_Used_Bytes.");
-      --  end if;
-      --  Ada.Text_IO.Put_Line ("Recv_Buf Size : " & Buf.Size'Img);
-      --  Ada.Text_IO.Put_Line ("Set_Used_Bytes : " & Integer (Buf.Size +
-      --           (Buf.Size / Load_Size
-      --              + (if Buf.Size rem Load_Size /= 0 then
-      --                 1 else 0))
-      --           * Header_Size)'Img);
-
-      --  Buffers.Set_Used_Bytes
-      --     (Buf.Handle,
-      --        Buffers.Buffer_Size_Type
-      --           (Buf.Size +
-      --           (Buf.Size / Load_Size
-      --              + (if Buf.Size rem Load_Size /= 0 then
-      --                 1 else 0))
-      --           * Header_Size));
 
       Buffers.Set_Used_Bytes
          (Buf.Handle, Buffers.Buffer_Size_Type
@@ -385,7 +366,7 @@ package body Buffer_Handling is
                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
                              Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
                              Dest_Handle     : in out Buffers.Buffer_Handle_Access;
-                             Src_Data_Stream : Base_Udp.Sequence_Type) return Integer is
+                             Src_Data_Stream : Base_Udp.Sequence_Type) return Boolean is
 
       Zero_Buf_Size  : exception;
       use type Buffers.Buffer_Handle_Access;
@@ -404,6 +385,8 @@ package body Buffer_Handling is
       Dest_Buffer.Get_Free_Buffer (Dest_Handle.all);
       Buffer_Size := Size;
       Dest_Index := 0;
+      --  This packet contains a buffer size,
+      --  move directly to next packet which contains buffer's data.
       Src_Index := Src_Index + 1;
       return New_Src_Buffer (Src_Index, Src_Handle, Src_Data_Stream);
    end New_Dest_Buffer;
@@ -430,7 +413,7 @@ package body Buffer_Handling is
 
    function New_Src_Buffer (Src_Index       : in out Interfaces.Unsigned_64;
                             Src_Handle      : in out Buffers.Buffer_Handle_Access;
-                            Src_Data_Stream : Base_Udp.Sequence_Type) return Integer is
+                            Src_Data_Stream : Base_Udp.Sequence_Type) return Boolean is
    begin
       if Src_Index > Src_Data_Stream'Last then
          Buffer_Cons.Release_Full_Buffer (Src_Handle.all);
@@ -439,9 +422,9 @@ package body Buffer_Handling is
          Src_Handle := new Buffers.Buffer_Handle_Type;
          Buffer_Cons.Get_Full_Buffer (Src_Handle.all);
          Src_Index := 1;
-         return 1;
+         return True;
       end if;
-      return 0;
+      return False;
    end New_Src_Buffer;
 
 
@@ -458,45 +441,18 @@ package body Buffer_Handling is
       use Ada.Streams;
       use Interfaces;
 
-      Dest_Data_Stream   : Stream_Element_Array
+      Dest_Data_Stream     : Stream_Element_Array
                             (1 .. Stream_Element_Offset
                                (Buffers.Get_Available_Bytes (Dest_Handle.all)));
 
       for Dest_Data_Stream'Address use Buffers.Get_Address (Dest_Handle.all);
-      Offset             : Unsigned_64 :=
-         Base_Udp.Load_Size - Base_Udp.Header_Size;
+      Offset               : Unsigned_64 :=
+                              Base_Udp.Load_Size - Base_Udp.Header_Size;
 
    begin
-      if Buffer_Size < Unsigned_32 (Dest_Index + 1)
-      then
-         Ada.Text_IO.Put_Line ("/!\ Buffer_Size < Dest_Index /!\");
-         Ada.Text_IO.Put_Line ("/!\" & Buffer_Size'Img & " <"
-            & Unsigned_32 (Dest_Index + 1)'Img & " /!\");
-         Dest_Index := 0;
-      end if;
-
       if Unsigned_64 (Dest_Index) + Offset > Unsigned_64 (Buffer_Size) then
          Offset := Unsigned_64 (Buffer_Size - Unsigned_32 (Dest_Index));
       end if;
-         ------------  DBG ----------
-         --  if Dest_Index + Stream_Element_Offset (Offset) > Dest_Data_Stream'Last
-         --     or Dest_Index + Stream_Element_Offset (Offset) < Dest_Data_Stream'First
-         --     or Dest_Index + 1 > Dest_Data_Stream'Last
-         --     or Dest_Index + 1 < Dest_Data_Stream'First
-         --  then
-         --     Ada.Text_IO.Put_Line ("Dest_Index : " & Dest_Index'Img);
-         --     Ada.Text_IO.Put_Line ("Offset : " & Offset'Img);
-         --     Ada.Text_IO.Put_Line ("Dest_Data_Stream'Last : " & Dest_Data_Stream'Last'Img);
-         --  end if;
-         --  if Base_Udp.Header_Size + Stream_Element_Offset (Offset) > Src_Data_Stream (1)'Last
-         --     or Base_Udp.Header_Size + Stream_Element_Offset (Offset) < Src_Data_Stream (1)'First
-         --     or Src_Index > Src_Data_Stream'Last
-         --     or Src_Index < Src_Data_Stream'First
-         --  then
-         --     Ada.Text_IO.Put_Line ("*** Src_Data_Stream ***  Src_Index : " & Src_Index'Img);
-         --     Ada.Text_IO.Put_Line ("*** Src_Data_Stream ***  Src_Stream_Last : " & Src_Data_Stream'Last'Img);
-         --     Ada.Text_IO.Put_Line ("*** Src_Data_Stream ***  Offset : " & Offset'Img);
-         --  end if;
 
       Dest_Data_Stream (Dest_Index + 1 .. Dest_Index + Stream_Element_Offset (Offset)) :=
          Src_Data_Stream
@@ -552,6 +508,9 @@ package body Buffer_Handling is
             Packet_Nb := Packet_Nb + 1;
             if New_Buffer then
                --  Ada.Text_IO.Put_Line ("YEP");
+
+               --  Loop if True which means that the buffer data is in next src_buffer
+               --  and src_data_stream (declared above) has to be reload with new buffer.
                if New_Dest_Buffer (Dest_Buffer,
                                    Size,
                                    Buffer_Size,
@@ -560,7 +519,7 @@ package body Buffer_Handling is
                                    Src_Handle,
                                    Dest_Index,
                                    Dest_Handle,
-                                   Src_Data_Stream) /= 1
+                                   Src_Data_Stream) = False
                then
                   Copy_Packet_Data_To_Dest (Buffer_Size,
                           Src_Index,

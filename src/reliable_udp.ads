@@ -18,7 +18,7 @@ package Reliable_Udp is
    use type Interfaces.Unsigned_32;
    use type Interfaces.Unsigned_64;
 
-   Client_Address    : GNAT.Sockets.Sock_Addr_Type;
+   Producer_Address    : GNAT.Sockets.Sock_Addr_Type;
 
    --  Stored in packet header to identify which packet was lost
    type Pkt_Nb is mod 2 ** (Base_Udp.Header'Size - 1);
@@ -50,10 +50,6 @@ package Reliable_Udp is
 
    for Header'Alignment use Base_Udp.Header_Size;
 
-   --  Vector of "Loss" Type which stores acks
-   package Losses_Container is
-      new Ada.Containers.Vectors (Natural, Loss);
-
    type Append_Ack_Type is
       record
          From     : GNAT.Sockets.Sock_Addr_Type;
@@ -78,10 +74,10 @@ package Reliable_Udp is
       entry Stop;
    end Ack_Task;
 
-   --  Appends packets to Losses Container
+   --  Appends packets to Losses Array
    task Append_Task;
 
-   --  Removes Pkt_Nb from Losses Container
+   --  Removes Pkt_Nb from Losses Array
    task type Remove_Task is
       entry Stop;
       entry Remove (Packet : in Pkt_Nb);
@@ -89,20 +85,26 @@ package Reliable_Udp is
 
    protected type Ack_Management is
 
-      procedure Set (Index    : in Loss_Index;
-                     Data     : in Loss);
+      procedure Set
+                  (Index   : in Loss_Index;
+                   Data    : in Loss);
 
-      procedure Get (Index : in Loss_Index;
-                     Data  : in out Loss);
+      procedure Get
+                  (Index   : in Loss_Index;
+                   Data    : in out Loss);
 
-      function Get (Index : in Loss_Index) return Loss;
+      function  Get
+                  (Index   : in Loss_Index) return Loss;
 
-      procedure Clear (Index    : in Loss_Index);
+      procedure Clear
+                  (Index   : in Loss_Index);
 
-      function Is_Empty (Index    : in Loss_Index) return Boolean;
+      function  Is_Empty
+                  (Index   : in Loss_Index) return Boolean;
 
       private
          Losses            : Losses_Array;
+
    end Ack_Management;
 
 end Reliable_Udp;

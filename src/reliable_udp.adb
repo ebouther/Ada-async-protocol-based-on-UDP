@@ -22,7 +22,7 @@ package body Reliable_Udp is
    begin
       Head.Seq_Nb := Cmd;
       Head.Ack    := False;
-      GNAT.Sockets.Send_Socket (Socket, Data, Offset, Client_Address);
+      GNAT.Sockets.Send_Socket (Socket, Data, Offset, Producer_Address);
    end Send_Cmd_Client;
 
    ------------------
@@ -65,8 +65,8 @@ package body Reliable_Udp is
    task body Append_Task is
       Ack   :  Append_Ack_Type;
    begin
-      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
-      --     (System.Multiprocessors.CPU_Range (6));
+      System.Multiprocessors.Dispatching_Domains.Set_CPU
+         (System.Multiprocessors.CPU_Range (6));
       loop
          Fifo.Remove_First_Wait (Ack);
          if Ack.First_D <= Ack.Last_D then

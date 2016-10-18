@@ -37,16 +37,16 @@ package body Data_Transport.Udp_Socket_Client is
 
 
    task body Socket_Client_Task is
-      Handle_Data          : Buffer_Handling.Handle_Data_Task;
+      Handle_Data        : Buffer_Handling.Handle_Data_Task;
 
-      Server               : Socket_Type;
-      Cons_Addr            : GNAT.Sockets.Inet_Addr_Type;
-      Cons_Port            : GNAT.Sockets.Port_Type;
+      Server             : Socket_Type;
+      Cons_Addr          : GNAT.Sockets.Inet_Addr_Type;
+      Cons_Port          : GNAT.Sockets.Port_Type;
 
-      From                 : Sock_Addr_Type;
-      Last                 : Ada.Streams.Stream_Element_Offset;
-      Data_Addr            : System.Address;
-      Recv_Offset          : Interfaces.Unsigned_64 := Base_Udp.Pkt_Max + 1;
+      From               : Sock_Addr_Type;
+      Last               : Ada.Streams.Stream_Element_Offset;
+      Data_Addr          : System.Address;
+      Recv_Offset        : Interfaces.Unsigned_64 := Base_Udp.Pkt_Max + 1;
 
       use System.Storage_Elements;
       use type Interfaces.C.int;
@@ -310,7 +310,7 @@ package body Data_Transport.Udp_Socket_Client is
       Init_Udp (Socket, Host, Port, False);
       loop
          GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
-         Reliable_Udp.Client_Address := From;
+         Reliable_Udp.Producer_Address := From;
 
          if Base_Udp.Acquisition and Head.Seq_Nb = 0 then  --  Means producer is ready.
             exit;

@@ -79,8 +79,8 @@ package body Data_Transport.Udp_Socket_Server is
                   use type Ada.Calendar.Time;
                begin
                   loop
-                     Rcv_Ack; -- Give server 2s to be sure it has all packets
-
+                     Rcv_Ack;
+                     --  Give server 2s to be sure it has all packets
                      if Ada.Calendar.Clock - Start_Time > 2.0 then
                         goto HandShake;
                      end if;
@@ -110,8 +110,11 @@ package body Data_Transport.Udp_Socket_Server is
 
       for Send_Head'Address use Send_Data'Address;
       for Recv_Head'Address use Recv_Data'Address;
+      Recv_Msg    : Reliable_Udp.Pkt_Nb renames Recv_Head.Seq_Nb;
+      Send_Msg    : Reliable_Udp.Pkt_Nb renames Send_Head.Seq_Nb;
+      Not_A_Msg   : Boolean renames Recv_Head.Ack;
    begin
-      Send_Head.Seq_Nb := 0;
+      Send_Msg := 0;
       loop
          Send_Packet (Send_Data);
          delay 0.2;
@@ -120,9 +123,8 @@ package body Data_Transport.Udp_Socket_Server is
                 Recv_Data (Recv_Data'First)'Address,
                 Recv_Data'Length,
                 64) /= -1
-               and Recv_Head.Ack = False
-               and (Recv_Head.Seq_Nb = Send_Head.Seq_Nb);
-               --  Should rename Seq_Nb by Msg in this case.
+               and Not_A_Msg = False
+               and Recv_Msg = Send_Msg;
       end loop;
    end Server_HandShake;
 
@@ -133,51 +135,47 @@ package body Data_Transport.Udp_Socket_Server is
 
    procedure Send_Buffer_Data (Buffer_Set    : Buffers.Buffer_Consume_Access;
                                Packet_Number : in out Reliable_Udp.Pkt_Nb) is
+      
+      Null_Buffer_Size  : exception;
+      Buffer_Handle     : Buffers.Buffer_Handle_Type;
    begin
+      Buffer_Set.Get_Full_Buffer (Buffer_Handle);
       declare
-         Buffer_Handle : Buffers.Buffer_Handle_Type;
+         Data_Size : constant Ada.Streams.Stream_Element_Offset :=
+           Ada.Streams.Stream_Element_Offset
+           (Buffers.Get_Used_Bytes (Buffer_Handle));
+
+         Buffer_Size : Interfaces.Unsigned_32 :=
+            --  Network_Utils.To_Network (Interfaces.Unsigned_32 (Buffer_Set.Full_Size));
+            Interfaces.Unsigned_32 (Buffer_Set.Full_Size);
+
+         Data     : Ada.Streams.Stream_Element_Array (1 .. Data_Size);
+         Header   : Reliable_Udp.Header;
+
+         for Data'Address use Buffers.Get_Address (Buffer_Handle);
+         for Header'Address use Last_Packets (Packet_Number).Data'Address;
+         for Buffer_Size'Address use Last_Packets (Packet_Number).Data
+                                       (Base_Udp.Header_Size + 1)'Address;
       begin
-         Buffer_Set.Get_Full_Buffer (Buffer_Handle);
-         declare
-            Data_Size : constant Ada.Streams.Stream_Element_Offset :=
-              Ada.Streams.Stream_Element_Offset
-              (Buffers.Get_Used_Bytes (Buffer_Handle));
-
-            Buffer_Size : Interfaces.Unsigned_32 :=
-               --  Network_Utils.To_Network (Interfaces.Unsigned_32 (Buffer_Set.Full_Size));
-               Interfaces.Unsigned_32 (Buffer_Set.Full_Size);
-
-            Data : Ada.Streams.Stream_Element_Array (1 .. Data_Size);
-
-            Header      : Reliable_Udp.Header;
-
-            for Data'Address use Buffers.Get_Address (Buffer_Handle);
-            for Header'Address use Last_Packets (Packet_Number).Data'Address;
-            for Buffer_Size'Address use Last_Packets (Packet_Number).Data
-                                          (Base_Udp.Header_Size + 1)'Address;
-         begin
-            if Buffer_Size = 0 then
-               Ada.Text_IO.Put_Line ("ERROR : Sent Buffer_Size 0");
-            end if;
-            Header := (Ack => False,
-                       Seq_Nb => Packet_Number);
-            Last_Packets (Packet_Number).Is_Buffer_Size := True;
-            --  if Packet_Number mod 2 = 0 then -- STRESS TEST !!
-            Send_Packet (Last_Packets (Packet_Number).Data, True);
-            --  end if;
-            Packet_Number := Packet_Number + 1;
-            Send_All_Stream (Data, Packet_Number);
-         exception
-            when E : others =>
-               Ada.Text_IO.Put_Line
-                 ("data transmit unattended exception : " &
-                    Ada.Exceptions.Exception_Name (E) & "," &
-                    Ada.Exceptions.Exception_Message (E));
-               raise;
-         end;
-         Buffer_Set.Release_Full_Buffer (Buffer_Handle);
+         if Buffer_Size <= 0 then
+            raise Null_Buffer_Size with "Buffer's Size Equal 0";
+         end if;
+         Header := (Ack => False,
+                    Seq_Nb => Packet_Number);
+         Last_Packets (Packet_Number).Is_Buffer_Size := True;
+         Send_Packet (Last_Packets (Packet_Number).Data, True);
+         Packet_Number := Packet_Number + 1;
+         Send_All_Stream (Data, Packet_Number);
+      exception
+         when E : others =>
+            Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+               Ada.Exceptions.Exception_Name (E)
+               & ASCII.LF & ASCII.ESC & "[33m"
+               & Ada.Exceptions.Exception_Message (E)
+               & ASCII.ESC & "[0m");
+            raise;
       end;
-
+      Buffer_Set.Release_Full_Buffer (Buffer_Handle);
    end Send_Buffer_Data;
 
 
@@ -284,6 +282,10 @@ package body Data_Transport.Udp_Socket_Server is
                Ack_Header.Ack := True;
                Send_Packet (Last_Packets (Head.Seq_Nb).Data,
                             Last_Packets (Head.Seq_Nb).Is_Buffer_Size);
+               --  DBG
+               if Last_Packets (Head.Seq_Nb).Is_Buffer_Size then
+                  Ada.Text_IO.Put_Line ("ReSent a Buffer Size :" & Head.Seq_Nb'Img);
+               end if;
             end;
          end if;
       end loop;

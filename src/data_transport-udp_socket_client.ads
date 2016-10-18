@@ -17,7 +17,9 @@ package Data_Transport.Udp_Socket_Client is
    use type Base_Udp.Header;
    use type Interfaces.Unsigned_64;
 
+   type Socket_Client_Access is access all Socket_Client_Task;
 
+   --  Main Task
    task type Socket_Client_Task (Buffer_Set : Buffers.Buffer_Produce_Access)
       is new Transport_Layer_Interface with
       entry Initialise (Host : String;
@@ -25,8 +27,6 @@ package Data_Transport.Udp_Socket_Client is
       overriding entry Connect;
       overriding entry Disconnect;
    end Socket_Client_Task;
-
-   type Socket_Client_Access is access all Socket_Client_Task;
 
    procedure Free is new Ada.Unchecked_Deallocation (Socket_Client_Task,
                                                      Socket_Client_Access);
@@ -44,7 +44,7 @@ package Data_Transport.Udp_Socket_Client is
    procedure Wait_Producer_HandShake (Host         : GNAT.Sockets.Inet_Addr_Type;
                                       Port         : GNAT.Sockets.Port_Type);
 
-   --  Main part of algorithm, does all the processing once a packet is receive
+   --  Main part of algorithm, does all the processing once a packet is receive.
    procedure Process_Packet (Data         : in Base_Udp.Packet_Stream;
                              Last         : in Ada.Streams.Stream_Element_Offset;
                              Recv_Offset  : in out Interfaces.Unsigned_64;
@@ -52,12 +52,13 @@ package Data_Transport.Udp_Socket_Client is
                              From         : in Sock_Addr_Type);
 
 
-   --  Get command line parameters and modify default values if needed
+   --  Get command line parameters and modify default values if needed.
    procedure Parse_Arguments;
 
+   --  Starts all tasks used by client.
    procedure Init_Consumer;
 
-   --  Create socket and Set Socket Opt.
+   --  Creates socket and Sets Socket Opt.
    procedure Init_Udp (Server       : in out Socket_Type;
                        Host         : GNAT.Sockets.Inet_Addr_Type;
                        Port         : GNAT.Sockets.Port_Type;

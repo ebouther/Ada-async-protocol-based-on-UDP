@@ -12,7 +12,7 @@ procedure Udp_Producer is
    use type Buffers.Buffer_Size_Type;
    use type Interfaces.Unsigned_64;
 
-   Used_Bytes  : constant Interfaces.Unsigned_64 := 409600;
+   Used_Bytes  : constant Interfaces.Unsigned_64 := 409600000;
    Buf_Num     : Integer := 0;
 
    Buffer : aliased Buffers.Local.Local_Buffer_Type;

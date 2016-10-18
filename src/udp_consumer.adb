@@ -57,7 +57,7 @@ begin
       end case;
    end loop;
    Buffer.Set_Name (To_String (Buffer_Name));
-   Buffer.Initialise (10, Size => 409600);
+   Buffer.Initialise (10, Size => 409600000);
    Client.Initialise (To_String (Host_Name), Port);
    Client.Connect;
    loop
@@ -93,16 +93,16 @@ begin
          Total_Bytes_Received := Total_Bytes_Received
                                     + Interfaces.Unsigned_64
                                        (Buffers.Get_Used_Bytes (Buffer_Handle));
-         declare
-            Data : array (1 .. Buffers.Get_Used_Bytes (Buffer_Handle) / Integer'Size) of Integer;
-            for Data'Address use Buffers.Get_Address (Buffer_Handle);
-         begin
-            Ada.Text_IO.Put_Line ("Used Bytes :"
-               & Buffers.Get_Used_Bytes (Buffer_Handle)'Img);
-            Ada.Text_IO.Put_Line ("FIRST : " & Data (1)'Img &
-                                  "SECOND : " & Data (2)'Img &
-                                  "LAST : " & Data (Data'Last)'Img);
-         end;
+         --  declare
+         --     Data : array (1 .. Buffers.Get_Used_Bytes (Buffer_Handle) / Integer'Size) of Integer;
+         --     for Data'Address use Buffers.Get_Address (Buffer_Handle);
+         --  begin
+         --     Ada.Text_IO.Put_Line ("Used Bytes :"
+         --        & Buffers.Get_Used_Bytes (Buffer_Handle)'Img);
+         --     Ada.Text_IO.Put_Line ("FIRST : " & Data (1)'Img &
+         --                           "SECOND : " & Data (2)'Img &
+         --                           "LAST : " & Data (Data'Last)'Img);
+         --  end;
          Buffer.Release_Full_Buffer (Buffer_Handle);
       end;
    end loop;
