@@ -59,12 +59,12 @@ package body WebSocket is
       if Message = "START_ACQ"
          and Base_Udp.Acquisition = False
       then
-         Reliable_Udp.Send_Cmd_Client (1);
+         Reliable_Udp.Send_Cmd_To_Producer (1);
          Base_Udp.Acquisition := True;
       elsif Message = "STOP_ACQ"
          and Base_Udp.Acquisition
       then
-         Reliable_Udp.Send_Cmd_Client (2);
+         Reliable_Udp.Send_Cmd_To_Producer (2);
          Base_Udp.Acquisition := False;
       end if;
       Socket.Send (Message, Is_Binary => Socket.Kind = Net.WebSocket.Binary);

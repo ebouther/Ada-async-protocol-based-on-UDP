@@ -282,9 +282,9 @@ package body Buffer_Handling is
    -------------------------
 
    function Search_Empty_Mark
-                        (First, Last           : Handle_Index_Type;
-                         Data                  : in Base_Udp.Packet_Stream;
-                         Seq_Nb                : Reliable_Udp.Pkt_Nb) return Boolean
+                        (First, Last   : Handle_Index_Type;
+                         Data          : in Base_Udp.Packet_Stream;
+                         Seq_Nb        : Reliable_Udp.Pkt_Nb) return Boolean
    is
 
       use Packet_Buffers;
@@ -507,8 +507,6 @@ package body Buffer_Handling is
          begin
             Packet_Nb := Packet_Nb + 1;
             if New_Buffer then
-               --  Ada.Text_IO.Put_Line ("YEP");
-
                --  Loop if True which means that the buffer data is in next src_buffer
                --  and src_data_stream (declared above) has to be reload with new buffer.
                if New_Dest_Buffer (Dest_Buffer,
@@ -536,7 +534,6 @@ package body Buffer_Handling is
                        Dest_Handle,
                        Dest_Index,
                        Src_Data_Stream);
-               --  Ada.Text_IO.Put_Line ("NOPE");
             end if;
 
          end;

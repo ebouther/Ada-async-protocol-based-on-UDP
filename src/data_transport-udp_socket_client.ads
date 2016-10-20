@@ -17,8 +17,6 @@ package Data_Transport.Udp_Socket_Client is
    use type Base_Udp.Header;
    use type Interfaces.Unsigned_64;
 
-   type Socket_Client_Access is access all Socket_Client_Task;
-
    --  Main Task
    task type Socket_Client_Task (Buffer_Set : Buffers.Buffer_Produce_Access)
       is new Transport_Layer_Interface with
@@ -27,6 +25,8 @@ package Data_Transport.Udp_Socket_Client is
       overriding entry Connect;
       overriding entry Disconnect;
    end Socket_Client_Task;
+
+   type Socket_Client_Access is access all Socket_Client_Task;
 
    procedure Free is new Ada.Unchecked_Deallocation (Socket_Client_Task,
                                                      Socket_Client_Access);

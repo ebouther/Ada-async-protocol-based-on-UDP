@@ -1,6 +1,4 @@
 with Ada.Real_Time;
-with Ada.Containers.Vectors;
-with Ada.Containers;
 with Interfaces;
 with System;
 
@@ -61,7 +59,7 @@ package Reliable_Udp is
 
    Fifo  : Sync_Queue.Synchronized_Queue;
 
-   procedure Send_Cmd_Client (Cmd : Pkt_Nb);
+   procedure Send_Cmd_To_Producer (Cmd : Pkt_Nb);
 
    procedure Append_Ack (First_D          : in Reliable_Udp.Pkt_Nb;
                          Last_D           : in Reliable_Udp.Pkt_Nb;

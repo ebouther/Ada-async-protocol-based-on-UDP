@@ -64,7 +64,7 @@ package Buffer_Handling is
 
 
    --  Search position of ack received in current and previous buffers
-   --  and then store content in it.
+   --  and then store content inside.
    function Search_Empty_Mark (First, Last   : Handle_Index_Type;
                                Data          : in Base_Udp.Packet_Stream;
                                Seq_Nb        : Reliable_Udp.Pkt_Nb) return Boolean;

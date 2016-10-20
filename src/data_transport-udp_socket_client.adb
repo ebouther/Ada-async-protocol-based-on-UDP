@@ -302,6 +302,8 @@ package body Data_Transport.Udp_Socket_Client is
 
       for Head'Address use Data'Address;
 
+      Msg      : Reliable_Udp.Pkt_Nb renames Head.Seq_Nb;
+
       use type Interfaces.Unsigned_32;
       use type Interfaces.C.int;
       use type Reliable_Udp.Pkt_Nb;
@@ -312,7 +314,7 @@ package body Data_Transport.Udp_Socket_Client is
          GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
          Reliable_Udp.Producer_Address := From;
 
-         if Base_Udp.Acquisition and Head.Seq_Nb = 0 then  --  Means producer is ready.
+         if Base_Udp.Acquisition and Msg = 0 then  --  Means producer is ready.
             exit;
          end if;
       end loop;

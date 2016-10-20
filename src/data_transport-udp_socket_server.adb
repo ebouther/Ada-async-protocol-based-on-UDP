@@ -135,7 +135,7 @@ package body Data_Transport.Udp_Socket_Server is
 
    procedure Send_Buffer_Data (Buffer_Set    : Buffers.Buffer_Consume_Access;
                                Packet_Number : in out Reliable_Udp.Pkt_Nb) is
-      
+
       Null_Buffer_Size  : exception;
       Buffer_Handle     : Buffers.Buffer_Handle_Type;
    begin
@@ -157,7 +157,7 @@ package body Data_Transport.Udp_Socket_Server is
          for Buffer_Size'Address use Last_Packets (Packet_Number).Data
                                        (Base_Udp.Header_Size + 1)'Address;
       begin
-         if Buffer_Size <= 0 then
+         if Buffer_Size = 0 then
             raise Null_Buffer_Size with "Buffer's Size Equal 0";
          end if;
          Header := (Ack => False,
@@ -248,15 +248,18 @@ package body Data_Transport.Udp_Socket_Server is
    ---------------
 
    procedure Rcv_Ack is
-      Payload  : Base_Udp.Packet_Stream;
-      Head     : Reliable_Udp.Header;
-      Ack      : array (1 .. 64) of Interfaces.Unsigned_8;
-      Data     : Ada.Streams.Stream_Element_Array (1 .. 64);
-      Res      : Interfaces.C.int;
+      Payload     : Base_Udp.Packet_Stream;
+      Head        : Reliable_Udp.Header;
+      Ack         : array (1 .. 64) of Interfaces.Unsigned_8;
+      Data        : Ada.Streams.Stream_Element_Array (1 .. 64);
+      Res         : Interfaces.C.int;
 
       for Ack'Address use Payload'Address;
       for Data'Address use Ack'Address;
       for Head'Address use Ack'Address;
+
+      Is_Not_Msg  : Boolean renames Head.Ack;
+      Message     : Reliable_Udp.Pkt_Nb renames Head.Seq_Nb;
    begin
       loop
          Res := GNAT.Sockets.Thin.C_Recv
@@ -264,17 +267,7 @@ package body Data_Transport.Udp_Socket_Server is
 
          exit when Res = -1;
 
-         if Head.Ack = False then
-            if Head.Seq_Nb = 2 then
-               Ada.Text_IO.Put_Line ("...Consumer asked to STOP ACQUISITION...");
-               Acquisition := False;
-               exit;
-            elsif Head.Seq_Nb = 1 then
-               Ada.Text_IO.Put_Line ("...Consumer asked to START ACQUISITION...");
-               Acquisition := True;
-               exit;
-            end if;
-         else
+         if Is_Not_Msg then
             declare
                Ack_Header  : Reliable_Udp.Header;
                for Ack_Header'Address use Last_Packets (Head.Seq_Nb).Data'Address;
@@ -287,6 +280,16 @@ package body Data_Transport.Udp_Socket_Server is
                   Ada.Text_IO.Put_Line ("ReSent a Buffer Size :" & Head.Seq_Nb'Img);
                end if;
             end;
+         else
+            if Message = 2 then
+               Ada.Text_IO.Put_Line ("...Consumer asked to PAUSE ACQUISITION...");
+               Acquisition := False;
+               exit;
+            elsif Message = 1 then
+               Ada.Text_IO.Put_Line ("...Consumer asked to START ACQUISITION...");
+               Acquisition := True;
+               exit;
+            end if;
          end if;
       end loop;
    end Rcv_Ack;

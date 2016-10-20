@@ -12,8 +12,6 @@ with Base_Udp;
 
 package Data_Transport.Udp_Socket_Server is
 
-   type Socket_Server_Access is access all Socket_Server_Task;
-
    --  Used to contain the data of a packet already sent in case of drops
    --  Is_Buffer_Size equal True if the Stream Data contains the size of the buffer sent.
    type History_Type is
@@ -31,9 +29,13 @@ package Data_Transport.Udp_Socket_Server is
       overriding entry Disconnect;
    end Socket_Server_Task;
 
+   type Socket_Server_Access is access all Socket_Server_Task;
+
    procedure Free is new Ada.Unchecked_Deallocation (Socket_Server_Task,
                                                      Socket_Server_Access);
 
+   --  Gets Full Buffers, sends the Buffer Size and then All Stream
+   --  and finally releases buffer.
    procedure Send_Buffer_Data (Buffer_Set    : Buffers.Buffer_Consume_Access;
                                Packet_Number : in out Reliable_Udp.Pkt_Nb);
 
@@ -48,6 +50,10 @@ package Data_Transport.Udp_Socket_Server is
    procedure Send_Packet (Payload            : Base_Udp.Packet_Stream;
                           Is_Buffer_Size     : Boolean := False);
 
+   --  Receives packets, checks if it is a packet request or a Msg,
+   --  if it's a request, it sends to Consumer the data of the index
+   --  of Last_Packets corresponding to packet header.
+   --  Otherwise it does the action matching with Msg.
    procedure Rcv_Ack;
 
    --  Sends messages to producer, wait for its reply

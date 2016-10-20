@@ -9,11 +9,12 @@ package body Reliable_Udp is
 
    Socket         : GNAT.Sockets.Socket_Type;
 
-   -----------------------
-   --  Send_Cmd_Client  --
-   -----------------------
 
-   procedure Send_Cmd_Client (Cmd : Reliable_Udp.Pkt_Nb) is
+   ----------------------------
+   --  Send_Cmd_To_Producer  --
+   ----------------------------
+
+   procedure Send_Cmd_To_Producer (Cmd : Reliable_Udp.Pkt_Nb) is
       Data        : Ada.Streams.Stream_Element_Array (1 .. Reliable_Udp.Header'Size);
       Head        : Reliable_Udp.Header;
       Offset      : Ada.Streams.Stream_Element_Offset;
@@ -23,7 +24,8 @@ package body Reliable_Udp is
       Head.Seq_Nb := Cmd;
       Head.Ack    := False;
       GNAT.Sockets.Send_Socket (Socket, Data, Offset, Producer_Address);
-   end Send_Cmd_Client;
+   end Send_Cmd_To_Producer;
+
 
    ------------------
    --  Append_Ack  --
@@ -100,6 +102,7 @@ package body Reliable_Udp is
          end select;
       end loop;
    end Remove_Task;
+
 
    ----------------
    --  Ack_Task  --
