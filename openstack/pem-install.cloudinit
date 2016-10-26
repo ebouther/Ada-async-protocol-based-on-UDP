@@ -1,0 +1,63 @@
+#cloud-config
+
+packages:
+ - autoconf
+ - graphviz
+ - zlib1g-dev
+ - patchutils
+ - uuid-dev
+ - rsync
+ - make
+ - libc6-dev
+ - lsb-release
+ - mercurial
+ - monotone
+ - libpq-dev
+ - libmagic-dev
+ - xmlstarlet
+ - unzip
+ - psmisc
+
+bootcmd:
+
+ - [ sysctl, "fs.mqueue.msg_max=256" ]
+
+runcmd:
+
+ - [ mkdir, "/opt/pem" ]
+
+ - [ useradd, pem ]
+ - [ usermod, -d, "/home/pem/", pem ]
+
+ - [ mkdir, -p, "/opt/pem/bin/" ]
+ - [ wget,  "https://csnpem.in2p3.fr:8080/pem", --no-check-certificate, -O, "/opt/pem/bin/pem" ]
+ - [ chmod, u+x, "/opt/pem/bin/pem" ]
+ - [ mkdir, -p, "/opt/pem/.pem" ]
+ - [ cd,  "/opt/pem/" ]
+ - [ /opt/pem/bin/pem, update, pem, -d, /opt/pem, "--uri=https://csnpem.in2p3.fr:8080", "--sync=csnpem.in2p3.fr:8081" ]
+ - [ /opt/pem/bin/pem, pull, env, dcod, -r, dev, "--uri=https://csnpem.in2p3.fr:8080", "--sync=csnpem.in2p3.fr:8081" ]
+ - [ chown, -R, "pem.pem", "/opt/pem" ]
+
+ - [ cd, /home/debian ]
+ - [ wget, "https://github.com/ebouther/CSNSM-RATP/archive/master.zip" ]
+ - [ wget, "https://github.com/ebouther/CSNSM-RATP/archive/ctl.zip" ]
+ - [ /usr/bin/unzip, -a, "master.zip" ]
+ - [ /usr/bin/unzip, -a, "ctl.zip" ]
+
+ - [ mkdir, "CSNSM-RATP-master/obj/", "CSNSM-RATP-master/bin/" ]
+ - [ mkdir, "CSNSM-RATP-ctl/obj/", "CSNSM-RATP-ctl/bin/" ]
+
+
+ - echo ". /opt/pem/bin/pem-source -d /opt/pem -e dcod -r dev\nexport LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/opt/pem/environments/dcod/dev/x86_64/Debian-jessie/last/gnat_pro/lib/gcc/x86_64-pc-linux-gnu/4.9.4/rts-native/adalib/:/opt/pem/builds/x86_64/Debian-jessie/gnat_pro/786c4d69084c9434ebb68a925f739328f5edf4e84dd5d54efd88b88bbdc1c1cb/lib/gcc/x86_64-pc-linux-gnu/4.9.4/rts-native/adalib/:/opt/pem/builds/x86_64/Debian-jessie/dcod/68cea9ed612e36b1764243fc772fbb85080b03dad12ba4647323d0c875770855/lib/:/opt/pem/builds/x86_64/Debian-jessie/polyorb_pro/84c772c3b8ef478d9260d81bdef80be8ec8902b704c4a0c04ffd1d041a4deacc/lib/\nexport NARVAL_LIBS=/opt/pem/environments/dcod/dev/x86_64/Debian-jessie/last/dcod/lib\nexport NARVAL_SCRIPTS=\$HOME/CSNSM-RATP-master/narval_ratp/narval_scripts\nexport NARVAL_CONFIG=\$HOME/CSNSM-RATP-master/narval_ratp/narval_config\nexport POLYORB_CONF=\$HOME/narval.conf\nexport NARVAL_ADA_PROJECT_PATH=/home/boutherin/repository/tp_ada_actors\nexport PATH=\$PATH:\$HOME/CSNSM-RATP-master/bin:\$HOME/CSNSM-RATP-ctl/bin\nkill \$(ps ax | grep \"SCREEN -S dcod_launch\" | cut -d ' ' -f 2 | head -n1)\n\nif [ ! -f /home/debian/narval.conf ]\nthen\ngenerate_narval_conf;\nfi\n\nrm -f /dev/shm/* /dev/mqueue/* && dcod_launch -i -m -l -L \$LD_LIBRARY_PATH -v\ngprbuild -P ~/CSNSM-RATP-master/udp.gpr\ngprbuild -P ~/CSNSM-RATP-ctl/udp.gpr\n" >> "/home/debian/.bashrc"
+
+ - [ chown, -R, debian.debian, "/home/debian/CSNSM-RATP-master" ]
+ - [ chown, -R, debian.debian, "/home/debian/CSNSM-RATP-ctl" ]
+ - echo "debian          soft    memlock         unlimited\ndebian          hard    memlock         unlimited" >> /etc/security/limits.conf
+
+
+final_message: "The system is finally up, after $UPTIME seconds"
+
+power_state:
+ mode: reboot
+ message: ...Reboot...
+ condition: True
