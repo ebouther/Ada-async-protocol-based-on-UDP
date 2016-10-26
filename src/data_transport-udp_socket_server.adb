@@ -1,6 +1,7 @@
 with Ada.Text_IO;
 with Ada.Calendar;
 with Ada.Exceptions;
+with System;
 
 pragma Warnings (Off);
 with GNAT.Sockets.Thin;
@@ -19,11 +20,20 @@ package body Data_Transport.Udp_Socket_Server is
 
    use type Reliable_Udp.Pkt_Nb;
 
-   Socket            : GNAT.Sockets.Socket_Type;
-   Address           : GNAT.Sockets.Sock_Addr_Type;
-   Acquisition       : Boolean := True;
-   Last_Packets      : array (Reliable_Udp.Pkt_Nb)
-                        of History_Type;
+   Socket               : GNAT.Sockets.Socket_Type;
+   Send_Throughput_Gbs  : Float := 0.0;
+   Address              : GNAT.Sockets.Sock_Addr_Type;
+   Acquisition          : Boolean := True;
+   Last_Packets         : array (Reliable_Udp.Pkt_Nb)
+                           of History_Type;
+
+   task body Set_Send_Throughput is
+   begin
+      loop
+         delay 1.0;
+         Send_Throughput_Gbs := 0.0;
+      end loop;
+   end Set_Send_Throughput;
 
    task body Socket_Server_Task is
       Packet_Number : Reliable_Udp.Pkt_Nb := 0;
@@ -187,9 +197,9 @@ package body Data_Transport.Udp_Socket_Server is
                               Packet_Number  : in out Reliable_Udp.Pkt_Nb) is
       use type Ada.Streams.Stream_Element_Array;
 
-      First : Ada.Streams.Stream_Element_Offset := Payload'First;
-      Index : Ada.Streams.Stream_Element_Offset := First - 1;
-      Last  : Ada.Streams.Stream_Element_Offset;
+      First    : Ada.Streams.Stream_Element_Offset := Payload'First;
+      Offset   : Ada.Streams.Stream_Element_Offset;
+      Last     : Ada.Streams.Stream_Element_Offset;
    begin
       loop
          Rcv_Ack;
@@ -215,8 +225,13 @@ package body Data_Transport.Udp_Socket_Server is
                      (First .. Last);
             end if;
             Last_Packets (Packet_Number).Is_Buffer_Size := False;
+            while Send_Throughput_Gbs > Base_Udp.Throughput_Gbs loop
+               delay 0.00000001;
+            end loop;
             GNAT.Sockets.Send_Socket (Socket, Last_Packets (Packet_Number).Data,
-                                       Index, Address);
+                                       Offset, Address);
+            Send_Throughput_Gbs := Send_Throughput_Gbs + (Float (Last_Packets (Packet_Number).Data'Last
+                                       * Float (System.Storage_Unit) / Float (10 ** 9));
 
             Packet_Number := Packet_Number + 1;
          end;
@@ -239,7 +254,11 @@ package body Data_Transport.Udp_Socket_Server is
       for Data'Address use Payload'Address;
       pragma Unreferenced (Offset);
    begin
+      while Send_Throughput_Gbs > Base_Udp.Throughput_Gbs loop
+         delay 0.00000001;
+      end loop;
       GNAT.Sockets.Send_Socket (Socket, Data, Offset, Address);
+      Send_Throughput_Gbs := Send_Throughput_Gbs + (Float (Payload'Last) * Float (System.Storage_Unit) / Float (10 ** 9));
    end Send_Packet;
 
 

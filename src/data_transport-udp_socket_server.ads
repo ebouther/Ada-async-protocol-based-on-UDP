@@ -64,4 +64,8 @@ package Data_Transport.Udp_Socket_Server is
       new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type,
          Interfaces.C.int);
 
+   --  Used to reset Send_Throughput_Gbs
+   --  which is incremented in Send_Packet each seconds
+   task Set_Send_Throughput;
+
 end Data_Transport.Udp_Socket_Server;

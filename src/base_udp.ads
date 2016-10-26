@@ -11,6 +11,10 @@ package Base_Udp is
 
    Acquisition : Boolean := True;
 
+   --  Network throughput in Gb/s, used to regulate packet send
+   --  as RATP doesn't have flow control.
+   Throughput_Gbs : constant Float := 1.0;
+
    --  8 or 16 otherwise it's too big for Set_Used_Bytes parameter (Integer)
    subtype Header is Interfaces.Unsigned_16;
 
