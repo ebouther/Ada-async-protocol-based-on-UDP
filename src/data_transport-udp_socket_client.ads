@@ -13,6 +13,9 @@ package Data_Transport.Udp_Socket_Client is
 
    use type Interfaces.Unsigned_64;
 
+   --  If Buffer_Set is set to null then RATP's Buffers
+   --  (Containing payload + RATP_Header) have to be consumed directly.
+   --  It prevents RATP from copying its buffer content to Buffer_Set.
    task type Socket_Client_Task (Buffer_Set : Buffers.Buffer_Produce_Access)
       is new Transport_Layer_Interface with
       entry Initialise (Host : String;

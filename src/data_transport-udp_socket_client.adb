@@ -14,7 +14,6 @@ with Ratp.Buffer_Handling;
 
 package body Data_Transport.Udp_Socket_Client is
 
-
    task body Socket_Client_Task is
       Handle_Data        : Ratp.Buffer_Handling.Handle_Data_Task;
 
@@ -29,6 +28,7 @@ package body Data_Transport.Udp_Socket_Client is
 
       use System.Storage_Elements;
       use type Interfaces.C.int;
+      use type Buffers.Buffer_Produce_Access;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (16));
@@ -46,7 +46,9 @@ package body Data_Transport.Udp_Socket_Client is
             Ratp.Consumer_Utilities.Init_Consumer;
             Ratp.Consumer_Utilities.Init_Udp (Server, Cons_Addr, Cons_Port);
 
-            Handle_Data.Start (Buffer_Set);
+            if Buffer_Set /= null then
+               Handle_Data.Start (Buffer_Set);
+            end if;
 
          end Initialise;
       or
@@ -74,7 +76,8 @@ package body Data_Transport.Udp_Socket_Client is
                exit;
          else
             if Recv_Offset > Ratp.Pkt_Max then
-               Ratp.Consumer_Utilities.PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
+               Ratp.Consumer_Utilities.PMH_Buffer_Task.New_Buffer_Addr
+                  (Buffer_Ptr => Data_Addr);
                Recv_Offset := Recv_Offset mod Ratp.Sequence_Size;
             end if;
 
@@ -86,7 +89,8 @@ package body Data_Transport.Udp_Socket_Client is
                use type Ada.Streams.Stream_Element_Offset;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
-               Ratp.Consumer_Utilities.Process_Packet (Data, Last, Recv_Offset, Data_Addr, From);
+               Ratp.Consumer_Utilities.Process_Packet
+                  (Data, Last, Recv_Offset, Data_Addr, From);
                Recv_Offset := Recv_Offset + 1;
             exception
                when Socket_Error =>

@@ -81,6 +81,7 @@ package Ratp.Buffer_Handling is
                               Last_Addr      :  System.Address;
                               Nb_Missed      :  Interfaces.Unsigned_64);
 
+   --  [CTL] Gets a new Dest Buffer, and a new Src_Buffer if it's necessary.
    function New_Dest_Buffer (Dest_Buffer     : Buffers.Buffer_Produce_Access;
                              Size            : Interfaces.Unsigned_32;
                              Buffer_Size     : in out Interfaces.Unsigned_32;
@@ -91,7 +92,7 @@ package Ratp.Buffer_Handling is
                              Dest_Handle     : in out Buffers.Buffer_Handle_Access;
                              Src_Data_Stream : Ratp.Sequence_Type) return Boolean;
 
-   --  Src_Handle get a new Src_Buffer if it's necessary returns 1 otherwise 0
+   --  [CTL] Src_Handle get a new Src_Buffer if it's necessary returns 1 otherwise 0
    function New_Src_Buffer (Src_Index        : in out Interfaces.Unsigned_64;
                             Src_Handle       : in out Buffers.Buffer_Handle_Access;
                             Src_Data_Stream  : Ratp.Sequence_Type) return Boolean;
@@ -100,6 +101,8 @@ package Ratp.Buffer_Handling is
                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
                              Src_Data_Stream : Ratp.Sequence_Type);
 
+   --  [CTL] Copies RATP Buffer's segment to CTL Dest Buffer.
+   --  (Removes all the headers)
    procedure Copy_Packet_Data_To_Dest
                            (Buffer_Size      : Interfaces.Unsigned_32;
                             Src_Index        : in out Interfaces.Unsigned_64;
@@ -125,9 +128,7 @@ package Ratp.Buffer_Handling is
       entry Start;
    end Check_Buf_Integrity;
 
-   --  procedure Save_Size_Pos (Seq_Pos :  Reliable_Udp.Pkt_Nb);
-   --  pragma Inline (Save_Size_Pos);
-
+   --  [CTL] Moves RATP buffers content to CTL destination buffer.
    task type Handle_Data_Task is
       entry Start (Buffer_Set : Buffers.Buffer_Produce_Access);
    end Handle_Data_Task;

@@ -259,7 +259,7 @@ package body Ratp.Consumer_Utilities is
 
    begin
       if Header.Ack then
-         --  Activate Ack to differenciate size packets from "normal" packets.
+         --  [CTL] Activate Ack to differenciate size packets from "normal" packets.
          pragma Warnings (Off);
          Header.Ack := (if Last = 6 then True else False);
          pragma Warnings (On);
@@ -268,7 +268,7 @@ package body Ratp.Consumer_Utilities is
          Remove_Task.Remove (Header.Seq_Nb);
          Recv_Offset := Recv_Offset - 1;
       else
-         --  Activate Ack to differenciate size packets from "normal" packets.
+         --  [CTL] Activate Ack to differenciate size packets from "normal" packets.
          pragma Warnings (Off);
          Header.Ack := (if Last = 6 then True else False);
          pragma Warnings (On);

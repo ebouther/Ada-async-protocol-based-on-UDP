@@ -25,6 +25,6 @@ project udp is
                                     "-gnata");
   end Compiler;
 
-  for main use ("udp_producer.adb", "udp_consumer.adb", "consumer.adb");
+  for main use ("udp_producer.adb", "udp_consumer.adb", "consumer.adb", "standalone_consumer.adb");
 
 end udp;

@@ -16,15 +16,15 @@ package body Ratp.Buffer_Handling is
    use type Interfaces.Unsigned_32;
 
 
-   Buffer_Handler    : Buffer_Handler_Type;
+   Buffer_Handler : Buffer_Handler_Type;
 
-   Production        : Buffers.Shared.Produce.Produce_Couple_Type;
-   Buffer_Prod       : Buffers.Shared.Produce.Produce_Type
-                           renames Production.Producer;
+   Production     : Buffers.Shared.Produce.Produce_Couple_Type;
+   Buffer_Prod    : Buffers.Shared.Produce.Produce_Type
+                      renames Production.Producer;
 
-   Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
-   Buffer_Cons       : Buffers.Shared.Consume.Consume_Type
-                           renames Consumption.Consumer;
+   Consumption    : Buffers.Shared.Consume.Consume_Couple_Type;
+   Buffer_Cons    : Buffers.Shared.Consume.Consume_Type
+                      renames Consumption.Consumer;
 
 
    --------------------
@@ -85,6 +85,7 @@ package body Ratp.Buffer_Handling is
             & ASCII.LF & ASCII.ESC & "[33m"
             & Ada.Exceptions.Exception_Message (E)
             & ASCII.ESC & "[0m");
+      raise;
    end Init_Buffers;
 
 
@@ -111,6 +112,7 @@ package body Ratp.Buffer_Handling is
             & ASCII.LF & ASCII.ESC & "[33m"
             & Ada.Exceptions.Exception_Message (E)
             & ASCII.ESC & "[0m");
+      raise;
    end Release_Free_Buffer_At;
 
 
@@ -192,6 +194,7 @@ package body Ratp.Buffer_Handling is
             & ASCII.LF & ASCII.ESC & "[33m"
             & Ada.Exceptions.Exception_Message (E)
             & ASCII.ESC & "[0m");
+      raise;
    end Mark_Empty_Cell;
 
 
@@ -226,6 +229,7 @@ package body Ratp.Buffer_Handling is
             Ada.Exceptions.Exception_Name (E) &
             " message : " &
             Ada.Exceptions.Exception_Message (E));
+      raise;
    end Release_Full_Buf;
 
 
@@ -431,12 +435,13 @@ package body Ratp.Buffer_Handling is
    --  Copy_Packet_Data_To_Dest  --
    --------------------------------
 
-   procedure Copy_Packet_Data_To_Dest (Buffer_Size     : Interfaces.Unsigned_32;
-                                       Src_Index       : in out Interfaces.Unsigned_64;
-                                       Src_Handle      : in out Buffers.Buffer_Handle_Access;
-                                       Dest_Handle     : Buffers.Buffer_Handle_Access;
-                                       Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
-                                       Src_Data_Stream : Ratp.Sequence_Type) is
+   procedure Copy_Packet_Data_To_Dest
+                     (Buffer_Size     : Interfaces.Unsigned_32;
+                      Src_Index       : in out Interfaces.Unsigned_64;
+                      Src_Handle      : in out Buffers.Buffer_Handle_Access;
+                      Dest_Handle     : Buffers.Buffer_Handle_Access;
+                      Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
+                      Src_Data_Stream : Ratp.Sequence_Type) is
       use Ada.Streams;
       use Interfaces;
 
@@ -544,6 +549,7 @@ package body Ratp.Buffer_Handling is
             & ASCII.LF & ASCII.ESC & "[33m"
             & Ada.Exceptions.Exception_Message (E)
             & ASCII.ESC & "[0m");
+         raise;
    end Handle_Data_Task;
 
 
