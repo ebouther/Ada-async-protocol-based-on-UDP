@@ -3,9 +3,9 @@ with Ada.Exceptions;
 with AWS.Server;
 with AWS.Net.WebSocket.Registry.Control;
 
-with WebSocket;
+with Ratp.WebSocket;
 
-package body Web_Interface is
+package body Ratp.Web_Interface is
 
    WS  : AWS.Server.HTTP;
 
@@ -41,4 +41,4 @@ package body Web_Interface is
       AWS.Net.WebSocket.Registry.Send (Rcp, Id & "|" & Data);
    end Send_To_Client;
 
-end Web_Interface;
+end Ratp.Web_Interface;

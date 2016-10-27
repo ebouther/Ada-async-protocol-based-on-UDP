@@ -9,12 +9,11 @@ with Buffers.Shared.Produce;
 with Buffers.Shared.Consume;
 with Common_Types;
 
-package body Buffer_Handling is
+package body Ratp.Buffer_Handling is
 
    use type Interfaces.Unsigned_8;
    use type Interfaces.Unsigned_16;
    use type Interfaces.Unsigned_32;
-   use type Interfaces.Unsigned_64;
 
 
    Buffer_Handler    : Buffer_Handler_Type;
@@ -46,17 +45,17 @@ package body Buffer_Handling is
 
       --  Need a "+ 1" otherwise it cannot get a
       --  free buffer in Release_Full_Buf
-      Dcod_Pmh_Service.Client.Provide_Buffer (Name => Base_Udp.Buffer_Name,
-                                              Size => Base_Udp.Buffer_Size,
-                                              Depth => Base_Udp.PMH_Buf_Nb + 1,
-                                              Endpoint => Base_Udp.End_Point);
+      Dcod_Pmh_Service.Client.Provide_Buffer (Name => Ratp.Buffer_Name,
+                                              Size => Ratp.PMH_Buffer_Size,
+                                              Depth => Ratp.PMH_Buf_Nb + 1,
+                                              Endpoint => Ratp.End_Point);
 
-      Ada.Text_IO.Put_Line ("Buffer   Size :" & Base_Udp.Buffer_Size'Img
-         & " Depth : " & Integer (Base_Udp.PMH_Buf_Nb + 1)'Img);
+      Ada.Text_IO.Put_Line ("Buffer   Size :" & Ratp.PMH_Buffer_Size'Img
+         & " Depth : " & Integer (Ratp.PMH_Buf_Nb + 1)'Img);
 
-      Buffer_Prod.Set_Name (Base_Udp.Buffer_Name);
+      Buffer_Prod.Set_Name (Ratp.Buffer_Name);
       Production.Message_Handling.Start (1.0);
-      Buffer_Cons.Set_Name (Base_Udp.Buffer_Name);
+      Buffer_Cons.Set_Name (Ratp.Buffer_Name);
       Consumption.Message_Handling.Start (1.0);
       Buffer_Prod.Is_Initialised;
 
@@ -96,7 +95,7 @@ package body Buffer_Handling is
    procedure Release_Free_Buffer_At (Index : in Handle_Index_Type) is
       Buf                  : Handler_Type
                               renames Buffer_Handler.Handlers (Index);
-      use Base_Udp;
+      use Ratp;
    begin
 
       Buffers.Set_Used_Bytes
@@ -133,17 +132,17 @@ package body Buffer_Handling is
             Addr := Buffer_Handler.Handlers (Index).Handle.Get_Address;
             N := 0;
             Parse_Buffer :
-               while N <= Base_Udp.Pkt_Max loop
+               while N <= Ratp.Pkt_Max loop
                   declare
                      Data  :  Interfaces.Unsigned_32;
                      for Data'Address use Addr + Storage_Offset
-                                                   (N * Base_Udp.Load_Size);
+                                                   (N * Ratp.Load_Size);
                   begin
                      exit Parse_Buffer when Data = 16#DEAD_BEEF#;
                   end;
                   N := N + 1;
                end loop Parse_Buffer;
-            if N = Base_Udp.Pkt_Max + 1 then
+            if N = Ratp.Pkt_Max + 1 then
                Buffer_Handler.Handlers (Index).State := Full;
             end if;
          end if;
@@ -169,11 +168,11 @@ package body Buffer_Handling is
    begin
       for N in I .. I + Nb_Missed - 1 loop
          Pos := N;
-         if N >= Base_Udp.Sequence_Size
-            and I < Base_Udp.Sequence_Size
+         if N >= Ratp.Sequence_Size
+            and I < Ratp.Sequence_Size
          then
             Addr  := Data_Addr;
-            Pos   := N mod Base_Udp.Sequence_Size;
+            Pos   := N mod Ratp.Sequence_Size;
          else
             Addr  := Last_Addr;
          end if;
@@ -181,7 +180,7 @@ package body Buffer_Handling is
          declare
             Data_Missed  :  Interfaces.Unsigned_32;
             for Data_Missed'Address use Addr + Storage_Offset
-                                             (Pos * Base_Udp.Load_Size);
+                                             (Pos * Ratp.Load_Size);
          begin
             Data_Missed := 16#DEAD_BEEF#;
          end;
@@ -283,7 +282,7 @@ package body Buffer_Handling is
 
    function Search_Empty_Mark
                         (First, Last   : Handle_Index_Type;
-                         Data          : in Base_Udp.Packet_Stream;
+                         Data          : in Ratp.Packet_Stream;
                          Seq_Nb        : Reliable_Udp.Pkt_Nb) return Boolean
    is
 
@@ -295,7 +294,7 @@ package body Buffer_Handling is
       for N in First .. Last loop
          declare
             type Data_Array is new Element_Array
-               (1 .. Integer (Base_Udp.Sequence_Size));
+               (1 .. Integer (Ratp.Sequence_Size));
 
             Datas    : Data_Array;
             Content  : Interfaces.Unsigned_32;
@@ -320,7 +319,7 @@ package body Buffer_Handling is
 
    procedure Save_Ack (Seq_Nb          :  in Reliable_Udp.Pkt_Nb;
                        Packet_Number   :  in Reliable_Udp.Pkt_Nb;
-                       Data            :  in Base_Udp.Packet_Stream) is
+                       Data            :  in Ratp.Packet_Stream) is
 
       Location_Not_Found   : exception;
       use type Reliable_Udp.Pkt_Nb;
@@ -366,7 +365,7 @@ package body Buffer_Handling is
                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
                              Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
                              Dest_Handle     : in out Buffers.Buffer_Handle_Access;
-                             Src_Data_Stream : Base_Udp.Sequence_Type) return Boolean is
+                             Src_Data_Stream : Ratp.Sequence_Type) return Boolean is
 
       Zero_Buf_Size  : exception;
       use type Buffers.Buffer_Handle_Access;
@@ -398,7 +397,7 @@ package body Buffer_Handling is
 
    procedure New_Src_Buffer (Src_Index       : in out Interfaces.Unsigned_64;
                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
-                             Src_Data_Stream : Base_Udp.Sequence_Type) is
+                             Src_Data_Stream : Ratp.Sequence_Type) is
    begin
       if Src_Index > Src_Data_Stream'Last then
          Buffer_Cons.Release_Full_Buffer (Src_Handle.all);
@@ -413,7 +412,7 @@ package body Buffer_Handling is
 
    function New_Src_Buffer (Src_Index       : in out Interfaces.Unsigned_64;
                             Src_Handle      : in out Buffers.Buffer_Handle_Access;
-                            Src_Data_Stream : Base_Udp.Sequence_Type) return Boolean is
+                            Src_Data_Stream : Ratp.Sequence_Type) return Boolean is
    begin
       if Src_Index > Src_Data_Stream'Last then
          Buffer_Cons.Release_Full_Buffer (Src_Handle.all);
@@ -437,7 +436,7 @@ package body Buffer_Handling is
                                        Src_Handle      : in out Buffers.Buffer_Handle_Access;
                                        Dest_Handle     : Buffers.Buffer_Handle_Access;
                                        Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
-                                       Src_Data_Stream : Base_Udp.Sequence_Type) is
+                                       Src_Data_Stream : Ratp.Sequence_Type) is
       use Ada.Streams;
       use Interfaces;
 
@@ -447,7 +446,7 @@ package body Buffer_Handling is
 
       for Dest_Data_Stream'Address use Buffers.Get_Address (Dest_Handle.all);
       Offset               : Unsigned_64 :=
-                              Base_Udp.Load_Size - Base_Udp.Header_Size;
+                              Ratp.Load_Size - Ratp.Header_Size;
 
    begin
       if Unsigned_64 (Dest_Index) + Offset > Unsigned_64 (Buffer_Size) then
@@ -457,11 +456,11 @@ package body Buffer_Handling is
       Dest_Data_Stream (Dest_Index + 1 .. Dest_Index + Stream_Element_Offset (Offset)) :=
          Src_Data_Stream
             (Src_Index)
-               (Base_Udp.Header_Size + 1 .. Base_Udp.Header_Size + Stream_Element_Offset (Offset));
+               (Ratp.Header_Size + 1 .. Ratp.Header_Size + Stream_Element_Offset (Offset));
 
       Src_Index := Src_Index + 1;
       New_Src_Buffer (Src_Index, Src_Handle, Src_Data_Stream);
-      Dest_Index := Dest_Index + (Base_Udp.Load_Size - Base_Udp.Header_Size);
+      Dest_Index := Dest_Index + (Ratp.Load_Size - Ratp.Header_Size);
    end Copy_Packet_Data_To_Dest;
 
 
@@ -496,13 +495,13 @@ package body Buffer_Handling is
       Buffer_Cons.Get_Full_Buffer (Src_Handle.all);
       loop
          declare
-            Src_Data_Stream    : Base_Udp.Sequence_Type;
+            Src_Data_Stream    : Ratp.Sequence_Type;
             for Src_Data_Stream'Address use Buffers.Get_Address (Src_Handle.all);
 
             Header      : Reliable_Udp.Header;
             Size        : Interfaces.Unsigned_32;
             for Header'Address use Src_Data_Stream (Src_Index)'Address;
-            for Size'Address use Src_Data_Stream (Src_Index) (Base_Udp.Header_Size + 1)'Address;
+            for Size'Address use Src_Data_Stream (Src_Index) (Ratp.Header_Size + 1)'Address;
             New_Buffer  : Boolean renames Header.Ack;
          begin
             Packet_Nb := Packet_Nb + 1;
@@ -548,113 +547,25 @@ package body Buffer_Handling is
    end Handle_Data_Task;
 
 
-   ----------------------
-   --  Get_Filled_Buf  --
-   ----------------------
-
-   procedure Get_Filled_Buf (To_File   : in Boolean := True) is
-      Log_File : Ada.Text_IO.File_Type;
-   begin
-      declare
-         Handle         : Buffers.Buffer_Handle_Type;
-
-         use Packet_Buffers;
-      begin
-         select
-            Buffer_Cons.Get_Full_Buffer (Handle);
-            Ada.Text_IO.Put_Line ("+++++++++++ Got A Buffer +++++++++++");
-         or
-            delay 1.0;
-            Ada.Text_IO.Put_Line ("/!\ Error : Cannot Get A Full Buffer /!\");
-            return;
-         end select;
-
-         if To_File then
-            Ada.Text_IO.Open
-               (Log_File, Ada.Text_IO.Append_File, "buffers.log");
-         end if;
-
-         declare
-            type Data_Array is new Element_Array
-               (1 .. To_Word_Count
-                  (Buffers.Get_Used_Bytes (Handle)));
-
-            Datas    : Data_Array;
-
-            for Datas'Address use Buffers.Get_Address (Handle);
-         begin
-            for I in Datas'Range loop
-               declare
-                  Pkt_U8      : array (1 .. Base_Udp.Load_Size)
-                                 of Interfaces.Unsigned_8;
-                  Pkt_Nb      : Base_Udp.Header;
-                  Content     : Interfaces.Unsigned_64;
-                  Dead_Beef   : Interfaces.Unsigned_32;
-
-                  for Pkt_Nb'Address use Datas (I)'Address;
-                  for Dead_Beef'Address use Datas (I)'Address;
-                  for Pkt_U8'Address use Datas (I)'Address;
-                  for Content'Address use Pkt_U8 (5)'Address;
-               begin
-                  if Dead_Beef = 16#DEAD_BEEF# then
-                     if To_File then
-                        Ada.Text_IO.Put_Line
-                           (Log_File, "Buffer (" & I'Img
-                              & " ) : ** DROPPED **");
-                     else
-                        Ada.Text_IO.Put_Line ("Buffer (" & I'Img
-                           & " ) : ** DROPPED **");
-                     end if;
-                  else
-                     if To_File then
-                        Ada.Text_IO.Put_Line
-                           (Log_File, "Buffer (" & I'Img & " ) :" &
-                              Pkt_Nb'Img & Content'Img);
-                     else
-                        Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) :" &
-                           Pkt_Nb'Img & Content'Img);
-                     end if;
-                  end if;
-
-               end;
-            end loop;
-         end;
-
-         Buffer_Cons.Release_Full_Buffer (Handle);
-         if To_File then
-            Ada.Text_IO.Close (Log_File);
-         end if;
-
-      exception
-         when E : others =>
-         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
-            Ada.Exceptions.Exception_Name (E)
-            & ASCII.LF & ASCII.ESC & "[33m"
-            & Ada.Exceptions.Exception_Message (E)
-            & ASCII.ESC & "[0m");
-      end;
-   end Get_Filled_Buf;
-
-
    --------------------------------
    --  Copy_To_Correct_Location  --
    --------------------------------
 
    procedure Copy_To_Correct_Location
                                  (I, Nb_Missed   : Interfaces.Unsigned_64;
-                                  Data           : Base_Udp.Packet_Stream;
+                                  Data           : Ratp.Packet_Stream;
                                   Data_Addr      : System.Address) is
 
       use System.Storage_Elements;
 
       Good_Loc_Index :  constant Interfaces.Unsigned_64 := (I + Nb_Missed)
-                           mod Base_Udp.Sequence_Size;
-      Good_Location  :  Base_Udp.Packet_Stream;
+                           mod Ratp.Sequence_Size;
+      Good_Location  :  Ratp.Packet_Stream;
 
       for Good_Location'Address use Data_Addr + Storage_Offset
-                                 (Good_Loc_Index * Base_Udp.Load_Size);
+                                 (Good_Loc_Index * Ratp.Load_Size);
    begin
       Good_Location := Data;
    end Copy_To_Correct_Location;
 
-end Buffer_Handling;
+end Ratp.Buffer_Handling;

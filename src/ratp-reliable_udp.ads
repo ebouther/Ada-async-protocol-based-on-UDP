@@ -6,20 +6,18 @@ pragma Warnings (Off);
 with GNAT.Sockets.Thin;
 pragma Warnings (On);
 
-with Base_Udp;
-with Queue;
+with Ratp.Queue;
 
-package Reliable_Udp is
+package Ratp.Reliable_Udp is
 
    use type Interfaces.Unsigned_8;
    use type Interfaces.Unsigned_16;
    use type Interfaces.Unsigned_32;
-   use type Interfaces.Unsigned_64;
 
    Producer_Address    : GNAT.Sockets.Sock_Addr_Type;
 
    --  Stored in packet header to identify which packet was lost
-   type Pkt_Nb is mod 2 ** (Base_Udp.Header'Size - 1);
+   type Pkt_Nb is mod 2 ** (Ratp.Header_Size * System.Storage_Unit - 1);
 
    --  Used to store lost packet and when it can be resend if needed
    type Loss is
@@ -29,7 +27,7 @@ package Reliable_Udp is
          From        : GNAT.Sockets.Sock_Addr_Type;
       end record;
 
-   type Loss_Index is mod Base_Udp.Sequence_Size;
+   type Loss_Index is mod Ratp.Sequence_Size;
 
    type Losses_Array is array (Loss_Index) of Loss;
 
@@ -46,7 +44,7 @@ package Reliable_Udp is
          Ack      at 0 range Pkt_Nb'Size .. Pkt_Nb'Size;
       end record;
 
-   for Header'Alignment use Base_Udp.Header_Size;
+   for Header'Alignment use Ratp.Header_Size;
 
    type Append_Ack_Type is
       record
@@ -55,7 +53,7 @@ package Reliable_Udp is
          Last_D   : Reliable_Udp.Pkt_Nb;
       end record;
 
-   package Sync_Queue is new Queue (Append_Ack_Type);
+   package Sync_Queue is new Ratp.Queue (Append_Ack_Type);
 
    Fifo  : Sync_Queue.Synchronized_Queue;
 
@@ -105,4 +103,4 @@ package Reliable_Udp is
 
    end Ack_Management;
 
-end Reliable_Udp;
+end Ratp.Reliable_Udp;

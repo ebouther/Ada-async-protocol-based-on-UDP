@@ -1,8 +1,8 @@
 with Interfaces;
 
-with Reliable_Udp;
+with Ratp.Reliable_Udp;
 
-package Output_Data is
+package Ratp.Output_Data is
 
    procedure Display (Log : in Boolean;
       Elapsed_Time         : in Duration;
@@ -17,4 +17,4 @@ package Output_Data is
       Missed               : in Interfaces.Unsigned_64;
       Nb_Packet_Received   : in Interfaces.Unsigned_64;
       Nb_Output            : in Natural);
-end Output_Data;
+end Ratp.Output_Data;

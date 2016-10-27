@@ -2,7 +2,7 @@ with AWS.Net.WebSocket;
 with AWS.Response;
 with AWS.Status;
 
-package WebSocket is
+package Ratp.WebSocket is
 
    function HW_CB (Request : in AWS.Status.Data)
      return AWS.Response.Data;
@@ -18,5 +18,4 @@ package WebSocket is
    overriding procedure On_Open (Socket : in out Object; Message : String);
    overriding procedure On_Close (Socket : in out Object; Message : String);
 
-
-end WebSocket;
+end Ratp.WebSocket;

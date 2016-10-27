@@ -1,6 +1,6 @@
 generic
    type Element_Type is private;
-package Queue is
+package Ratp.Queue is
 
    type Element_Type_Array is array (Integer range <>) of Element_Type;
 
@@ -18,4 +18,4 @@ package Queue is
       Count                : Natural := 0;
       In_Index, Out_Index  : Positive := 1;
    end Synchronized_Queue;
-end Queue;
+end Ratp.Queue;

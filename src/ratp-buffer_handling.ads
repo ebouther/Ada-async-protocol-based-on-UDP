@@ -2,20 +2,19 @@ with Ada.Streams;
 with System;
 with Interfaces.C;
 
-with Reliable_Udp;
-with Base_Udp;
+with Ratp.Reliable_Udp;
 
 with Buffers;
 
-package Buffer_Handling is
+package Ratp.Buffer_Handling is
 
    package Packet_Buffers is new
       Buffers.Generic_Buffers
-         (Element_Type => Base_Udp.Packet_Stream);
+         (Element_Type => Ratp.Packet_Stream);
 
    --  Index Type for "Handlers" array
    --  "is mod type" enables a circular parsing
-   type Handle_Index_Type is mod Base_Udp.PMH_Buf_Nb;
+   type Handle_Index_Type is mod Ratp.PMH_Buf_Nb;
 
    --  State of Buffer:
    --  Empty =>  Buf is released
@@ -58,26 +57,21 @@ package Buffer_Handling is
    --  Release Buffer at Handlers (Index) and change its State to Empty
    procedure Release_Free_Buffer_At (Index   : in Handle_Index_Type);
 
-   --  Get Content of Released Buffers and Log it to File (buffers.log)
-   --  or Display it. Depends on To_File Boolean.
-   procedure Get_Filled_Buf (To_File         : in Boolean := True);
-
-
    --  Search position of ack received in current and previous buffers
    --  and then store content inside.
    function Search_Empty_Mark (First, Last   : Handle_Index_Type;
-                               Data          : in Base_Udp.Packet_Stream;
+                               Data          : in Ratp.Packet_Stream;
                                Seq_Nb        : Reliable_Udp.Pkt_Nb) return Boolean;
 
    procedure Save_Ack (Seq_Nb                :  in Reliable_Udp.Pkt_Nb;
                        Packet_Number         :  in Reliable_Udp.Pkt_Nb;
-                       Data                  :  in Base_Udp.Packet_Stream);
+                       Data                  :  in Ratp.Packet_Stream);
 
    --  Move Data Received to good location (Nb_Missed Offset) if packets
    --  were dropped
    procedure Copy_To_Correct_Location
                             (I, Nb_Missed    : Interfaces.Unsigned_64;
-                             Data            : Base_Udp.Packet_Stream;
+                             Data            : Ratp.Packet_Stream;
                              Data_Addr       : System.Address);
 
    --  Write 16#DEAD_BEEF# at missed packets location.
@@ -95,16 +89,16 @@ package Buffer_Handling is
                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
                              Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
                              Dest_Handle     : in out Buffers.Buffer_Handle_Access;
-                             Src_Data_Stream : Base_Udp.Sequence_Type) return Boolean;
+                             Src_Data_Stream : Ratp.Sequence_Type) return Boolean;
 
    --  Src_Handle get a new Src_Buffer if it's necessary returns 1 otherwise 0
    function New_Src_Buffer (Src_Index        : in out Interfaces.Unsigned_64;
                             Src_Handle       : in out Buffers.Buffer_Handle_Access;
-                            Src_Data_Stream  : Base_Udp.Sequence_Type) return Boolean;
+                            Src_Data_Stream  : Ratp.Sequence_Type) return Boolean;
 
    procedure New_Src_Buffer (Src_Index       : in out Interfaces.Unsigned_64;
                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
-                             Src_Data_Stream : Base_Udp.Sequence_Type);
+                             Src_Data_Stream : Ratp.Sequence_Type);
 
    procedure Copy_Packet_Data_To_Dest
                            (Buffer_Size      : Interfaces.Unsigned_32;
@@ -112,7 +106,7 @@ package Buffer_Handling is
                             Src_Handle       : in out Buffers.Buffer_Handle_Access;
                             Dest_Handle      : Buffers.Buffer_Handle_Access;
                             Dest_Index       : in out Ada.Streams.Stream_Element_Offset;
-                            Src_Data_Stream  : Base_Udp.Sequence_Type);
+                            Src_Data_Stream  : Ratp.Sequence_Type);
 
    --  Release Buffer and Reuse Handler only if Buffer State is "Full"
    task type Release_Full_Buf is
@@ -138,4 +132,4 @@ package Buffer_Handling is
       entry Start (Buffer_Set : Buffers.Buffer_Produce_Access);
    end Handle_Data_Task;
 
-end Buffer_Handling;
+end Ratp.Buffer_Handling;

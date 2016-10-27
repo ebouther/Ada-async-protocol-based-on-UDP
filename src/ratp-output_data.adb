@@ -2,11 +2,9 @@ with Ada.Text_IO;
 with Text_IO.Unbounded_IO;
 with Ada.Strings.Unbounded;
 
-with Base_Udp;
-with Web_Interface;
+with Ratp.Web_Interface;
 
-package body Output_Data is
-   use type Interfaces.Unsigned_64;
+package body Ratp.Output_Data is
 
    procedure Log_CSV (Elapsed_Time        : in Duration;
                      Last_Packet          : in Reliable_Udp.Pkt_Nb;
@@ -46,7 +44,7 @@ package body Output_Data is
    begin
 
       Ratio := Long_Float (Missed) / Long_Float (Nb_Packet_Received + Missed);
-      Debit := Base_Udp.Load_Size * 8 * (Nb_Packet_Received -  Last_Nb);
+      Debit := Ratp.Load_Size * 8 * (Nb_Packet_Received -  Last_Nb);
       Pps   := Long_Float (Nb_Packet_Received) / Long_Float (Elapsed_Time);
 
       Ada.Text_IO.Put_Line ("-- Nb output                     : "
@@ -87,4 +85,4 @@ package body Output_Data is
 
    end Display;
 
-end Output_Data;
+end Ratp.Output_Data;

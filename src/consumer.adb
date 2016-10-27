@@ -2,7 +2,7 @@ with Ada.Text_IO;
 with Ada.Exceptions;
 with Interfaces;
 
-with Base_Udp;
+with Ratp.Reliable_Udp;
 
 with Buffers.Shared.Consume;
 
@@ -14,7 +14,7 @@ procedure Consumer is
 
    package Packet_Buffers is new
       Buffers.Generic_Buffers
-         (Element_Type => Base_Udp.Packet_Stream);
+         (Element_Type => Ratp.Packet_Stream);
 
    procedure Get_Filled_Buf (To_File   : in Boolean := True);
 
@@ -55,13 +55,13 @@ procedure Consumer is
       begin
          for I in Datas'Range loop
             declare
-               Pkt_U8      : array (1 .. Base_Udp.Load_Size)
+               Pkt_U8      : array (1 .. Ratp.Load_Size)
                               of Interfaces.Unsigned_8;
-               Pkt_Nb      : Base_Udp.Header;
+               Header      : Ratp.Reliable_Udp.Header;
                Content     : Interfaces.Unsigned_64;
                Dead_Beef   : Interfaces.Unsigned_32;
 
-               for Pkt_Nb'Address use Datas (I)'Address;
+               for Header'Address use Datas (I)'Address;
                for Dead_Beef'Address use Datas (I)'Address;
                for Pkt_U8'Address use Datas (I)'Address;
                for Content'Address use Pkt_U8 (5)'Address;
@@ -79,10 +79,10 @@ procedure Consumer is
                   if To_File then
                      Ada.Text_IO.Put_Line
                         (Log_File, "Buffer (" & I'Img & " ) :" &
-                           Pkt_Nb'Img & Content'Img);
+                           Header.Seq_Nb'Img & Content'Img);
                   else
                      Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) :" &
-                        Pkt_Nb'Img & Content'Img);
+                        Header.Seq_Nb'Img & Content'Img);
                   end if;
                end if;
             end;
@@ -103,7 +103,7 @@ procedure Consumer is
    end Get_Filled_Buf;
 begin
 
-   Buffer_Cons.Set_Name (Base_Udp.Buffer_Name);
+   Buffer_Cons.Set_Name (Ratp.Buffer_Name);
    Consumption.Message_Handling.Start (1.0);
    loop
       Get_Filled_Buf;

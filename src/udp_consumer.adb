@@ -74,7 +74,7 @@ begin
             --  Ada.Text_IO.Put_Line ("block full seen");
             exit;
          or
-            delay 1.0;
+            delay 10.0;
             Ada.Text_IO.Put_Line ("watchdog" & Watchdog_Counter'Img);
             Watchdog_Counter := Watchdog_Counter + 1;
             if Watchdog_Counter = Watchdog_Limit then

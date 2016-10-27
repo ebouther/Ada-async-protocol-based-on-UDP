@@ -7,8 +7,6 @@ pragma Warnings (Off);
 with GNAT.Sockets.Thin;
 pragma Warnings (On);
 
---  with Network_Utils;
-
 package body Data_Transport.Udp_Socket_Server is
 
    use type Interfaces.Unsigned_8;
@@ -18,25 +16,28 @@ package body Data_Transport.Udp_Socket_Server is
    use type Interfaces.C.int;
    use type Ada.Streams.Stream_Element_Offset;
 
-   use type Reliable_Udp.Pkt_Nb;
+   use type Ratp.Reliable_Udp.Pkt_Nb;
 
-   Socket               : GNAT.Sockets.Socket_Type;
-   Send_Throughput_Gbs  : Float := 0.0;
-   Address              : GNAT.Sockets.Sock_Addr_Type;
-   Acquisition          : Boolean := True;
-   Last_Packets         : array (Reliable_Udp.Pkt_Nb)
-                           of History_Type;
+   Socket                  : GNAT.Sockets.Socket_Type;
+   Send_Throughput_Gb      : Float := 0.0;
+   Send_Throughput_Start   : Ada.Calendar.Time;
+   Address                 : GNAT.Sockets.Sock_Addr_Type;
+   Acquisition             : Boolean := True;
+   Last_Packets            : array (Ratp.Reliable_Udp.Pkt_Nb)
+                              of History_Type;
 
-   task body Set_Send_Throughput is
+   task body Reset_Send_Throughput is
    begin
       loop
-         delay 1.0;
-         Send_Throughput_Gbs := 0.0;
+         Send_Throughput_Gb := 0.0;
+         Send_Throughput_Start := Ada.Calendar.Clock;
+         delay 10.0;
       end loop;
-   end Set_Send_Throughput;
+   end Reset_Send_Throughput;
+
 
    task body Socket_Server_Task is
-      Packet_Number : Reliable_Udp.Pkt_Nb := 0;
+      Packet_Number : Ratp.Reliable_Udp.Pkt_Nb := 0;
    begin
       select
          accept Initialise
@@ -115,13 +116,13 @@ package body Data_Transport.Udp_Socket_Server is
    ------------------------
 
    procedure Server_HandShake is
-      Send_Data, Recv_Data : Base_Udp.Packet_Stream;
-      Send_Head, Recv_Head : Reliable_Udp.Header;
+      Send_Data, Recv_Data : Ratp.Packet_Stream;
+      Send_Head, Recv_Head : Ratp.Reliable_Udp.Header;
 
       for Send_Head'Address use Send_Data'Address;
       for Recv_Head'Address use Recv_Data'Address;
-      Recv_Msg    : Reliable_Udp.Pkt_Nb renames Recv_Head.Seq_Nb;
-      Send_Msg    : Reliable_Udp.Pkt_Nb renames Send_Head.Seq_Nb;
+      Recv_Msg    : Ratp.Reliable_Udp.Pkt_Nb renames Recv_Head.Seq_Nb;
+      Send_Msg    : Ratp.Reliable_Udp.Pkt_Nb renames Send_Head.Seq_Nb;
       Not_A_Msg   : Boolean renames Recv_Head.Ack;
    begin
       Send_Msg := 0;
@@ -144,7 +145,7 @@ package body Data_Transport.Udp_Socket_Server is
    ------------------------
 
    procedure Send_Buffer_Data (Buffer_Set    : Buffers.Buffer_Consume_Access;
-                               Packet_Number : in out Reliable_Udp.Pkt_Nb) is
+                               Packet_Number : in out Ratp.Reliable_Udp.Pkt_Nb) is
 
       Null_Buffer_Size  : exception;
       Buffer_Handle     : Buffers.Buffer_Handle_Type;
@@ -160,12 +161,12 @@ package body Data_Transport.Udp_Socket_Server is
             Interfaces.Unsigned_32 (Buffer_Set.Full_Size);
 
          Data     : Ada.Streams.Stream_Element_Array (1 .. Data_Size);
-         Header   : Reliable_Udp.Header;
+         Header   : Ratp.Reliable_Udp.Header;
 
          for Data'Address use Buffers.Get_Address (Buffer_Handle);
          for Header'Address use Last_Packets (Packet_Number).Data'Address;
          for Buffer_Size'Address use Last_Packets (Packet_Number).Data
-                                       (Base_Udp.Header_Size + 1)'Address;
+                                       (Ratp.Header_Size + 1)'Address;
       begin
          if Buffer_Size = 0 then
             raise Null_Buffer_Size with "Buffer's Size Equal 0";
@@ -194,7 +195,7 @@ package body Data_Transport.Udp_Socket_Server is
    -----------------------
 
    procedure Send_All_Stream (Payload        : Ada.Streams.Stream_Element_Array;
-                              Packet_Number  : in out Reliable_Udp.Pkt_Nb) is
+                              Packet_Number  : in out Ratp.Reliable_Udp.Pkt_Nb) is
       use type Ada.Streams.Stream_Element_Array;
 
       First    : Ada.Streams.Stream_Element_Offset := Payload'First;
@@ -205,12 +206,13 @@ package body Data_Transport.Udp_Socket_Server is
          Rcv_Ack;
          declare
             Head     : Ada.Streams.Stream_Element_Array (1 .. 2);
-            Header   : Reliable_Udp.Header := (Ack => False,
+            Header   : Ratp.Reliable_Udp.Header := (Ack => False,
                                                Seq_Nb => Packet_Number);
 
             for Header'Address use Head'Address;
+            use type Ada.Calendar.Time;
          begin
-            Last := First + (Base_Udp.Load_Size - Base_Udp.Header_Size) - 1;
+            Last := First + (Ratp.Load_Size - Ratp.Header_Size) - 1;
 
             if Last > Payload'Last then
                declare
@@ -225,14 +227,16 @@ package body Data_Transport.Udp_Socket_Server is
                      (First .. Last);
             end if;
             Last_Packets (Packet_Number).Is_Buffer_Size := False;
-            while Send_Throughput_Gbs > Base_Udp.Throughput_Gbs loop
-               delay 0.00000001;
+            while Float (Duration (Send_Throughput_Gb)
+               / (Ada.Calendar.Clock - Send_Throughput_Start))
+                     > Ratp.Throughput_Gbs loop
+               delay 0.0;
             end loop;
             GNAT.Sockets.Send_Socket (Socket, Last_Packets (Packet_Number).Data,
                                        Offset, Address);
-            Send_Throughput_Gbs := Send_Throughput_Gbs + (Float (Last_Packets (Packet_Number).Data'Last
+            Send_Throughput_Gb := Send_Throughput_Gb
+                                    + (Float (Last_Packets (Packet_Number).Data'Last + 28)
                                        * Float (System.Storage_Unit) / Float (10 ** 9));
-
             Packet_Number := Packet_Number + 1;
          end;
          First := Last + 1;
@@ -245,20 +249,24 @@ package body Data_Transport.Udp_Socket_Server is
    --  Send_Packet  --
    -------------------
 
-   procedure Send_Packet (Payload : Base_Udp.Packet_Stream;
+   procedure Send_Packet (Payload : Ratp.Packet_Stream;
                           Is_Buffer_Size : Boolean := False) is
       Offset   : Ada.Streams.Stream_Element_Offset;
       Data     : Ada.Streams.Stream_Element_Array
-                     (1 .. (if Is_Buffer_Size then 6 else Base_Udp.Load_Size));
+                     (1 .. (if Is_Buffer_Size then 6 else Ratp.Load_Size));
 
       for Data'Address use Payload'Address;
       pragma Unreferenced (Offset);
+      use type Ada.Calendar.Time;
    begin
-      while Send_Throughput_Gbs > Base_Udp.Throughput_Gbs loop
-         delay 0.00000001;
+
+      while Float (Duration (Send_Throughput_Gb) / (Ada.Calendar.Clock - Send_Throughput_Start))
+             > Ratp.Throughput_Gbs loop
+         delay 0.0;
       end loop;
       GNAT.Sockets.Send_Socket (Socket, Data, Offset, Address);
-      Send_Throughput_Gbs := Send_Throughput_Gbs + (Float (Payload'Last) * Float (System.Storage_Unit) / Float (10 ** 9));
+      Send_Throughput_Gb := Send_Throughput_Gb + (Float (Payload'Last + 28)
+                              * Float (System.Storage_Unit) / Float (10 ** 9));
    end Send_Packet;
 
 
@@ -267,8 +275,8 @@ package body Data_Transport.Udp_Socket_Server is
    ---------------
 
    procedure Rcv_Ack is
-      Payload     : Base_Udp.Packet_Stream;
-      Head        : Reliable_Udp.Header;
+      Payload     : Ratp.Packet_Stream;
+      Head        : Ratp.Reliable_Udp.Header;
       Ack         : array (1 .. 64) of Interfaces.Unsigned_8;
       Data        : Ada.Streams.Stream_Element_Array (1 .. 64);
       Res         : Interfaces.C.int;
@@ -277,8 +285,8 @@ package body Data_Transport.Udp_Socket_Server is
       for Data'Address use Ack'Address;
       for Head'Address use Ack'Address;
 
-      Is_Not_Msg  : Boolean renames Head.Ack;
-      Message     : Reliable_Udp.Pkt_Nb renames Head.Seq_Nb;
+      Not_A_Msg   : Boolean renames Head.Ack;
+      Message     : Ratp.Reliable_Udp.Pkt_Nb renames Head.Seq_Nb;
    begin
       loop
          Res := GNAT.Sockets.Thin.C_Recv
@@ -286,18 +294,14 @@ package body Data_Transport.Udp_Socket_Server is
 
          exit when Res = -1;
 
-         if Is_Not_Msg then
+         if Not_A_Msg then
             declare
-               Ack_Header  : Reliable_Udp.Header;
+               Ack_Header  : Ratp.Reliable_Udp.Header;
                for Ack_Header'Address use Last_Packets (Head.Seq_Nb).Data'Address;
             begin
                Ack_Header.Ack := True;
                Send_Packet (Last_Packets (Head.Seq_Nb).Data,
                             Last_Packets (Head.Seq_Nb).Is_Buffer_Size);
-               --  DBG
-               if Last_Packets (Head.Seq_Nb).Is_Buffer_Size then
-                  Ada.Text_IO.Put_Line ("ReSent a Buffer Size :" & Head.Seq_Nb'Img);
-               end if;
             end;
          else
             if Message = 2 then

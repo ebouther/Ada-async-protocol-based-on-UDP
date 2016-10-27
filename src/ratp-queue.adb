@@ -1,4 +1,4 @@
-package body Queue is
+package body Ratp.Queue is
 
    protected body Synchronized_Queue is
       entry Append_Wait (Data : in Element_Type)
@@ -44,4 +44,4 @@ package body Queue is
       end Max_Count;
    end Synchronized_Queue;
 
-end Queue;
+end Ratp.Queue;

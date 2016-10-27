@@ -3,7 +3,7 @@ with Ada.Exceptions;
 with System.Multiprocessors.Dispatching_Domains;
 with Ada.Text_IO;
 
-package body Reliable_Udp is
+package body Ratp.Reliable_Udp is
 
    Ack_Mgr        : Ack_Management;
 
@@ -41,7 +41,7 @@ package body Reliable_Udp is
    begin
       for I in Reliable_Udp.Pkt_Nb range First_D .. Last_D loop
          Packet_Lost.Last_Ack := Ada.Real_Time.Clock -
-            Ada.Real_Time.Microseconds (Base_Udp.RTT_US_Max);
+            Ada.Real_Time.Microseconds (Ratp.RTT_US_Max);
          Packet_Lost.From := Client_Addr;
          if not Ack_Mgr.Is_Empty (Loss_Index (I)) then
             Ada.Text_IO.Put_Line
@@ -74,7 +74,7 @@ package body Reliable_Udp is
          if Ack.First_D <= Ack.Last_D then
             Append_Ack (Ack.First_D, Ack.Last_D, Ack.From);
          else
-            Append_Ack (Ack.First_D, Base_Udp.Pkt_Max, Ack.From);
+            Append_Ack (Ack.First_D, Ratp.Pkt_Max, Ack.From);
             Append_Ack (Reliable_Udp.Pkt_Nb'First, Ack.Last_D, Ack.From);
          end if;
       end loop;
@@ -139,7 +139,7 @@ package body Reliable_Udp is
             if not Ack_Mgr.Is_Empty (Index) then
                Element := Ack_Mgr.Get (Index);
                if Ada.Real_Time.Clock - Element.Last_Ack >
-                  Ada.Real_Time.Microseconds (Base_Udp.RTT_US_Max)
+                  Ada.Real_Time.Microseconds (Ratp.RTT_US_Max)
                then
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Ack_Mgr.Set (Index, Element);
@@ -207,4 +207,4 @@ package body Reliable_Udp is
 
    end Ack_Management;
 
-end Reliable_Udp;
+end Ratp.Reliable_Udp;
