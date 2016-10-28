@@ -9,8 +9,6 @@ package Ratp is
 
    use type Interfaces.Unsigned_64;
 
-   Acquisition : Boolean := True;
-
    --  Network throughput in Gb/s, used to regulate packet send
    --  as RATP doesn't have flow control.
    Throughput_Gbs : constant Float := 0.5;

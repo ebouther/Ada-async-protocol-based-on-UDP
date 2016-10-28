@@ -4,6 +4,8 @@ with AWS.Status;
 
 package Ratp.WebSocket is
 
+   Acquisition          : Boolean := True;
+
    function HW_CB (Request : in AWS.Status.Data)
      return AWS.Response.Data;
 

@@ -56,15 +56,15 @@ package body Ratp.WebSocket is
       use type AWS.Net.WebSocket.Kind_Type;
    begin
       if Message = "START_ACQ"
-         and Ratp.Acquisition = False
+         and Acquisition = False
       then
          Reliable_Udp.Send_Cmd_To_Producer (1);
-         Ratp.Acquisition := True;
+         Acquisition := True;
       elsif Message = "STOP_ACQ"
-         and Ratp.Acquisition
+         and Acquisition
       then
          Reliable_Udp.Send_Cmd_To_Producer (2);
-         Ratp.Acquisition := False;
+         Acquisition := False;
       end if;
       Socket.Send (Message, Is_Binary => Socket.Kind = Net.WebSocket.Binary);
    end On_Message;

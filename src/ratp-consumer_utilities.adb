@@ -14,10 +14,11 @@ pragma Warnings (On);
 with Ratp.Reliable_Udp;
 with Ratp.Web_Interface;
 with Ratp.Output_Data;
+with Ratp.WebSocket;
 
 package body Ratp.Consumer_Utilities is
 
-   Log_Task             : Ratp.Consumer_Utilities.Timer;
+   Log_Task             : Timer;
 
    Remove_Task          : Reliable_Udp.Remove_Task;
    Ack_Task             : Reliable_Udp.Ack_Task;
@@ -220,7 +221,7 @@ package body Ratp.Consumer_Utilities is
          GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
          Reliable_Udp.Producer_Address := From;
 
-         if Ratp.Acquisition and Msg = 0 then  --  Means producer is ready.
+         if Ratp.WebSocket.Acquisition and Msg = 0 then  --  Means producer is ready.
             exit;
          end if;
       end loop;

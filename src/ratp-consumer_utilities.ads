@@ -4,7 +4,6 @@ with System;
 with Interfaces.C;
 with GNAT.Sockets;
 
-with Ratp;
 with Ratp.Buffer_Handling;
 
 
@@ -13,6 +12,7 @@ package Ratp.Consumer_Utilities is
    use GNAT.Sockets;
 
    PMH_Buffer_Task      : Buffer_Handling.PMH_Buffer_Addr;
+   Acquisition          : Boolean := True;
 
    --  Log Data every seconds.
    task type Timer is
