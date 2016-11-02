@@ -24,14 +24,14 @@ package body Data_Transport.Udp_Socket_Client is
    Remove_Task          : Reliable_Udp.Remove_Task;
    Ack_Task             : Reliable_Udp.Ack_Task;
 
-   Check_Integrity_Task : Buffer_Handling.Check_Buf_Integrity;
-   PMH_Buffer_Task      : Buffer_Handling.PMH_Buffer_Addr;
-   Release_Buf_Task     : Buffer_Handling.Release_Full_Buf;
+   Check_Integrity_Task : Buffer_Handling.Check_Buf_Integrity_Task;
+   PMH_Buffer_Task      : Buffer_Handling.PMH_Buffer_Addr_Task;
+   Release_Buf_Task     : Buffer_Handling.Release_Full_Buf_Task;
 
    Start_Time           : Ada.Calendar.Time;
 
    Nb_Packet_Received   : Interfaces.Unsigned_64 := 0;
-   Packet_Number        : Reliable_Udp.Pkt_Nb := 0;
+   Packet_Number        : Reliable_Udp.Packet_Number_Type := 0;
    Total_Missed         : Interfaces.Unsigned_64 := 0;
    Nb_Output            : Natural := 0;
 
@@ -296,17 +296,17 @@ package body Data_Transport.Udp_Socket_Client is
                                       Port   : GNAT.Sockets.Port_Type) is
       Socket   : Socket_Type;
       Data     : Base_Udp.Packet_Stream;
-      Head     : Reliable_Udp.Header;
+      Head     : Reliable_Udp.Header_Type;
       From     : Sock_Addr_Type;
       Last     : Ada.Streams.Stream_Element_Offset;
 
       for Head'Address use Data'Address;
 
-      Msg      : Reliable_Udp.Pkt_Nb renames Head.Seq_Nb;
+      Msg      : Reliable_Udp.Packet_Number_Type renames Head.Seq_Nb;
 
       use type Interfaces.Unsigned_32;
       use type Interfaces.C.int;
-      use type Reliable_Udp.Pkt_Nb;
+      use type Reliable_Udp.Packet_Number_Type;
       pragma Unreferenced (Last);
    begin
       Init_Udp (Socket, Host, Port, False);
@@ -343,10 +343,10 @@ package body Data_Transport.Udp_Socket_Client is
    is
       Last_Addr            : System.Address;
       Nb_Missed            : Interfaces.Unsigned_64;
-      Header               : Reliable_Udp.Header;
+      Header               : Reliable_Udp.Header_Type;
 
       for Header'Address use Data'Address;
-      use type Reliable_Udp.Pkt_Nb;
+      use type Reliable_Udp.Packet_Number_Type;
       use type Ada.Real_Time.Time;
       use type Ada.Streams.Stream_Element_Offset;
 

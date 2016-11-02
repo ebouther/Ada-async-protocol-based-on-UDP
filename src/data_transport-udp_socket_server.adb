@@ -17,16 +17,16 @@ package body Data_Transport.Udp_Socket_Server is
    use type Interfaces.C.int;
    use type Ada.Streams.Stream_Element_Offset;
 
-   use type Reliable_Udp.Pkt_Nb;
+   use type Reliable_Udp.Packet_Number_Type;
 
    Socket            : GNAT.Sockets.Socket_Type;
    Address           : GNAT.Sockets.Sock_Addr_Type;
    Acquisition       : Boolean := True;
-   Last_Packets      : array (Reliable_Udp.Pkt_Nb)
+   Last_Packets      : array (Reliable_Udp.Packet_Number_Type)
                         of History_Type;
 
    task body Socket_Server_Task is
-      Packet_Number : Reliable_Udp.Pkt_Nb := 0;
+      Packet_Number : Reliable_Udp.Packet_Number_Type := 0;
    begin
       select
          accept Initialise
@@ -106,12 +106,12 @@ package body Data_Transport.Udp_Socket_Server is
 
    procedure Server_HandShake is
       Send_Data, Recv_Data : Base_Udp.Packet_Stream;
-      Send_Head, Recv_Head : Reliable_Udp.Header;
+      Send_Head, Recv_Head : Reliable_Udp.Header_Type;
 
       for Send_Head'Address use Send_Data'Address;
       for Recv_Head'Address use Recv_Data'Address;
-      Recv_Msg    : Reliable_Udp.Pkt_Nb renames Recv_Head.Seq_Nb;
-      Send_Msg    : Reliable_Udp.Pkt_Nb renames Send_Head.Seq_Nb;
+      Recv_Msg    : Reliable_Udp.Packet_Number_Type renames Recv_Head.Seq_Nb;
+      Send_Msg    : Reliable_Udp.Packet_Number_Type renames Send_Head.Seq_Nb;
       Not_A_Msg   : Boolean renames Recv_Head.Ack;
    begin
       Send_Msg := 0;
@@ -134,7 +134,7 @@ package body Data_Transport.Udp_Socket_Server is
    ------------------------
 
    procedure Send_Buffer_Data (Buffer_Set    : Buffers.Buffer_Consume_Access;
-                               Packet_Number : in out Reliable_Udp.Pkt_Nb) is
+                               Packet_Number : in out Reliable_Udp.Packet_Number_Type) is
 
       Null_Buffer_Size  : exception;
       Buffer_Handle     : Buffers.Buffer_Handle_Type;
@@ -150,7 +150,7 @@ package body Data_Transport.Udp_Socket_Server is
             Interfaces.Unsigned_32 (Buffer_Set.Full_Size);
 
          Data     : Ada.Streams.Stream_Element_Array (1 .. Data_Size);
-         Header   : Reliable_Udp.Header;
+         Header   : Reliable_Udp.Header_Type;
 
          for Data'Address use Buffers.Get_Address (Buffer_Handle);
          for Header'Address use Last_Packets (Packet_Number).Data'Address;
@@ -184,7 +184,7 @@ package body Data_Transport.Udp_Socket_Server is
    -----------------------
 
    procedure Send_All_Stream (Payload        : Ada.Streams.Stream_Element_Array;
-                              Packet_Number  : in out Reliable_Udp.Pkt_Nb) is
+                              Packet_Number  : in out Reliable_Udp.Packet_Number_Type) is
       use type Ada.Streams.Stream_Element_Array;
 
       First : Ada.Streams.Stream_Element_Offset := Payload'First;
@@ -195,7 +195,7 @@ package body Data_Transport.Udp_Socket_Server is
          Rcv_Ack;
          declare
             Head     : Ada.Streams.Stream_Element_Array (1 .. 2);
-            Header   : Reliable_Udp.Header := (Ack => False,
+            Header   : Reliable_Udp.Header_Type := (Ack => False,
                                                Seq_Nb => Packet_Number);
 
             for Header'Address use Head'Address;
@@ -249,7 +249,7 @@ package body Data_Transport.Udp_Socket_Server is
 
    procedure Rcv_Ack is
       Payload     : Base_Udp.Packet_Stream;
-      Head        : Reliable_Udp.Header;
+      Head        : Reliable_Udp.Header_Type;
       Ack         : array (1 .. 64) of Interfaces.Unsigned_8;
       Data        : Ada.Streams.Stream_Element_Array (1 .. 64);
       Res         : Interfaces.C.int;
@@ -259,7 +259,7 @@ package body Data_Transport.Udp_Socket_Server is
       for Head'Address use Ack'Address;
 
       Is_Not_Msg  : Boolean renames Head.Ack;
-      Message     : Reliable_Udp.Pkt_Nb renames Head.Seq_Nb;
+      Message     : Reliable_Udp.Packet_Number_Type renames Head.Seq_Nb;
    begin
       loop
          Res := GNAT.Sockets.Thin.C_Recv
@@ -269,7 +269,7 @@ package body Data_Transport.Udp_Socket_Server is
 
          if Is_Not_Msg then
             declare
-               Ack_Header  : Reliable_Udp.Header;
+               Ack_Header  : Reliable_Udp.Header_Type;
                for Ack_Header'Address use Last_Packets (Head.Seq_Nb).Data'Address;
             begin
                Ack_Header.Ack := True;

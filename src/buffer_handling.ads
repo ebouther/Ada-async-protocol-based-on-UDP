@@ -58,19 +58,15 @@ package Buffer_Handling is
    --  Release Buffer at Handlers (Index) and change its State to Empty
    procedure Release_Free_Buffer_At (Index   : in Handle_Index_Type);
 
-   --  Get Content of Released Buffers and Log it to File (buffers.log)
-   --  or Display it. Depends on To_File Boolean.
-   procedure Get_Filled_Buf (To_File         : in Boolean := True);
-
 
    --  Search position of ack received in current and previous buffers
    --  and then store content inside.
    function Search_Empty_Mark (First, Last   : Handle_Index_Type;
                                Data          : in Base_Udp.Packet_Stream;
-                               Seq_Nb        : Reliable_Udp.Pkt_Nb) return Boolean;
+                               Seq_Nb        : Reliable_Udp.Packet_Number_Type) return Boolean;
 
-   procedure Save_Ack (Seq_Nb                :  in Reliable_Udp.Pkt_Nb;
-                       Packet_Number         :  in Reliable_Udp.Pkt_Nb;
+   procedure Save_Ack (Seq_Nb                :  in Reliable_Udp.Packet_Number_Type;
+                       Packet_Number         :  in Reliable_Udp.Packet_Number_Type;
                        Data                  :  in Base_Udp.Packet_Stream);
 
    --  Move Data Received to good location (Nb_Missed Offset) if packets
@@ -115,23 +111,23 @@ package Buffer_Handling is
                             Src_Data_Stream  : Base_Udp.Sequence_Type);
 
    --  Release Buffer and Reuse Handler only if Buffer State is "Full"
-   task type Release_Full_Buf is
+   task type Release_Full_Buf_Task is
       entry Start;
-   end Release_Full_Buf;
+   end Release_Full_Buf_Task;
 
    --  Get the address of a New Buffer
-   task type PMH_Buffer_Addr is
+   task type PMH_Buffer_Addr_Task is
       entry Stop;
       entry New_Buffer_Addr (Buffer_Ptr : in out System.Address);
-   end PMH_Buffer_Addr;
+   end PMH_Buffer_Addr_Task;
 
    --  Change Buffer State from "Near_Full" to "Full" only if it contains
    --  all Packets
-   task type Check_Buf_Integrity is
+   task type Check_Buf_Integrity_Task is
       entry Start;
-   end Check_Buf_Integrity;
+   end Check_Buf_Integrity_Task;
 
-   --  procedure Save_Size_Pos (Seq_Pos :  Reliable_Udp.Pkt_Nb);
+   --  procedure Save_Size_Pos (Seq_Pos :  Reliable_Udp.Packet_Number_Type);
    --  pragma Inline (Save_Size_Pos);
 
    task type Handle_Data_Task is

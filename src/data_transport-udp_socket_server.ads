@@ -37,12 +37,12 @@ package Data_Transport.Udp_Socket_Server is
    --  Gets Full Buffers, sends the Buffer Size and then All Stream
    --  and finally releases buffer.
    procedure Send_Buffer_Data (Buffer_Set    : Buffers.Buffer_Consume_Access;
-                               Packet_Number : in out Reliable_Udp.Pkt_Nb);
+                               Packet_Number : in out Reliable_Udp.Packet_Number_Type);
 
    --  Gets all the content of a buffer as a stream,
    --  divides it into packets and sends them to consumer.
    procedure Send_All_Stream (Payload        : Ada.Streams.Stream_Element_Array;
-                              Packet_Number  : in out Reliable_Udp.Pkt_Nb);
+                              Packet_Number  : in out Reliable_Udp.Packet_Number_Type);
 
    --  Sends a packet to consumer,
    --  if Is_Buffer_Size is true the packet sent's length will only be 6 Bytes

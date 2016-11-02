@@ -115,11 +115,11 @@ package body Buffer_Handling is
    end Release_Free_Buffer_At;
 
 
-  ---------------------------
-  --  Check_Buf_Integrity  --
-  ---------------------------
+  --------------------------------
+  --  Check_Buf_Integrity_Task  --
+  --------------------------------
 
-   task body Check_Buf_Integrity is
+   task body Check_Buf_Integrity_Task is
       Index : Handle_Index_Type := Handle_Index_Type'First;
       Addr  : System.Address;
       N     : Integer;
@@ -149,7 +149,7 @@ package body Buffer_Handling is
          end if;
          Index := Index + 1;
       end loop;
-   end Check_Buf_Integrity;
+   end Check_Buf_Integrity_Task;
 
 
   -----------------------
@@ -196,11 +196,11 @@ package body Buffer_Handling is
    end Mark_Empty_Cell;
 
 
-  ------------------------
-  --  Release_Full_Buf  --
-  ------------------------
+  -----------------------------
+  --  Release_Full_Buf_Task  --
+  -----------------------------
 
-   task body Release_Full_Buf is
+   task body Release_Full_Buf_Task is
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (11));
@@ -227,14 +227,14 @@ package body Buffer_Handling is
             Ada.Exceptions.Exception_Name (E) &
             " message : " &
             Ada.Exceptions.Exception_Message (E));
-   end Release_Full_Buf;
+   end Release_Full_Buf_Task;
 
 
-   -----------------------
-   --  PMH_Buffer_Addr  --
-   -----------------------
+   ----------------------------
+   --  PMH_Buffer_Addr_Task  --
+   ----------------------------
 
-   task body PMH_Buffer_Addr is
+   task body PMH_Buffer_Addr_Task is
       Not_Released_Fast_Enough   : exception;
       Init                       : Boolean := True;
    begin
@@ -274,7 +274,7 @@ package body Buffer_Handling is
             & ASCII.LF & ASCII.ESC & "[33m"
             & Ada.Exceptions.Exception_Message (E)
             & ASCII.ESC & "[0m");
-   end PMH_Buffer_Addr;
+   end PMH_Buffer_Addr_Task;
 
 
    -------------------------
@@ -284,12 +284,12 @@ package body Buffer_Handling is
    function Search_Empty_Mark
                         (First, Last   : Handle_Index_Type;
                          Data          : in Base_Udp.Packet_Stream;
-                         Seq_Nb        : Reliable_Udp.Pkt_Nb) return Boolean
+                         Seq_Nb        : Reliable_Udp.Packet_Number_Type) return Boolean
    is
 
       use Packet_Buffers;
       use System.Storage_Elements;
-      use type Reliable_Udp.Pkt_Nb;
+      use type Reliable_Udp.Packet_Number_Type;
       use type Handle_Index_Type;
    begin
       for N in First .. Last loop
@@ -318,12 +318,12 @@ package body Buffer_Handling is
    --  Save_Ack  --
    ----------------
 
-   procedure Save_Ack (Seq_Nb          :  in Reliable_Udp.Pkt_Nb;
-                       Packet_Number   :  in Reliable_Udp.Pkt_Nb;
+   procedure Save_Ack (Seq_Nb          :  in Reliable_Udp.Packet_Number_Type;
+                       Packet_Number   :  in Reliable_Udp.Packet_Number_Type;
                        Data            :  in Base_Udp.Packet_Stream) is
 
       Location_Not_Found   : exception;
-      use type Reliable_Udp.Pkt_Nb;
+      use type Reliable_Udp.Packet_Number_Type;
       pragma Unreferenced (Packet_Number);
    begin
       if Buffer_Handler.First > Buffer_Handler.Current then
@@ -512,7 +512,7 @@ package body Buffer_Handling is
             Src_Data_Stream    : Base_Udp.Sequence_Type;
             for Src_Data_Stream'Address use Buffers.Get_Address (Src_Handle.all);
 
-            Header      : Reliable_Udp.Header;
+            Header      : Reliable_Udp.Header_Type;
             Size        : Interfaces.Unsigned_32;
             for Header'Address use Src_Data_Stream (Src_Index)'Address;
             for Size'Address use Src_Data_Stream (Src_Index) (Base_Udp.Header_Size + 1)'Address;
@@ -559,94 +559,6 @@ package body Buffer_Handling is
             & Ada.Exceptions.Exception_Message (E)
             & ASCII.ESC & "[0m");
    end Handle_Data_Task;
-
-
-   ----------------------
-   --  Get_Filled_Buf  --
-   ----------------------
-
-   procedure Get_Filled_Buf (To_File   : in Boolean := True) is
-      Log_File : Ada.Text_IO.File_Type;
-   begin
-      declare
-         Handle         : Buffers.Buffer_Handle_Type;
-
-         use Packet_Buffers;
-      begin
-         select
-            Buffer_Cons.Get_Full_Buffer (Handle);
-            Ada.Text_IO.Put_Line ("+++++++++++ Got A Buffer +++++++++++");
-         or
-            delay 1.0;
-            Ada.Text_IO.Put_Line ("/!\ Error : Cannot Get A Full Buffer /!\");
-            return;
-         end select;
-
-         if To_File then
-            Ada.Text_IO.Open
-               (Log_File, Ada.Text_IO.Append_File, "buffers.log");
-         end if;
-
-         declare
-            type Data_Array is new Element_Array
-               (1 .. To_Word_Count
-                  (Buffers.Get_Used_Bytes (Handle)));
-
-            Datas    : Data_Array;
-
-            for Datas'Address use Buffers.Get_Address (Handle);
-         begin
-            for I in Datas'Range loop
-               declare
-                  Pkt_U8      : array (1 .. Base_Udp.Load_Size)
-                                 of Interfaces.Unsigned_8;
-                  Pkt_Nb      : Base_Udp.Header;
-                  Content     : Interfaces.Unsigned_64;
-                  Dead_Beef   : Interfaces.Unsigned_32;
-
-                  for Pkt_Nb'Address use Datas (I)'Address;
-                  for Dead_Beef'Address use Datas (I)'Address;
-                  for Pkt_U8'Address use Datas (I)'Address;
-                  for Content'Address use Pkt_U8 (5)'Address;
-               begin
-                  if Dead_Beef = 16#DEAD_BEEF# then
-                     if To_File then
-                        Ada.Text_IO.Put_Line
-                           (Log_File, "Buffer (" & I'Img
-                              & " ) : ** DROPPED **");
-                     else
-                        Ada.Text_IO.Put_Line ("Buffer (" & I'Img
-                           & " ) : ** DROPPED **");
-                     end if;
-                  else
-                     if To_File then
-                        Ada.Text_IO.Put_Line
-                           (Log_File, "Buffer (" & I'Img & " ) :" &
-                              Pkt_Nb'Img & Content'Img);
-                     else
-                        Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) :" &
-                           Pkt_Nb'Img & Content'Img);
-                     end if;
-                  end if;
-
-               end;
-            end loop;
-         end;
-
-         Buffer_Cons.Release_Full_Buffer (Handle);
-         if To_File then
-            Ada.Text_IO.Close (Log_File);
-         end if;
-
-      exception
-         when E : others =>
-         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
-            Ada.Exceptions.Exception_Name (E)
-            & ASCII.LF & ASCII.ESC & "[33m"
-            & Ada.Exceptions.Exception_Message (E)
-            & ASCII.ESC & "[0m");
-      end;
-   end Get_Filled_Buf;
 
 
    --------------------------------

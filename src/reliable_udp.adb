@@ -14,9 +14,9 @@ package body Reliable_Udp is
    --  Send_Cmd_To_Producer  --
    ----------------------------
 
-   procedure Send_Cmd_To_Producer (Cmd : Reliable_Udp.Pkt_Nb) is
-      Data        : Ada.Streams.Stream_Element_Array (1 .. Reliable_Udp.Header'Size);
-      Head        : Reliable_Udp.Header;
+   procedure Send_Cmd_To_Producer (Cmd : Reliable_Udp.Packet_Number_Type) is
+      Data        : Ada.Streams.Stream_Element_Array (1 .. Reliable_Udp.Header_Type'Size);
+      Head        : Reliable_Udp.Header_Type;
       Offset      : Ada.Streams.Stream_Element_Offset;
       for Head'Address use Data'Address;
       pragma Unreferenced (Offset);
@@ -31,24 +31,24 @@ package body Reliable_Udp is
    --  Append_Ack  --
    ------------------
 
-   procedure Append_Ack (First_D          : in Reliable_Udp.Pkt_Nb;
-                         Last_D           : in Reliable_Udp.Pkt_Nb;
+   procedure Append_Ack (First_D          : in Reliable_Udp.Packet_Number_Type;
+                         Last_D           : in Reliable_Udp.Packet_Number_Type;
                          Client_Addr      : in GNAT.Sockets.Sock_Addr_Type)
    is
-      Packet_Lost                      : Reliable_Udp.Loss;
+      Packet_Lost                      : Reliable_Udp.Loss_Type;
       Missed_2_Times_Same_Seq_Number   : exception;
       use type Ada.Real_Time.Time;
    begin
-      for I in Reliable_Udp.Pkt_Nb range First_D .. Last_D loop
+      for I in Reliable_Udp.Packet_Number_Type range First_D .. Last_D loop
          Packet_Lost.Last_Ack := Ada.Real_Time.Clock -
             Ada.Real_Time.Microseconds (Base_Udp.RTT_US_Max);
          Packet_Lost.From := Client_Addr;
-         if not Ack_Mgr.Is_Empty (Loss_Index (I)) then
+         if not Ack_Mgr.Is_Empty (Loss_Index_Type (I)) then
             Ada.Text_IO.Put_Line
                ("/!\ Two packets with the same number:" & I'Img  & " were dropped /!\");
             raise Missed_2_Times_Same_Seq_Number;
          end if;
-         Ack_Mgr.Set (Loss_Index (I), Packet_Lost);
+         Ack_Mgr.Set (Loss_Index_Type (I), Packet_Lost);
       end loop;
    exception
       when E : others =>
@@ -75,7 +75,7 @@ package body Reliable_Udp is
             Append_Ack (Ack.First_D, Ack.Last_D, Ack.From);
          else
             Append_Ack (Ack.First_D, Base_Udp.Pkt_Max, Ack.From);
-            Append_Ack (Reliable_Udp.Pkt_Nb'First, Ack.Last_D, Ack.From);
+            Append_Ack (Reliable_Udp.Packet_Number_Type'First, Ack.Last_D, Ack.From);
          end if;
       end loop;
    end Append_Task;
@@ -86,7 +86,7 @@ package body Reliable_Udp is
    -------------------
 
    task body Remove_Task is
-      Pkt   : Pkt_Nb;
+      Pkt   : Packet_Number_Type;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (7));
@@ -95,10 +95,10 @@ package body Reliable_Udp is
             accept Stop;
             exit;
          or
-            accept Remove (Packet : in Pkt_Nb) do
+            accept Remove (Packet : in Packet_Number_Type) do
                Pkt   := Packet;
             end Remove;
-            Ack_Mgr.Clear (Loss_Index (Pkt));
+            Ack_Mgr.Clear (Loss_Index_Type (Pkt));
          end select;
       end loop;
    end Remove_Task;
@@ -108,15 +108,15 @@ package body Reliable_Udp is
    --  Ack_Task  --
    ----------------
 
-   --  Issue: Prevent from receiving packets when two much aks
+   --  Issue: Prevent from receiving packets when two much acks
    --  which create even more acks...
    task body Ack_Task is
       Ack_Array   : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
-      Head        : Reliable_Udp.Header;
+      Head        : Reliable_Udp.Header_Type;
       Data        : Ada.Streams.Stream_Element_Array (1 .. 64);
       Offset      : Ada.Streams.Stream_Element_Offset;
-      Element     : Loss;
-      Index       : Loss_Index := Loss_Index'First;
+      Element     : Loss_Type;
+      Index       : Loss_Index_Type := Loss_Index_Type'First;
 
       for Data'Address use Ack_Array'Address;
       for Head'Address use Ack_Array'Address;
@@ -143,7 +143,7 @@ package body Reliable_Udp is
                then
                   Element.Last_Ack := Ada.Real_Time.Clock;
                   Ack_Mgr.Set (Index, Element);
-                  Head.Seq_Nb := Pkt_Nb (Index);
+                  Head.Seq_Nb := Packet_Number_Type (Index);
                   Head.Ack := True;
                   GNAT.Sockets.Send_Socket (Socket, Data, Offset, Element.From);
                end if;
@@ -161,8 +161,8 @@ package body Reliable_Udp is
       --  Set  --
       -----------
 
-      procedure Set (Index    : in Loss_Index;
-                     Data     : in Loss) is
+      procedure Set (Index    : in Loss_Index_Type;
+                     Data     : in Loss_Type) is
       begin
          Losses (Index) := Data;
          Losses (Index).Is_Empty := False;
@@ -173,13 +173,13 @@ package body Reliable_Udp is
       --  Get  --
       -----------
 
-      procedure Get (Index : in Loss_Index;
-                     Data  : in out Loss) is
+      procedure Get (Index : in Loss_Index_Type;
+                     Data  : in out Loss_Type) is
       begin
          Data := Losses (Index);
       end Get;
 
-      function Get (Index : in Loss_Index) return Loss is
+      function Get (Index : in Loss_Index_Type) return Loss_Type is
       begin
          return Losses (Index);
       end Get;
@@ -189,7 +189,7 @@ package body Reliable_Udp is
       --  Clear  --
       -------------
 
-      procedure Clear (Index    : in Loss_Index) is
+      procedure Clear (Index    : in Loss_Index_Type) is
       begin
          Losses (Index).Is_Empty := True;
       end Clear;
@@ -199,7 +199,7 @@ package body Reliable_Udp is
       --  Is_Empty  --
       ----------------
 
-      function Is_Empty (Index    : in Loss_Index) return Boolean is
+      function Is_Empty (Index    : in Loss_Index_Type) return Boolean is
       begin
          return Losses (Index).Is_Empty;
       end Is_Empty;
