@@ -441,6 +441,8 @@ package body Buffer_Handling is
       use Ada.Streams;
       use Interfaces;
 
+      Bad_Index            : exception;
+
       Dest_Data_Stream     : Stream_Element_Array
                             (1 .. Stream_Element_Offset
                                (Buffers.Get_Available_Bytes (Dest_Handle.all)));
@@ -451,6 +453,10 @@ package body Buffer_Handling is
 
    begin
       if Unsigned_64 (Dest_Index) + Offset > Unsigned_64 (Buffer_Size) then
+         if Unsigned_32 (Dest_Index) > Buffer_Size then
+            raise Bad_Index with "Index [" & Unsigned_32 (Dest_Index)'Img
+                     & "] bigger that buffer size [" & Buffer_Size'Img & "]";
+         end if;
          Offset := Unsigned_64 (Buffer_Size - Unsigned_32 (Dest_Index));
       end if;
 
@@ -462,6 +468,13 @@ package body Buffer_Handling is
       Src_Index := Src_Index + 1;
       New_Src_Buffer (Src_Index, Src_Handle, Src_Data_Stream);
       Dest_Index := Dest_Index + (Base_Udp.Load_Size - Base_Udp.Header_Size);
+   exception
+      when E : others =>
+      Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+         Ada.Exceptions.Exception_Name (E)
+         & ASCII.LF & ASCII.ESC & "[33m"
+         & Ada.Exceptions.Exception_Message (E)
+         & ASCII.ESC & "[0m");
    end Copy_Packet_Data_To_Dest;
 
 

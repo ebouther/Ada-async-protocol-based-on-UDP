@@ -17,8 +17,8 @@ procedure Udp_Consumer is
    Host_Name : Unbounded_String := To_Unbounded_String ("localhost");
    Buffer_Name : Unbounded_String := To_Unbounded_String ("blue");
    Port : GNAT.Sockets.Port_Type := 8042;
-   Watchdog_Counter : Natural;
-   Watchdog_Limit : Positive := 10;
+   --  Watchdog_Counter : Natural;
+   --  Watchdog_Limit : Positive := 10;
    use type Buffers.Buffer_Size_Type;
 
    task type Timer_Task is
@@ -50,8 +50,8 @@ begin
             Host_Name := To_Unbounded_String (GNAT.Command_Line.Parameter);
          when 'p' =>
             Port := GNAT.Sockets.Port_Type'Value (GNAT.Command_Line.Parameter);
-         when 'w' =>
-            Watchdog_Limit := Positive'Value (GNAT.Command_Line.Parameter);
+         --  when 'w' =>
+         --     Watchdog_Limit := Positive'Value (GNAT.Command_Line.Parameter);
          when others =>
             raise Program_Error;
       end case;
@@ -62,27 +62,27 @@ begin
    Client.Connect;
    loop
       --  Ada.Text_IO.Put_Line ("consuming buffer loop");
-      Watchdog_Counter := 0;
+      --  Watchdog_Counter := 0;
       loop
+         --  select
+         Buffer.Block_Full;
          select
-            Buffer.Block_Full;
-            select
-               Timer.Start;
-            else
-               null;
-            end select;
-            --  Ada.Text_IO.Put_Line ("block full seen");
-            exit;
-         or
-            delay 1.0;
-            Ada.Text_IO.Put_Line ("watchdog" & Watchdog_Counter'Img);
-            Watchdog_Counter := Watchdog_Counter + 1;
-            if Watchdog_Counter = Watchdog_Limit then
-               Client.Disconnect;
-               Ada.Text_IO.Put_Line ("end of test");
-               return;
-            end if;
+            Timer.Start;
+         else
+            null;
          end select;
+         --  Ada.Text_IO.Put_Line ("block full seen");
+         exit;
+         --  or
+         --     delay 1.0;
+         --     Ada.Text_IO.Put_Line ("watchdog" & Watchdog_Counter'Img);
+         --     Watchdog_Counter := Watchdog_Counter + 1;
+         --     if Watchdog_Counter = Watchdog_Limit then
+         --        Client.Disconnect;
+         --        Ada.Text_IO.Put_Line ("end of test");
+         --        return;
+         --     end if;
+         --  end select;
       end loop;
       declare
          Buffer_Handle : Buffers.Buffer_Handle_Type;
