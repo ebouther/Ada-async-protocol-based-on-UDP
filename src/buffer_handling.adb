@@ -17,23 +17,13 @@ package body Buffer_Handling is
    use type Interfaces.Unsigned_64;
 
 
-   Buffer_Handler    : Buffer_Handler_Type;
-
-   Production        : Buffers.Shared.Produce.Produce_Couple_Type;
-   Buffer_Prod       : Buffers.Shared.Produce.Produce_Type
-                           renames Production.Producer;
-
-   Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
-   Buffer_Cons       : Buffers.Shared.Consume.Consume_Type
-                           renames Consumption.Consumer;
-
-
    --------------------
    --  Init_Buffers  --
    --------------------
 
-   procedure Init_Buffers (Buffer_Name : String;
-                           End_Point   : String) is
+   procedure Init_Buffers (Obj                  : Buffer_Handler_Obj_Access;
+                           Buffer_Name          : String;
+                           End_Point            : String) is
       Ret  : Interfaces.C.int;
 
       use type Common_Types.Buffer_Size_Type;
@@ -55,19 +45,19 @@ package body Buffer_Handling is
       Ada.Text_IO.Put_Line ("Buffer   Size :" & Base_Udp.Buffer_Size'Img
          & " Depth : " & Integer (Base_Udp.PMH_Buf_Nb + 1)'Img);
 
-      Buffer_Prod.Set_Name (Buffer_Name);
-      Production.Message_Handling.Start (1.0);
-      Buffer_Cons.Set_Name (Buffer_Name);
-      Consumption.Message_Handling.Start (1.0);
-      Buffer_Prod.Is_Initialised;
+      Obj.Buffer_Prod.Set_Name (Buffer_Name);
+      Obj.Production.Message_Handling.Start (1.0);
+      Obj.Buffer_Cons.Set_Name (Buffer_Name);
+      Obj.Consumption.Message_Handling.Start (1.0);
+      Obj.Buffer_Prod.Is_Initialised;
 
-      Buffer_Handler.First := Buffer_Handler.Handlers'First;
+      Obj.Buffer_Handler.First := Obj.Buffer_Handler.Handlers'First;
 
       --  Current is incremented to First when Recv_Packets asks for new Buf
-      Buffer_Handler.Current := Buffer_Handler.Handlers'Last;
+      Obj.Buffer_Handler.Current := Obj.Buffer_Handler.Handlers'Last;
 
-      for I in Buffer_Handler.Handlers'Range loop
-         Buffer_Prod.Get_Free_Buffer (Buffer_Handler.Handlers (I)
+      for I in Obj.Buffer_Handler.Handlers'Range loop
+         Obj.Buffer_Prod.Get_Free_Buffer (Obj.Buffer_Handler.Handlers (I)
             .Handle);
       end loop;
       Ada.Text_IO.Put_Line (ASCII.ESC & "[32;1m" & "Buffers   [✓]" & ASCII.ESC & "[0m");
@@ -94,10 +84,10 @@ package body Buffer_Handling is
    --  Release_Free_Buffer_At  --
    ------------------------------
 
-   procedure Release_Free_Buffer_At (Index : in Handle_Index_Type) is
-      Buf                  : Handler_Type
-                              renames Buffer_Handler.Handlers (Index);
+   procedure Release_Free_Buffer_At (Obj     : Buffer_Handle_Obj_Access;
+                                     Index   : in Handle_Index_Type) is
       use Base_Udp;
+      Buf     : Handler_Type renames Obj.Buffer_Handler.Handlers (Index);
    begin
 
       Buffers.Set_Used_Bytes
@@ -121,6 +111,7 @@ package body Buffer_Handling is
   --------------------------------
 
    task body Check_Buf_Integrity_Task is
+      Obj   : Buffer_Handle_Obj_Access;
       Index : Handle_Index_Type := Handle_Index_Type'First;
       Addr  : System.Address;
       N     : Integer;
@@ -128,10 +119,12 @@ package body Buffer_Handling is
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (4));
-      accept Start;
+      accept Start (Buffer_H  :  Buffer_Handler_Obj_Access) do
+         Obj   := Buffer_H;
+      end Start;
       loop
-         if Buffer_Handler.Handlers (Index).State = Near_Full then
-            Addr := Buffer_Handler.Handlers (Index).Handle.Get_Address;
+         if Obj.Buffer_Handler.Handlers (Index).State = Near_Full then
+            Addr := Obj.Buffer_Handler.Handlers (Index).Handle.Get_Address;
             N := 0;
             Parse_Buffer :
                while N <= Base_Udp.Pkt_Max loop
@@ -140,12 +133,13 @@ package body Buffer_Handling is
                      for Data'Address use Addr + Storage_Offset
                                                    (N * Base_Udp.Load_Size);
                   begin
+                     --  Exit if buffer is still waiting for dropped packet payload.
                      exit Parse_Buffer when Data = 16#DEAD_BEEF#;
                   end;
                   N := N + 1;
                end loop Parse_Buffer;
             if N = Base_Udp.Pkt_Max + 1 then
-               Buffer_Handler.Handlers (Index).State := Full;
+               Obj.Buffer_Handler.Handlers (Index).State := Full;
             end if;
          end if;
          Index := Index + 1;
@@ -202,10 +196,13 @@ package body Buffer_Handling is
   -----------------------------
 
    task body Release_Full_Buf_Task is
+      Obj   : Buffer_Handle_Obj_Access;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (11));
-      accept Start;
+      accept Start (Buffer_H  : Buffer_Handler_Obj_Access) do
+         Obj := Buffer_H;
+      end Start;
       loop
          delay 0.0; -- Doesn't work without rescheduling; -- edit: Might not be needed anymore
          if Buffer_Handler.Handlers (Buffer_Handler.First).State = Full then
@@ -238,9 +235,13 @@ package body Buffer_Handling is
    task body PMH_Buffer_Addr_Task is
       Not_Released_Fast_Enough   : exception;
       Init                       : Boolean := True;
+      Obj                        : Buffer_Handler_Obj_Access;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (12));
+      accept Start (Buffer_H  : Buffer_Handler_Obj_Access) do
+         Obj := Buffer_H; 
+      end Start;
       loop
          select
             accept Stop;
@@ -248,23 +249,23 @@ package body Buffer_Handling is
          or
             accept New_Buffer_Addr (Buffer_Ptr   : in out System.Address)
             do
-               if Buffer_Handler.Current + 1 = Buffer_Handler.First
+               if Obj.Buffer_Handler.Current + 1 = Obj.Buffer_Handler.First
                   and not Init
                then
                   Ada.Exceptions.Raise_Exception (Not_Released_Fast_Enough'Identity,
                      "All buffers are used. Make sure a consumer was launched.");
                end if;
-               Buffer_Ptr := Buffer_Handler.Handlers
-                                (Buffer_Handler.Current + 1).
+               Buffer_Ptr := Obj.Buffer_Handler.Handlers
+                                (Obj.Buffer_Handler.Current + 1).
                                     Handle.Get_Address;
             end New_Buffer_Addr;
                if not Init then
-                  Buffer_Handler.Handlers (Buffer_Handler.Current).
+                  Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.Current).
                                                       State := Near_Full;
                end if;
-               Buffer_Handler.Current := Buffer_Handler.Current + 1;
+               Obj.Buffer_Handler.Current := Obj.Buffer_Handler.Current + 1;
                Init := False;
-               Ada.Text_IO.Put_Line ("Current : " & Buffer_Handler.Current'Img);
+               Ada.Text_IO.Put_Line ("Current : " & Obj.Buffer_Handler.Current'Img);
          end select;
       end loop;
    exception
@@ -286,16 +287,16 @@ package body Buffer_Handling is
                         (First, Last   : Handle_Index_Type;
                          Data          : in Base_Udp.Packet_Stream;
                          Seq_Nb        : Reliable_Udp.Packet_Number_Type) return Boolean
+
    is
 
-      use Packet_Buffers;
       use System.Storage_Elements;
       use type Reliable_Udp.Packet_Number_Type;
       use type Handle_Index_Type;
    begin
       for N in First .. Last loop
          declare
-            type Data_Array is new Element_Array
+            type Data_Array is new Packet_Buffers.Element_Array
                (1 .. Integer (Base_Udp.Sequence_Size));
 
             Datas    : Data_Array;
@@ -305,6 +306,7 @@ package body Buffer_Handling is
                .Handle.Get_Address;
             for Content'Address use Datas (Integer (Seq_Nb) + 1)'Address;
          begin
+            --  This is "Empty Mark" (16#DEAD_BEEF#)
             if Content = 16#DEAD_BEEF# then
                Datas (Integer (Seq_Nb) + 1) := Data;
                return True;
@@ -319,9 +321,10 @@ package body Buffer_Handling is
    --  Save_Ack  --
    ----------------
 
-   procedure Save_Ack (Seq_Nb          :  in Reliable_Udp.Packet_Number_Type;
-                       Packet_Number   :  in Reliable_Udp.Packet_Number_Type;
-                       Data            :  in Base_Udp.Packet_Stream) is
+   procedure Save_Ack (Obj             : Buffer_Handler_Obj_Access;
+                       Seq_Nb          : in Reliable_Udp.Packet_Number_Type;
+                       Packet_Number   : in Reliable_Udp.Packet_Number_Type;
+                       Data            : in Base_Udp.Packet_Stream) is
 
       Location_Not_Found   : exception;
       use type Reliable_Udp.Packet_Number_Type;

@@ -9,6 +9,7 @@ with Buffers;
 
 with Base_Udp;
 with Reliable_Udp;
+with Buffer_Handling;
 with Web_Interfaces;
 
 package Data_Transport.Udp_Socket_Client is
@@ -42,9 +43,16 @@ package Data_Transport.Udp_Socket_Client is
       entry Stop;
    end Timer;
 
+   --  Append some stuff to Base_Udp.Consumer_Type.
+   --  Cannot do it in Base_Udp because of circular dependencies.
    type Consumer_Type is new Base_Udp.Consumer_Type with record
-      Ack_Mgr        : Reliable_Udp.Ack_Management_Access := new Reliable_Udp.Ack_Management;
-      Ack_Fifo       : Reliable_Udp.Synchronized_Queue_Access := new Reliable_Udp.Sync_Queue.Synchronized_Queue;
+      Ack_Mgr        : Reliable_Udp.Ack_Management_Access :=
+                           new Reliable_Udp.Ack_Management;
+      Ack_Fifo       : Reliable_Udp.Synchronized_Queue_Access :=
+                           new Reliable_Udp.Sync_Queue.Synchronized_Queue;
+
+      Buffer_Handler : Buffer_Handling.Buffer_Handler_Obj_Access :=
+                           new Buffer_Handling.Buffer_Handler_Obj;
    end record;
 
    --  A "connect" alternative for udp. Enables to wait for producer.

@@ -5,9 +5,13 @@ with Interfaces.C;
 with Reliable_Udp;
 with Base_Udp;
 
-with Buffers;
+with Buffers.Shared.Produce;
+with Buffers.Shared.Consume;
 
 package Buffer_Handling is
+
+   type Buffer_Handler_Obj is limited private;
+   type Buffer_Handler_Obj_Access is access Buffer_Handler_Obj;
 
    package Packet_Buffers is new
       Buffers.Generic_Buffers
@@ -53,11 +57,13 @@ package Buffer_Handling is
 
    --  Initialize "PMH_Buf_Nb" of Buffer and attach a buffer
    --  to each Handler of Handle_Array
-   procedure Init_Buffers (Buffer_Name : String;
+   procedure Init_Buffers (Obj         : Buffer_Handler_Obj_Access;
+                           Buffer_Name : String;
                            End_Point   : String);
 
    --  Release Buffer at Handlers (Index) and change its State to Empty
-   procedure Release_Free_Buffer_At (Index   : in Handle_Index_Type);
+   procedure Release_Free_Buffer_At (Buffer_Handler   : Buffer_Handler_Obj_Access;
+                                     Index            : in Handle_Index_Type);
 
 
    --  Search position of ack received in current and previous buffers
@@ -66,9 +72,10 @@ package Buffer_Handling is
                                Data          : in Base_Udp.Packet_Stream;
                                Seq_Nb        : Reliable_Udp.Packet_Number_Type) return Boolean;
 
-   procedure Save_Ack (Seq_Nb                :  in Reliable_Udp.Packet_Number_Type;
-                       Packet_Number         :  in Reliable_Udp.Packet_Number_Type;
-                       Data                  :  in Base_Udp.Packet_Stream);
+   procedure Save_Ack (Obj             : Buffer_Handler_Obj_Access;
+                       Seq_Nb          : in Reliable_Udp.Packet_Number_Type;
+                       Packet_Number   : in Reliable_Udp.Packet_Number_Type;
+                       Data            : in Base_Udp.Packet_Stream);
 
    --  Move Data Received to good location (Nb_Missed Offset) if packets
    --  were dropped
@@ -113,11 +120,12 @@ package Buffer_Handling is
 
    --  Release Buffer and Reuse Handler only if Buffer State is "Full"
    task type Release_Full_Buf_Task is
-      entry Start;
+      entry Start (Buffer_H   : Buffer_Handler_Obj_Access);
    end Release_Full_Buf_Task;
 
    --  Get the address of a New Buffer
    task type PMH_Buffer_Addr_Task is
+      entry Start (Buffer_H   : Buffer_Handler_Obj_Access);
       entry Stop;
       entry New_Buffer_Addr (Buffer_Ptr : in out System.Address);
    end PMH_Buffer_Addr_Task;
@@ -125,14 +133,26 @@ package Buffer_Handling is
    --  Change Buffer State from "Near_Full" to "Full" only if it contains
    --  all Packets
    task type Check_Buf_Integrity_Task is
-      entry Start;
+      entry Start (Buffer_H   : Buffer_Handler_Obj_Access);
    end Check_Buf_Integrity_Task;
-
-   --  procedure Save_Size_Pos (Seq_Pos :  Reliable_Udp.Packet_Number_Type);
-   --  pragma Inline (Save_Size_Pos);
 
    task type Handle_Data_Task is
       entry Start (Buffer_Set : Buffers.Buffer_Produce_Access);
    end Handle_Data_Task;
+
+private
+
+   type Buffer_Handler_Obj is limited
+      record
+         Buffer_Handler    : Buffer_Handler_Type;
+
+         Production        : Buffers.Shared.Produce.Produce_Couple_Type;
+         Buffer_Prod       : Buffers.Shared.Produce.Produce_Type; --  renames Production.Producer;
+
+         Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
+         Buffer_Cons       : Buffers.Shared.Consume.Consume_Type; --  renames Consumption.Consumer;
+
+         --  Packet_Buffer     : Packet_Buffers_Access := new Packet_Buffers;
+      end record;
 
 end Buffer_Handling;

@@ -14,7 +14,6 @@ with GNAT.Sockets.Thin;
 pragma Warnings (On);
 
 with Output_Data;
-with Buffer_Handling;
 
 package body Data_Transport.Udp_Socket_Client is
 
@@ -149,11 +148,12 @@ package body Data_Transport.Udp_Socket_Client is
 
       Web_Interfaces.Init_WebServer (Consumer.Web_Interface);
 
-      Release_Buf_Task.Start;
+      Release_Buf_Task.Start (Consumer.Buffer_Handler);
       Ack_Task.Start (Consumer.Ack_Mgr);
-      Check_Integrity_Task.Start;
+      Check_Integrity_Task.Start (Consumer.Buffer_Handler);
 
-      Buffer_Handling.Init_Buffers (To_String (Consumer.Buffer_Name),
+      Buffer_Handling.Init_Buffers (Consumer.Buffer_Handler,
+                                    To_String (Consumer.Buffer_Name),
                                     To_String (Consumer.End_Point));
 
       Log_Task.Start (Consumer.Web_Interface);

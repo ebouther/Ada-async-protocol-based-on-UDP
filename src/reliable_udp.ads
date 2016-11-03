@@ -55,6 +55,7 @@ package Reliable_Udp is
 
    type Losses_Array_Type is array (Loss_Index_Type) of Loss_Type;
 
+
    protected type Ack_Management is
 
       procedure Set
@@ -80,6 +81,7 @@ package Reliable_Udp is
    end Ack_Management;
 
    type Ack_Management_Access is access Ack_Management;
+
 
    package Sync_Queue is new Queue (Append_Ack_Type);
 
