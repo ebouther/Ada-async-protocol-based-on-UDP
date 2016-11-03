@@ -53,32 +53,6 @@ package Reliable_Udp is
          Last_D   : Packet_Number_Type;
       end record;
 
-   package Sync_Queue is new Queue (Append_Ack_Type);
-
-   Fifo  : Sync_Queue.Synchronized_Queue;
-
-   procedure Send_Cmd_To_Producer (Cmd : Packet_Number_Type);
-
-   procedure Append_Ack (First_D          : in Reliable_Udp.Packet_Number_Type;
-                         Last_D           : in Reliable_Udp.Packet_Number_Type;
-                         Client_Addr      : in GNAT.Sockets.Sock_Addr_Type);
-
-   --  Send acks to client if it's necessary
-   task type Ack_Task is
-      pragma Priority (System.Priority'First);
-      entry Start;
-      entry Stop;
-   end Ack_Task;
-
-   --  Appends packets to Losses Array
-   task Append_Task;
-
-   --  Removes Packet_Number from Losses Array
-   task type Remove_Task is
-      entry Stop;
-      entry Remove (Packet : in Packet_Number_Type);
-   end Remove_Task;
-
    type Losses_Array_Type is array (Loss_Index_Type) of Loss_Type;
 
    protected type Ack_Management is
@@ -104,5 +78,39 @@ package Reliable_Udp is
          Losses            : Losses_Array_Type;
 
    end Ack_Management;
+
+   type Ack_Management_Access is access Ack_Management;
+
+   package Sync_Queue is new Queue (Append_Ack_Type);
+
+   type Synchronized_Queue_Access is access Sync_Queue.Synchronized_Queue;
+
+   --  ** Move Send_Cmd_To_Producer somewhere else. :/
+   procedure Send_Cmd_To_Producer (Cmd : Packet_Number_Type);
+
+   procedure Append_Ack (Ack_Mgr          : in Ack_Management_Access;
+                         First_D          : in Reliable_Udp.Packet_Number_Type;
+                         Last_D           : in Reliable_Udp.Packet_Number_Type;
+                         Client_Addr      : in GNAT.Sockets.Sock_Addr_Type);
+
+   --  Send acks to client if it's necessary
+   task type Ack_Task is
+      pragma Priority (System.Priority'First);
+      entry Start (Ack_M   : in Ack_Management_Access);
+      entry Stop;
+   end Ack_Task;
+
+   --  Appends packets to Losses Array
+   task type Append_Task is
+      entry Start (Ack_M      : Ack_Management_Access;
+                   Ack_Fifo   : Synchronized_Queue_Access);
+   end Append_Task;
+
+   --  Removes Packet_Number from Losses Array
+   task type Remove_Task is
+      entry Initialize (Ack_M : Ack_Management_Access);
+      entry Remove (Packet : in Packet_Number_Type);
+      entry Stop;
+   end Remove_Task;
 
 end Reliable_Udp;

@@ -8,6 +8,8 @@ with System;
 with Buffers;
 
 with Base_Udp;
+with Reliable_Udp;
+with Web_Interfaces;
 
 package Data_Transport.Udp_Socket_Client is
    pragma Optimize (Time);
@@ -36,16 +38,23 @@ package Data_Transport.Udp_Socket_Client is
 
    --  Log Data every seconds.
    task type Timer is
-      entry Start;
+      entry Start (Web_I   : Web_Interfaces.Web_Interface_Access);
       entry Stop;
    end Timer;
 
+   type Consumer_Type is new Base_Udp.Consumer_Type with record
+      Ack_Mgr        : Reliable_Udp.Ack_Management_Access := new Reliable_Udp.Ack_Management;
+      Ack_Fifo       : Reliable_Udp.Synchronized_Queue_Access := new Reliable_Udp.Sync_Queue.Synchronized_Queue;
+   end record;
+
    --  A "connect" alternative for udp. Enables to wait for producer.
-   procedure Wait_Producer_HandShake (Host         : GNAT.Sockets.Inet_Addr_Type;
+   procedure Wait_Producer_HandShake (Consumer  : in out Consumer_Type;
+                                      Host         : GNAT.Sockets.Inet_Addr_Type;
                                       Port         : GNAT.Sockets.Port_Type);
 
    --  Main part of algorithm, does all the processing once a packet is receive.
-   procedure Process_Packet (Data         : in Base_Udp.Packet_Stream;
+   procedure Process_Packet (Consumer     : in out Consumer_Type;
+                             Data         : in Base_Udp.Packet_Stream;
                              Last         : in Ada.Streams.Stream_Element_Offset;
                              Recv_Offset  : in out Interfaces.Unsigned_64;
                              Data_Addr    : in out System.Address;
@@ -53,10 +62,10 @@ package Data_Transport.Udp_Socket_Client is
 
 
    --  Get command line parameters and modify default values if needed.
-   procedure Parse_Arguments;
+   procedure Parse_Arguments (Consumer : in out Consumer_Type);
 
    --  Starts all tasks used by client.
-   procedure Init_Consumer;
+   procedure Init_Consumer (Consumer   : in out Consumer_Type);
 
    --  Creates socket and Sets Socket Opt.
    procedure Init_Udp (Server       : in out Socket_Type;

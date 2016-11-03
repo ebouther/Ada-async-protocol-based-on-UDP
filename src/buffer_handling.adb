@@ -32,7 +32,8 @@ package body Buffer_Handling is
    --  Init_Buffers  --
    --------------------
 
-   procedure Init_Buffers is
+   procedure Init_Buffers (Buffer_Name : String;
+                           End_Point   : String) is
       Ret  : Interfaces.C.int;
 
       use type Common_Types.Buffer_Size_Type;
@@ -46,17 +47,17 @@ package body Buffer_Handling is
 
       --  Need a "+ 1" otherwise it cannot get a
       --  free buffer in Release_Full_Buf
-      Dcod_Pmh_Service.Client.Provide_Buffer (Name => Base_Udp.Buffer_Name,
+      Dcod_Pmh_Service.Client.Provide_Buffer (Name => Buffer_Name,
                                               Size => Base_Udp.Buffer_Size,
                                               Depth => Base_Udp.PMH_Buf_Nb + 1,
-                                              Endpoint => Base_Udp.End_Point);
+                                              Endpoint => End_Point);
 
       Ada.Text_IO.Put_Line ("Buffer   Size :" & Base_Udp.Buffer_Size'Img
          & " Depth : " & Integer (Base_Udp.PMH_Buf_Nb + 1)'Img);
 
-      Buffer_Prod.Set_Name (Base_Udp.Buffer_Name);
+      Buffer_Prod.Set_Name (Buffer_Name);
       Production.Message_Handling.Start (1.0);
-      Buffer_Cons.Set_Name (Base_Udp.Buffer_Name);
+      Buffer_Cons.Set_Name (Buffer_Name);
       Consumption.Message_Handling.Start (1.0);
       Buffer_Prod.Is_Initialised;
 

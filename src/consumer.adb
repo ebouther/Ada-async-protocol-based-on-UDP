@@ -103,7 +103,7 @@ procedure Consumer is
    end Get_Filled_Buf;
 begin
 
-   Buffer_Cons.Set_Name (Base_Udp.Buffer_Name);
+   Buffer_Cons.Set_Name ("Consumer");
    Consumption.Message_Handling.Start (1.0);
    loop
       Get_Filled_Buf;

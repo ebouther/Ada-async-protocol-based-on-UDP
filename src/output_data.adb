@@ -3,7 +3,6 @@ with Text_IO.Unbounded_IO;
 with Ada.Strings.Unbounded;
 
 with Base_Udp;
-with Web_Interface;
 
 package body Output_Data is
    use type Interfaces.Unsigned_64;
@@ -30,13 +29,15 @@ package body Output_Data is
 
    end Log_CSV;
 
-   procedure Display (Log : in Boolean;
-      Elapsed_Time         : in Duration;
-      Last_Packet          : in Reliable_Udp.Packet_Number_Type;
-      Missed, Last_Missed  : in Interfaces.Unsigned_64;
-      Nb_Packet_Received   : in Interfaces.Unsigned_64;
-      Last_Nb              : in Interfaces.Unsigned_64;
-      Nb_Output            : in Natural)
+   procedure Display
+      (Web_Interface        : in Web_Interfaces.Web_Interface_Access;
+       Log                  : in Boolean;
+       Elapsed_Time         : in Duration;
+       Last_Packet          : in Reliable_Udp.Packet_Number_Type;
+       Missed, Last_Missed  : in Interfaces.Unsigned_64;
+       Nb_Packet_Received   : in Interfaces.Unsigned_64;
+       Last_Nb              : in Interfaces.Unsigned_64;
+       Nb_Output            : in Natural)
    is
       use type Long_Float;
 
@@ -68,14 +69,14 @@ package body Output_Data is
       Ada.Text_IO.New_Line;
 
       --  WebSocket --
-      Web_Interface.Send_To_Client ("debit", Debit'Img);
-      Web_Interface.Send_To_Client ("pps", Pps'Img);
-      Web_Interface.Send_To_Client ("total_drops", Missed'Img);
-      Web_Interface.Send_To_Client ("drops",
-         Interfaces.Unsigned_64'Image (Missed - Last_Missed));
-      Web_Interface.Send_To_Client ("uptime", Nb_Output'Img);
-      Web_Interface.Send_To_Client ("total_pkt", Nb_Packet_Received'Img);
-      Web_Interface.Send_To_Client ("ratio", Ratio'Img);
+      Web_Interfaces.Send_To_Client (Web_Interface, "debit", Debit'Img);
+      Web_Interfaces.Send_To_Client (Web_Interface, "pps", Pps'Img);
+      Web_Interfaces.Send_To_Client (Web_Interface, "total_drops", Missed'Img);
+      Web_Interfaces.Send_To_Client (Web_Interface, "drops",
+            Interfaces.Unsigned_64'Image (Missed - Last_Missed));
+      Web_Interfaces.Send_To_Client (Web_Interface, "uptime", Nb_Output'Img);
+      Web_Interfaces.Send_To_Client (Web_Interface, "total_pkt", Nb_Packet_Received'Img);
+      Web_Interfaces.Send_To_Client (Web_Interface, "ratio", Ratio'Img);
 
       if Log then
          Log_CSV (Elapsed_Time,

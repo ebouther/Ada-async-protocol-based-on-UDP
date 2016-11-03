@@ -18,5 +18,8 @@ package WebSocket is
    overriding procedure On_Open (Socket : in out Object; Message : String);
    overriding procedure On_Close (Socket : in out Object; Message : String);
 
+   function Get_Acquisition_State return Boolean;
 
+private
+   Acquisition : Boolean := True;
 end WebSocket;

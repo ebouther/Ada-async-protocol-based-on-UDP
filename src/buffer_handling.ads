@@ -53,7 +53,8 @@ package Buffer_Handling is
 
    --  Initialize "PMH_Buf_Nb" of Buffer and attach a buffer
    --  to each Handler of Handle_Array
-   procedure Init_Buffers;
+   procedure Init_Buffers (Buffer_Name : String;
+                           End_Point   : String);
 
    --  Release Buffer at Handlers (Index) and change its State to Empty
    procedure Release_Free_Buffer_At (Index   : in Handle_Index_Type);

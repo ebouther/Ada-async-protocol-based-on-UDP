@@ -5,10 +5,6 @@ with Ada.Text_IO;
 
 package body Reliable_Udp is
 
-   Ack_Mgr        : Ack_Management;
-
-   Socket         : GNAT.Sockets.Socket_Type;
-
 
    ----------------------------
    --  Send_Cmd_To_Producer  --
@@ -18,11 +14,17 @@ package body Reliable_Udp is
       Data        : Ada.Streams.Stream_Element_Array (1 .. Reliable_Udp.Header_Type'Size);
       Head        : Reliable_Udp.Header_Type;
       Offset      : Ada.Streams.Stream_Element_Offset;
+      Socket      : GNAT.Sockets.Socket_Type;
+
       for Head'Address use Data'Address;
       pragma Unreferenced (Offset);
    begin
       Head.Seq_Nb := Cmd;
       Head.Ack    := False;
+      --  Add Socket to Consumer, to avoid initialization at each call.
+      GNAT.Sockets.Create_Socket (Socket,
+                                  GNAT.Sockets.Family_Inet,
+                                  GNAT.Sockets.Socket_Datagram);
       GNAT.Sockets.Send_Socket (Socket, Data, Offset, Producer_Address);
    end Send_Cmd_To_Producer;
 
@@ -31,7 +33,8 @@ package body Reliable_Udp is
    --  Append_Ack  --
    ------------------
 
-   procedure Append_Ack (First_D          : in Reliable_Udp.Packet_Number_Type;
+   procedure Append_Ack (Ack_Mgr          : Ack_Management_Access;
+                         First_D          : in Reliable_Udp.Packet_Number_Type;
                          Last_D           : in Reliable_Udp.Packet_Number_Type;
                          Client_Addr      : in GNAT.Sockets.Sock_Addr_Type)
    is
@@ -43,12 +46,12 @@ package body Reliable_Udp is
          Packet_Lost.Last_Ack := Ada.Real_Time.Clock -
             Ada.Real_Time.Microseconds (Base_Udp.RTT_US_Max);
          Packet_Lost.From := Client_Addr;
-         if not Ack_Mgr.Is_Empty (Loss_Index_Type (I)) then
+         if not Ack_Mgr.all.Is_Empty (Loss_Index_Type (I)) then
             Ada.Text_IO.Put_Line
                ("/!\ Two packets with the same number:" & I'Img  & " were dropped /!\");
             raise Missed_2_Times_Same_Seq_Number;
          end if;
-         Ack_Mgr.Set (Loss_Index_Type (I), Packet_Lost);
+         Ack_Mgr.all.Set (Loss_Index_Type (I), Packet_Lost);
       end loop;
    exception
       when E : others =>
@@ -65,19 +68,33 @@ package body Reliable_Udp is
    -------------------
 
    task body Append_Task is
-      Ack   :  Append_Ack_Type;
+      Ack      : Append_Ack_Type;
+      Fifo     : Synchronized_Queue_Access;
+      Ack_Mgr  : Ack_Management_Access;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (6));
+      accept Start (Ack_M     : Ack_Management_Access;
+                    Ack_Fifo  : Synchronized_Queue_Access) do
+         Fifo  := Ack_Fifo;
+         Ack_Mgr  := Ack_M;
+      end Start;
       loop
-         Fifo.Remove_First_Wait (Ack);
+         Fifo.all.Remove_First_Wait (Ack);
          if Ack.First_D <= Ack.Last_D then
-            Append_Ack (Ack.First_D, Ack.Last_D, Ack.From);
+            Append_Ack (Ack_Mgr, Ack.First_D, Ack.Last_D, Ack.From);
          else
-            Append_Ack (Ack.First_D, Base_Udp.Pkt_Max, Ack.From);
-            Append_Ack (Reliable_Udp.Packet_Number_Type'First, Ack.Last_D, Ack.From);
+            Append_Ack (Ack_Mgr, Ack.First_D, Base_Udp.Pkt_Max, Ack.From);
+            Append_Ack (Ack_Mgr, Reliable_Udp.Packet_Number_Type'First, Ack.Last_D, Ack.From);
          end if;
       end loop;
+   exception
+      when E : others =>
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
    end Append_Task;
 
 
@@ -86,10 +103,14 @@ package body Reliable_Udp is
    -------------------
 
    task body Remove_Task is
-      Pkt   : Packet_Number_Type;
+      Pkt      : Packet_Number_Type;
+      Ack_Mgr  : Ack_Management_Access;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (7));
+      accept Initialize (Ack_M : Ack_Management_Access) do
+         Ack_Mgr  := Ack_M;
+      end Initialize;
       loop
          select
             accept Stop;
@@ -111,12 +132,14 @@ package body Reliable_Udp is
    --  Issue: Prevent from receiving packets when two much acks
    --  which create even more acks...
    task body Ack_Task is
+      Ack_Mgr     : Ack_Management_Access;
       Ack_Array   : array (1 .. 64) of Interfaces.Unsigned_8 := (others => 0);
       Head        : Reliable_Udp.Header_Type;
       Data        : Ada.Streams.Stream_Element_Array (1 .. 64);
       Offset      : Ada.Streams.Stream_Element_Offset;
       Element     : Loss_Type;
       Index       : Loss_Index_Type := Loss_Index_Type'First;
+      Socket      : GNAT.Sockets.Socket_Type;
 
       for Data'Address use Ack_Array'Address;
       for Head'Address use Ack_Array'Address;
@@ -129,7 +152,10 @@ package body Reliable_Udp is
       GNAT.Sockets.Create_Socket (Socket,
                                   GNAT.Sockets.Family_Inet,
                                   GNAT.Sockets.Socket_Datagram);
-      accept Start;
+
+      accept Start (Ack_M : in Ack_Management_Access) do
+         Ack_Mgr  := Ack_M;
+      end Start;
       loop
          delay 0.0;
          select
