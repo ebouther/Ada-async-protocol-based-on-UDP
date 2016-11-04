@@ -10,8 +10,12 @@ with Buffers.Shared.Consume;
 
 package Buffer_Handling is
 
+
    type Buffer_Handler_Obj is limited private;
    type Buffer_Handler_Obj_Access is access Buffer_Handler_Obj;
+
+   --  DBG
+   procedure Get_Filled_Buf (Obj : Buffer_Handler_Obj_Access);
 
    package Packet_Buffers is new
       Buffers.Generic_Buffers
@@ -153,11 +157,8 @@ private
          Buffer_Handler    : Buffer_Handler_Type;
 
          Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
-         --  Buffer_Cons       : Buffers.Shared.Consume.Consume_Type; --  renames Consumption.Consumer;
 
          Production        : Buffers.Shared.Produce.Produce_Couple_Type;
-         --  Buffer_Prod       : Buffers.Shared.Produce.Produce_Type; --  renames Production.Producer;
-
       end record;
 
 end Buffer_Handling;

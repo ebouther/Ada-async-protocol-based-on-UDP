@@ -51,6 +51,7 @@ package body Data_Transport.Udp_Socket_Client is
 
       use System.Storage_Elements;
       use type Interfaces.C.int;
+      use type Buffers.Buffer_Produce_Access;
    begin
       System.Multiprocessors.Dispatching_Domains.Set_CPU
          (System.Multiprocessors.CPU_Range (16));
@@ -67,8 +68,9 @@ package body Data_Transport.Udp_Socket_Client is
 
             Init_Consumer (Consumer);
             Init_Udp (Server, Cons_Addr, Cons_Port);
-
-            Handle_Data.Start (Consumer.Buffer_Handler, Buffer_Set);
+            if Buffer_Set /= null then
+               Handle_Data.Start (Consumer.Buffer_Handler, Buffer_Set);
+            end if;
 
             PMH_Buffer_Task.Start (Consumer.Buffer_Handler);
 

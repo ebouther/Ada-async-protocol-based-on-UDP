@@ -34,15 +34,15 @@ package body WebSocket is
    begin
       return Object'
         (AWS.Net.WebSocket.Object
-          (AWS.Net.WebSocket.Create (Socket, Request)) with null record);
+          (AWS.Net.WebSocket.Create (Socket, Request)) with Acquisition => True);
    end Create;
 
    -------------
    -- On_Open --
    -------------
 
-   overriding procedure On_Open (Socket : in out Object; Message : String) is
-      pragma Unreferenced (Socket);
+   overriding procedure On_Open (Obj : in out Object; Message : String) is
+      pragma Unreferenced (Obj);
    begin
       Text_IO.Put_Line ("On_Open : " & Message);
    end On_Open;
@@ -52,41 +52,41 @@ package body WebSocket is
    ----------------
 
    overriding procedure On_Message
-     (Socket : in out Object; Message : String) is
+     (Obj : in out Object; Message : String) is
       use type AWS.Net.WebSocket.Kind_Type;
    begin
       if Message = "START_ACQ"
-         and Acquisition = False
+         and Obj.Acquisition = False
       then
          Reliable_Udp.Send_Cmd_To_Producer (1);
-         Acquisition := True;
+         Obj.Acquisition := True;
       elsif Message = "STOP_ACQ"
-         and Acquisition
+         and Obj.Acquisition
       then
          Reliable_Udp.Send_Cmd_To_Producer (2);
-         Acquisition := False;
+         Obj.Acquisition := False;
       end if;
-      Socket.Send (Message, Is_Binary => Socket.Kind = Net.WebSocket.Binary);
+      Obj.Send (Message, Is_Binary => Obj.Kind = Net.WebSocket.Binary);
    end On_Message;
 
    --------------
    -- On_Close --
    --------------
 
-   overriding procedure On_Close (Socket : in out Object; Message : String) is
+   overriding procedure On_Close (Obj : in out Object; Message : String) is
    begin
       Text_IO.Put_Line
         ("On_Close : "
-         & Net.WebSocket.Error_Type'Image (Socket.Error) & ", " & Message);
+         & Net.WebSocket.Error_Type'Image (Obj.Error) & ", " & Message);
    end On_Close;
 
    ---------------------
    -- Get_Acquisition --
    ---------------------
 
-   function Get_Acquisition_State return Boolean is
+   function Get_Acquisition_State (Obj : in out Object) return Boolean is
    begin
-      return Acquisition;
+      return Obj.Acquisition;
    end Get_Acquisition_State;
 
 end WebSocket;

@@ -19,25 +19,22 @@ package body Data_Transport.Udp_Socket_Server is
 
    use type Reliable_Udp.Packet_Number_Type;
 
-   Socket            : GNAT.Sockets.Socket_Type;
-   Address           : GNAT.Sockets.Sock_Addr_Type;
-   Acquisition       : Boolean := True;
-   Last_Packets      : array (Reliable_Udp.Packet_Number_Type)
-                        of History_Type;
-
    task body Socket_Server_Task is
-      Packet_Number : Reliable_Udp.Packet_Number_Type := 0;
+      Packet_Number  : Reliable_Udp.Packet_Number_Type := 0;
+      Producer       : Producer_Access;
    begin
       select
          accept Initialise
-           (Network_Interface : String;
-            Port : GNAT.Sockets.Port_Type) do
-
-            Address.Addr := GNAT.Sockets.Addresses
-                            (GNAT.Sockets.Get_Host_By_Name (Network_Interface));
-            Address.Port := Port;
+           (Obj               : Producer_Access;
+            Network_Interface : String;
+            Port              : GNAT.Sockets.Port_Type)
+         do
+            Producer := Obj;
+            Producer.Address.Addr := GNAT.Sockets.Addresses
+                                    (GNAT.Sockets.Get_Host_By_Name (Network_Interface));
+            Producer.Address.Port := Port;
             GNAT.Sockets.Create_Socket
-               (Socket,
+               (Producer.Socket,
                 GNAT.Sockets.Family_Inet,
                 GNAT.Sockets.Socket_Datagram);
          end Initialise;
@@ -54,22 +51,22 @@ package body Data_Transport.Udp_Socket_Server is
       end loop;
 
       <<HandShake>>
-      Server_HandShake;
-      Acquisition := True;
+      Consumer_HandShake (Producer);
+      Producer.Acquisition := True;
       delay 0.0001;
       Ada.Text_IO.Put_Line ("Consumer ready, start sending packets...");
 
       loop
          select
             accept Disconnect;
-               GNAT.Sockets.Close_Socket (Socket);
+               GNAT.Sockets.Close_Socket (Producer.Socket);
                exit;
          else
-            if Acquisition then
-               Rcv_Ack;
+            if Producer.Acquisition then
+               Rcv_Ack (Producer);
                select
                   Buffer_Set.Block_Full;
-                  Send_Buffer_Data (Buffer_Set, Packet_Number);
+                  Send_Buffer_Data (Producer, Buffer_Set, Packet_Number);
                else
                   null;
                end select;
@@ -79,7 +76,7 @@ package body Data_Transport.Udp_Socket_Server is
                   use type Ada.Calendar.Time;
                begin
                   loop
-                     Rcv_Ack;
+                     Rcv_Ack (Producer);
                      --  Give server 2s to be sure it has all packets
                      if Ada.Calendar.Clock - Start_Time > 2.0 then
                         goto HandShake;
@@ -101,10 +98,10 @@ package body Data_Transport.Udp_Socket_Server is
 
 
    ------------------------
-   --  Server_HandShake  --
+   --  Consumer_HandShake  --
    ------------------------
 
-   procedure Server_HandShake is
+   procedure Consumer_HandShake (Producer : Producer_Access) is
       Send_Data, Recv_Data : Base_Udp.Packet_Stream;
       Send_Head, Recv_Head : Reliable_Udp.Header_Type;
 
@@ -116,24 +113,26 @@ package body Data_Transport.Udp_Socket_Server is
    begin
       Send_Msg := 0;
       loop
-         Send_Packet (Send_Data);
+         Send_Packet (Producer => Producer,
+                      Payload => Send_Data);
          delay 0.2;
          exit when GNAT.Sockets.Thin.C_Recv
-               (To_Int (Socket),
+               (To_Int (Producer.Socket),
                 Recv_Data (Recv_Data'First)'Address,
                 Recv_Data'Length,
                 64) /= -1
                and Not_A_Msg = False
                and Recv_Msg = Send_Msg;
       end loop;
-   end Server_HandShake;
+   end Consumer_HandShake;
 
 
    ------------------------
    --  Send_Buffer_Data  --
    ------------------------
 
-   procedure Send_Buffer_Data (Buffer_Set    : Buffers.Buffer_Consume_Access;
+   procedure Send_Buffer_Data (Producer      : Producer_Access;
+                               Buffer_Set    : Buffers.Buffer_Consume_Access;
                                Packet_Number : in out Reliable_Udp.Packet_Number_Type) is
 
       Null_Buffer_Size  : exception;
@@ -153,8 +152,8 @@ package body Data_Transport.Udp_Socket_Server is
          Header   : Reliable_Udp.Header_Type;
 
          for Data'Address use Buffers.Get_Address (Buffer_Handle);
-         for Header'Address use Last_Packets (Packet_Number).Data'Address;
-         for Buffer_Size'Address use Last_Packets (Packet_Number).Data
+         for Header'Address use Producer.Last_Packets (Packet_Number).Data'Address;
+         for Buffer_Size'Address use Producer.Last_Packets (Packet_Number).Data
                                        (Base_Udp.Header_Size + 1)'Address;
       begin
          if Buffer_Size = 0 then
@@ -162,10 +161,10 @@ package body Data_Transport.Udp_Socket_Server is
          end if;
          Header := (Ack => False,
                     Seq_Nb => Packet_Number);
-         Last_Packets (Packet_Number).Is_Buffer_Size := True;
-         Send_Packet (Last_Packets (Packet_Number).Data, True);
+         Producer.Last_Packets (Packet_Number).Is_Buffer_Size := True;
+         Send_Packet (Producer, Producer.Last_Packets (Packet_Number).Data, True);
          Packet_Number := Packet_Number + 1;
-         Send_All_Stream (Data, Packet_Number);
+         Send_All_Stream (Producer, Data, Packet_Number);
       exception
          when E : others =>
             Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
@@ -183,7 +182,8 @@ package body Data_Transport.Udp_Socket_Server is
    --  Send_All_Stream  --
    -----------------------
 
-   procedure Send_All_Stream (Payload        : Ada.Streams.Stream_Element_Array;
+   procedure Send_All_Stream (Producer       : Producer_Access;
+                              Payload        : Ada.Streams.Stream_Element_Array;
                               Packet_Number  : in out Reliable_Udp.Packet_Number_Type) is
       use type Ada.Streams.Stream_Element_Array;
 
@@ -192,7 +192,7 @@ package body Data_Transport.Udp_Socket_Server is
       Last  : Ada.Streams.Stream_Element_Offset;
    begin
       loop
-         Rcv_Ack;
+         Rcv_Ack (Producer);
          declare
             Head     : Ada.Streams.Stream_Element_Array (1 .. 2);
             Header   : Reliable_Udp.Header_Type := (Ack => False,
@@ -207,16 +207,16 @@ package body Data_Transport.Udp_Socket_Server is
                   Pad   : constant Ada.Streams.Stream_Element_Array
                            (1 .. Last - Payload'Last) := (others => 0);
                begin
-                  Last_Packets (Packet_Number).Data := Head & Payload
+                  Producer.Last_Packets (Packet_Number).Data := Head & Payload
                         (First .. Payload'Last) & Pad;
                end;
             else
-               Last_Packets (Packet_Number).Data := Head & Payload
+               Producer.Last_Packets (Packet_Number).Data := Head & Payload
                      (First .. Last);
             end if;
-            Last_Packets (Packet_Number).Is_Buffer_Size := False;
-            GNAT.Sockets.Send_Socket (Socket, Last_Packets (Packet_Number).Data,
-                                       Index, Address);
+            Producer.Last_Packets (Packet_Number).Is_Buffer_Size := False;
+            GNAT.Sockets.Send_Socket (Producer.Socket, Producer.Last_Packets (Packet_Number).Data,
+                                       Index, Producer.Address);
 
             Packet_Number := Packet_Number + 1;
          end;
@@ -230,8 +230,10 @@ package body Data_Transport.Udp_Socket_Server is
    --  Send_Packet  --
    -------------------
 
-   procedure Send_Packet (Payload : Base_Udp.Packet_Stream;
-                          Is_Buffer_Size : Boolean := False) is
+   procedure Send_Packet (Producer        : Producer_Access;
+                          Payload         : Base_Udp.Packet_Stream;
+                          Is_Buffer_Size  : Boolean := False)
+   is
       Offset   : Ada.Streams.Stream_Element_Offset;
       Data     : Ada.Streams.Stream_Element_Array
                      (1 .. (if Is_Buffer_Size then 6 else Base_Udp.Load_Size));
@@ -239,7 +241,7 @@ package body Data_Transport.Udp_Socket_Server is
       for Data'Address use Payload'Address;
       pragma Unreferenced (Offset);
    begin
-      GNAT.Sockets.Send_Socket (Socket, Data, Offset, Address);
+      GNAT.Sockets.Send_Socket (Producer.Socket, Data, Offset, Producer.Address);
    end Send_Packet;
 
 
@@ -247,7 +249,7 @@ package body Data_Transport.Udp_Socket_Server is
    --  Rcv_Ack  --
    ---------------
 
-   procedure Rcv_Ack is
+   procedure Rcv_Ack (Producer   : Producer_Access) is
       Payload     : Base_Udp.Packet_Stream;
       Head        : Reliable_Udp.Header_Type;
       Ack         : array (1 .. 64) of Interfaces.Unsigned_8;
@@ -263,31 +265,31 @@ package body Data_Transport.Udp_Socket_Server is
    begin
       loop
          Res := GNAT.Sockets.Thin.C_Recv
-            (To_Int (Socket), Data (Data'First)'Address, Data'Length, 64);
+            (To_Int (Producer.Socket), Data (Data'First)'Address, Data'Length, 64);
 
          exit when Res = -1;
 
          if Is_Not_Msg then
             declare
                Ack_Header  : Reliable_Udp.Header_Type;
-               for Ack_Header'Address use Last_Packets (Head.Seq_Nb).Data'Address;
+               for Ack_Header'Address use Producer.Last_Packets (Head.Seq_Nb).Data'Address;
             begin
                Ack_Header.Ack := True;
-               Send_Packet (Last_Packets (Head.Seq_Nb).Data,
-                            Last_Packets (Head.Seq_Nb).Is_Buffer_Size);
+               Send_Packet (Producer, Producer.Last_Packets (Head.Seq_Nb).Data,
+                            Producer.Last_Packets (Head.Seq_Nb).Is_Buffer_Size);
                --  DBG
-               if Last_Packets (Head.Seq_Nb).Is_Buffer_Size then
+               if Producer.Last_Packets (Head.Seq_Nb).Is_Buffer_Size then
                   Ada.Text_IO.Put_Line ("ReSent a Buffer Size :" & Head.Seq_Nb'Img);
                end if;
             end;
          else
             if Message = 2 then
                Ada.Text_IO.Put_Line ("...Consumer asked to PAUSE ACQUISITION...");
-               Acquisition := False;
+               Producer.Acquisition := False;
                exit;
             elsif Message = 1 then
                Ada.Text_IO.Put_Line ("...Consumer asked to START ACQUISITION...");
-               Acquisition := True;
+               Producer.Acquisition := True;
                exit;
             end if;
          end if;

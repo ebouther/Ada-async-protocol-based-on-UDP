@@ -14,6 +14,29 @@ package body Buffer_Handling is
    use type Interfaces.Unsigned_32;
    use type Interfaces.Unsigned_64;
 
+   --  DBG --
+   procedure Get_Filled_Buf (Obj : Buffer_Handler_Obj_Access) is
+      Handle   : Buffers.Buffer_Handle_Type;
+
+      use Packet_Buffers;
+   begin
+      select
+         Obj.Consumption.Consumer.Get_Full_Buffer (Handle);
+      or
+         delay 5.0;
+         Ada.Text_IO.Put_Line
+               ("/!\ Timeout : Cannot Get A Full Buffer /!\");
+         return;
+      end select;
+
+      Obj.Consumption.Consumer.Release_Full_Buffer (Handle);
+   exception
+      when E : others =>
+         Ada.Text_IO.Put_Line ("exception : " &
+            Ada.Exceptions.Exception_Name (E) &
+            " message : " &
+            Ada.Exceptions.Exception_Message (E));
+   end Get_Filled_Buf;
 
    --------------------
    --  Init_Buffers  --
@@ -55,8 +78,8 @@ package body Buffer_Handling is
       Obj.Buffer_Handler.Current := Obj.Buffer_Handler.Handlers'Last;
 
       for I in Obj.Buffer_Handler.Handlers'Range loop
-         Obj.Production.Producer.Get_Free_Buffer (Obj.Buffer_Handler.Handlers (I)
-            .Handle);
+         Obj.Production.Producer.Get_Free_Buffer
+            (Obj.Buffer_Handler.Handlers (I).Handle);
       end loop;
       Ada.Text_IO.Put_Line (ASCII.ESC & "[32;1m" & "Buffers   [✓]" & ASCII.ESC & "[0m");
 
@@ -83,14 +106,16 @@ package body Buffer_Handling is
    ------------------------------
 
    procedure Release_Free_Buffer_At (Obj     : Buffer_Handler_Obj_Access;
-                                     Index   : in Handle_Index_Type) is
-      use Base_Udp;
+                                     Index   : in Handle_Index_Type)
+   is
       Buf     : Handler_Type renames Obj.Buffer_Handler.Handlers (Index);
+      use Base_Udp;
    begin
 
+      --  Size changes on disconnect / end of prod data
       Buffers.Set_Used_Bytes
          (Buf.Handle, Buffers.Buffer_Size_Type
-            (Load_Size * Sequence_Size)); --  Size change on disconnect / end of prod data
+            (Load_Size * Sequence_Size));
       Obj.Production.Producer.Release_Free_Buffer (Buf.Handle);
       Buf.State := Empty;
 
@@ -206,6 +231,8 @@ package body Buffer_Handling is
          if Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.First).State = Full then
 
             Release_Free_Buffer_At (Obj, Obj.Buffer_Handler.First);
+
+            Get_Filled_Buf (Obj);
 
             Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.First).Handle.Reuse;
 

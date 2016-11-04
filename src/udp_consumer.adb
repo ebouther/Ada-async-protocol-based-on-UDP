@@ -10,7 +10,8 @@ procedure Udp_Consumer is
    Total_Bytes_Received : Interfaces.Unsigned_64 := 0;
    Buffer : aliased Buffers.Local.Local_Buffer_Type;
    Client : Data_Transport.Udp_Socket_Client.Socket_Client_Task
-     (Buffer'Unchecked_Access);
+      (null);
+      --  (Buffer'Unchecked_Access);
    --  type Data_Array is array (1 .. 1024) of Integer;
    Options : constant String := "buffer_name= host_name= port= watchdog=";
    use Ada.Strings.Unbounded;

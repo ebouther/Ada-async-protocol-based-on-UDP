@@ -29,6 +29,8 @@ procedure Consumer is
 
       use Packet_Buffers;
       use type Interfaces.Unsigned_32;
+      pragma Unreferenced (To_File);
+      pragma Unreferenced (Log_File);
    begin
       select
          Buffer_Cons.Get_Full_Buffer (Handle);
@@ -39,60 +41,62 @@ procedure Consumer is
          return;
       end select;
 
-      if To_File then
-         Ada.Text_IO.Open
-            (Log_File, Ada.Text_IO.Append_File, "buffers.log");
-      end if;
+      Ada.Text_IO.Put_Line ("--  Buffer  --");
 
-      declare
-         type Data_Array is new Element_Array
-            (1 .. To_Word_Count
-               (Buffers.Get_Used_Bytes (Handle)));
+      --  if To_File then
+      --     Ada.Text_IO.Open
+      --        (Log_File, Ada.Text_IO.Append_File, "buffers.log");
+      --  end if;
 
-         Datas    : Data_Array;
+      --  declare
+      --     type Data_Array is new Element_Array
+      --        (1 .. To_Word_Count
+      --           (Buffers.Get_Used_Bytes (Handle)));
 
-         for Datas'Address use Buffers.Get_Address (Handle);
-      begin
-         for I in Datas'Range loop
-            declare
-               Pkt_U8      : array (1 .. Base_Udp.Load_Size)
-                              of Interfaces.Unsigned_8;
-               Pkt_Nb      : Base_Udp.Header;
-               Content     : Interfaces.Unsigned_64;
-               Dead_Beef   : Interfaces.Unsigned_32;
+      --     Datas    : Data_Array;
 
-               for Pkt_Nb'Address use Datas (I)'Address;
-               for Dead_Beef'Address use Datas (I)'Address;
-               for Pkt_U8'Address use Datas (I)'Address;
-               for Content'Address use Pkt_U8 (5)'Address;
-            begin
-               if Dead_Beef = 16#DEAD_BEEF# then
-                  if To_File then
-                     Ada.Text_IO.Put_Line
-                        (Log_File, "Buffer (" & I'Img
-                           & " ) : ** DROPPED **");
-                  else
-                     Ada.Text_IO.Put_Line ("Buffer (" & I'Img
-                        & " ) : ** DROPPED **");
-                  end if;
-               else
-                  if To_File then
-                     Ada.Text_IO.Put_Line
-                        (Log_File, "Buffer (" & I'Img & " ) :" &
-                           Pkt_Nb'Img & Content'Img);
-                  else
-                     Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) :" &
-                        Pkt_Nb'Img & Content'Img);
-                  end if;
-               end if;
-            end;
-         end loop;
-      end;
+      --     for Datas'Address use Buffers.Get_Address (Handle);
+      --  begin
+      --     for I in Datas'Range loop
+      --        declare
+      --           Pkt_U8      : array (1 .. Base_Udp.Load_Size)
+      --                          of Interfaces.Unsigned_8;
+      --           Pkt_Nb      : Base_Udp.Header;
+      --           Content     : Interfaces.Unsigned_64;
+      --           Dead_Beef   : Interfaces.Unsigned_32;
+
+      --           for Pkt_Nb'Address use Datas (I)'Address;
+      --           for Dead_Beef'Address use Datas (I)'Address;
+      --           for Pkt_U8'Address use Datas (I)'Address;
+      --           for Content'Address use Pkt_U8 (5)'Address;
+      --        begin
+      --           if Dead_Beef = 16#DEAD_BEEF# then
+      --              if To_File then
+      --                 Ada.Text_IO.Put_Line
+      --                    (Log_File, "Buffer (" & I'Img
+      --                       & " ) : ** DROPPED **");
+      --              else
+      --                 Ada.Text_IO.Put_Line ("Buffer (" & I'Img
+      --                    & " ) : ** DROPPED **");
+      --              end if;
+      --           else
+      --              if To_File then
+      --                 Ada.Text_IO.Put_Line
+      --                    (Log_File, "Buffer (" & I'Img & " ) :" &
+      --                       Pkt_Nb'Img & Content'Img);
+      --              else
+      --                 Ada.Text_IO.Put_Line ("Buffer (" & I'Img & " ) :" &
+      --                    Pkt_Nb'Img & Content'Img);
+      --              end if;
+      --           end if;
+      --        end;
+      --     end loop;
+      --  end;
 
       Buffer_Cons.Release_Full_Buffer (Handle);
-      if To_File then
-         Ada.Text_IO.Close (Log_File);
-      end if;
+      --  if To_File then
+      --     Ada.Text_IO.Close (Log_File);
+      --  end if;
 
    exception
       when E : others =>
@@ -103,7 +107,7 @@ procedure Consumer is
    end Get_Filled_Buf;
 begin
 
-   Buffer_Cons.Set_Name ("Consumer");
+   Buffer_Cons.Set_Name ("toto");
    Consumption.Message_Handling.Start (1.0);
    loop
       Get_Filled_Buf;

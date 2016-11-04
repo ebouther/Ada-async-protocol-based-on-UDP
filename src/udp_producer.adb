@@ -12,20 +12,25 @@ procedure Udp_Producer is
    use type Buffers.Buffer_Size_Type;
    use type Interfaces.Unsigned_64;
 
+   pragma Warnings (Off);
+   Producer    : Data_Transport.Udp_Socket_Server.Producer_Access :=
+                  new Data_Transport.Udp_Socket_Server.Producer_Type;
+   pragma Warnings (On);
+
    Used_Bytes  : constant Interfaces.Unsigned_64 := 409600000;
    Buf_Num     : Integer := 0;
 
-   Buffer : aliased Buffers.Local.Local_Buffer_Type;
-   Server : Data_Transport.Udp_Socket_Server.Socket_Server_Task
-     (Buffer'Unchecked_Access);
+   Buffer      : aliased Buffers.Local.Local_Buffer_Type;
+   Server      : Data_Transport.Udp_Socket_Server.Socket_Server_Task
+                     (Buffer'Unchecked_Access);
    type Data_Array is array (1 .. Used_Bytes / Integer'Size) of Integer;
-   Port : GNAT.Sockets.Port_Type := 8042;
+   Port                 : GNAT.Sockets.Port_Type := 8042;
    use Ada.Strings.Unbounded;
-   Buffer_Name : Unbounded_String := To_Unbounded_String ("blue");
-   Network_Interface : Unbounded_String := To_Unbounded_String ("lo");
-   Options : constant String := "buffer_name= port= hostname=";
+   Buffer_Name          : Unbounded_String := To_Unbounded_String ("blue");
+   Network_Interface    : Unbounded_String := To_Unbounded_String ("lo");
+   Options              : constant String := "buffer_name= port= hostname=";
    A_Task_Communication : aliased Utiles_Task.Task_Communication;
-   A_Terminate_Task : Utiles_Task.Terminate_Task (A_Task_Communication'Access);
+   A_Terminate_Task     : Utiles_Task.Terminate_Task (A_Task_Communication'Access);
 begin
    loop
       case GNAT.Command_Line.Getopt (Options) is
@@ -45,7 +50,7 @@ begin
    Buffer.Set_Name (To_String (Buffer_Name));
 
    Buffer.Initialise (10, Size => Buffers.Buffer_Size_Type (Used_Bytes));
-   Server.Initialise (To_String (Network_Interface), Port);
+   Server.Initialise (Producer, To_String (Network_Interface), Port);
    Ada.Text_IO.Put_Line ("Get port :" & Port'Img);
    Server.Connect;
    Ada.Text_IO.Put_Line ("Connect done");

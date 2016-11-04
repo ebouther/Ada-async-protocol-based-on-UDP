@@ -46,12 +46,12 @@ package body Reliable_Udp is
          Packet_Lost.Last_Ack := Ada.Real_Time.Clock -
             Ada.Real_Time.Microseconds (Base_Udp.RTT_US_Max);
          Packet_Lost.From := Client_Addr;
-         if not Ack_Mgr.all.Is_Empty (Loss_Index_Type (I)) then
+         if not Ack_Mgr.Is_Empty (Loss_Index_Type (I)) then
             Ada.Text_IO.Put_Line
                ("/!\ Two packets with the same number:" & I'Img  & " were dropped /!\");
             raise Missed_2_Times_Same_Seq_Number;
          end if;
-         Ack_Mgr.all.Set (Loss_Index_Type (I), Packet_Lost);
+         Ack_Mgr.Set (Loss_Index_Type (I), Packet_Lost);
       end loop;
    exception
       when E : others =>
@@ -80,12 +80,14 @@ package body Reliable_Udp is
          Ack_Mgr  := Ack_M;
       end Start;
       loop
-         Fifo.all.Remove_First_Wait (Ack);
+         Fifo.Remove_First_Wait (Ack);
          if Ack.First_D <= Ack.Last_D then
             Append_Ack (Ack_Mgr, Ack.First_D, Ack.Last_D, Ack.From);
          else
             Append_Ack (Ack_Mgr, Ack.First_D, Base_Udp.Pkt_Max, Ack.From);
-            Append_Ack (Ack_Mgr, Reliable_Udp.Packet_Number_Type'First, Ack.Last_D, Ack.From);
+            Append_Ack (Ack_Mgr,
+                        Reliable_Udp.Packet_Number_Type'First,
+                        Ack.Last_D, Ack.From);
          end if;
       end loop;
    exception

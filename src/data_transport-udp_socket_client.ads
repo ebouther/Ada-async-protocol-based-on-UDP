@@ -45,20 +45,12 @@ package Data_Transport.Udp_Socket_Client is
 
    --  Append some stuff to Base_Udp.Consumer_Type.
    --  Cannot do it in Base_Udp because of circular dependencies.
-   type Consumer_Type is new Base_Udp.Consumer_Type with record
-      Ack_Mgr        : Reliable_Udp.Ack_Management_Access :=
-                           new Reliable_Udp.Ack_Management;
-      Ack_Fifo       : Reliable_Udp.Synchronized_Queue_Access :=
-                           new Reliable_Udp.Sync_Queue.Synchronized_Queue;
-
-      Buffer_Handler : Buffer_Handling.Buffer_Handler_Obj_Access :=
-                           new Buffer_Handling.Buffer_Handler_Obj;
-   end record;
+   type Consumer_Type is new Base_Udp.Consumer_Type with private;
 
    --  A "connect" alternative for udp. Enables to wait for producer.
    procedure Wait_Producer_HandShake (Consumer  : in out Consumer_Type;
-                                      Host         : GNAT.Sockets.Inet_Addr_Type;
-                                      Port         : GNAT.Sockets.Port_Type);
+                                      Host      : GNAT.Sockets.Inet_Addr_Type;
+                                      Port      : GNAT.Sockets.Port_Type);
 
    --  Main part of algorithm, does all the processing once a packet is receive.
    procedure Process_Packet (Consumer     : in out Consumer_Type;
@@ -67,7 +59,6 @@ package Data_Transport.Udp_Socket_Client is
                              Recv_Offset  : in out Interfaces.Unsigned_64;
                              Data_Addr    : in out System.Address;
                              From         : in Sock_Addr_Type);
-
 
    --  Get command line parameters and modify default values if needed.
    procedure Parse_Arguments (Consumer : in out Consumer_Type);
@@ -84,5 +75,19 @@ package Data_Transport.Udp_Socket_Client is
    pragma Warnings (Off);
    procedure Stop_Server;
    pragma Warnings (On);
+
+private
+
+   type Consumer_Type is new Base_Udp.Consumer_Type with
+      record
+         Ack_Mgr        : Reliable_Udp.Ack_Management_Access :=
+                              new Reliable_Udp.Ack_Management;
+
+         Ack_Fifo       : Reliable_Udp.Synchronized_Queue_Access :=
+                              new Reliable_Udp.Sync_Queue.Synchronized_Queue;
+
+         Buffer_Handler : Buffer_Handling.Buffer_Handler_Obj_Access :=
+                              new Buffer_Handling.Buffer_Handler_Obj;
+      end record;
 
 end Data_Transport.Udp_Socket_Client;
