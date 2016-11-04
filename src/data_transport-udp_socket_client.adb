@@ -68,7 +68,9 @@ package body Data_Transport.Udp_Socket_Client is
             Init_Consumer (Consumer);
             Init_Udp (Server, Cons_Addr, Cons_Port);
 
-            Handle_Data.Start (Buffer_Set);
+            Handle_Data.Start (Consumer.Buffer_Handler, Buffer_Set);
+
+            PMH_Buffer_Task.Start (Consumer.Buffer_Handler);
 
          end Initialise;
       or
@@ -371,7 +373,7 @@ package body Data_Transport.Udp_Socket_Client is
          Header.Ack := (if Last = 6 then True else False);
          pragma Warnings (On);
 
-         Buffer_Handling.Save_Ack (Header.Seq_Nb, Packet_Number, Data);
+         Buffer_Handling.Save_Ack (Consumer.Buffer_Handler, Header.Seq_Nb, Packet_Number, Data);
          Remove_Task.Remove (Header.Seq_Nb);
          Recv_Offset := Recv_Offset - 1;
       else

@@ -62,13 +62,14 @@ package Buffer_Handling is
                            End_Point   : String);
 
    --  Release Buffer at Handlers (Index) and change its State to Empty
-   procedure Release_Free_Buffer_At (Buffer_Handler   : Buffer_Handler_Obj_Access;
-                                     Index            : in Handle_Index_Type);
+   procedure Release_Free_Buffer_At (Obj     : Buffer_Handler_Obj_Access;
+                                     Index   : in Handle_Index_Type);
 
 
    --  Search position of ack received in current and previous buffers
    --  and then store content inside.
-   function Search_Empty_Mark (First, Last   : Handle_Index_Type;
+   function Search_Empty_Mark (Obj           : Buffer_Handler_Obj_Access;
+                               First, Last   : Handle_Index_Type;
                                Data          : in Base_Udp.Packet_Stream;
                                Seq_Nb        : Reliable_Udp.Packet_Number_Type) return Boolean;
 
@@ -91,7 +92,8 @@ package Buffer_Handling is
                               Last_Addr      :  System.Address;
                               Nb_Missed      :  Interfaces.Unsigned_64);
 
-   function New_Dest_Buffer (Dest_Buffer     : Buffers.Buffer_Produce_Access;
+   function New_Dest_Buffer (Obj             : Buffer_Handler_Obj_Access;
+                             Dest_Buffer     : Buffers.Buffer_Produce_Access;
                              Size            : Interfaces.Unsigned_32;
                              Buffer_Size     : in out Interfaces.Unsigned_32;
                              Packet_Nb       : in out Interfaces.Unsigned_64;
@@ -102,16 +104,19 @@ package Buffer_Handling is
                              Src_Data_Stream : Base_Udp.Sequence_Type) return Boolean;
 
    --  Src_Handle get a new Src_Buffer if it's necessary returns 1 otherwise 0
-   function New_Src_Buffer (Src_Index        : in out Interfaces.Unsigned_64;
+   function New_Src_Buffer (Obj              : Buffer_Handler_Obj_Access;
+                            Src_Index        : in out Interfaces.Unsigned_64;
                             Src_Handle       : in out Buffers.Buffer_Handle_Access;
                             Src_Data_Stream  : Base_Udp.Sequence_Type) return Boolean;
 
-   procedure New_Src_Buffer (Src_Index       : in out Interfaces.Unsigned_64;
+   procedure New_Src_Buffer (Obj              : Buffer_Handler_Obj_Access;
+                             Src_Index       : in out Interfaces.Unsigned_64;
                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
                              Src_Data_Stream : Base_Udp.Sequence_Type);
 
    procedure Copy_Packet_Data_To_Dest
-                           (Buffer_Size      : Interfaces.Unsigned_32;
+                           (Obj              : Buffer_Handler_Obj_Access;
+                            Buffer_Size      : Interfaces.Unsigned_32;
                             Src_Index        : in out Interfaces.Unsigned_64;
                             Src_Handle       : in out Buffers.Buffer_Handle_Access;
                             Dest_Handle      : Buffers.Buffer_Handle_Access;
@@ -137,7 +142,8 @@ package Buffer_Handling is
    end Check_Buf_Integrity_Task;
 
    task type Handle_Data_Task is
-      entry Start (Buffer_Set : Buffers.Buffer_Produce_Access);
+      entry Start (Buffer_H   : Buffer_Handler_Obj_Access;
+                   Buffer_Set : Buffers.Buffer_Produce_Access);
    end Handle_Data_Task;
 
 private
@@ -146,13 +152,12 @@ private
       record
          Buffer_Handler    : Buffer_Handler_Type;
 
-         Production        : Buffers.Shared.Produce.Produce_Couple_Type;
-         Buffer_Prod       : Buffers.Shared.Produce.Produce_Type; --  renames Production.Producer;
-
          Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
-         Buffer_Cons       : Buffers.Shared.Consume.Consume_Type; --  renames Consumption.Consumer;
+         --  Buffer_Cons       : Buffers.Shared.Consume.Consume_Type; --  renames Consumption.Consumer;
 
-         --  Packet_Buffer     : Packet_Buffers_Access := new Packet_Buffers;
+         Production        : Buffers.Shared.Produce.Produce_Couple_Type;
+         --  Buffer_Prod       : Buffers.Shared.Produce.Produce_Type; --  renames Production.Producer;
+
       end record;
 
 end Buffer_Handling;
