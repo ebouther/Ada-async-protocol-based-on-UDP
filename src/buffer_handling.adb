@@ -1,7 +1,7 @@
 with Ada.Text_IO;
 with Ada.Exceptions;
 with Ada.Calendar;
-with System.Multiprocessors.Dispatching_Domains;
+--  with System.Multiprocessors.Dispatching_Domains;
 with System.Storage_Elements;
 
 with Dcod_Pmh_Service.Client;
@@ -140,8 +140,8 @@ package body Buffer_Handling is
       N     : Integer;
       use System.Storage_Elements;
    begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (4));
+      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
+      --     (System.Multiprocessors.CPU_Range (4));
       accept Start (Buffer_H  :  Buffer_Handler_Obj_Access) do
          Obj   := Buffer_H;
       end Start;
@@ -221,8 +221,8 @@ package body Buffer_Handling is
    task body Release_Full_Buf_Task is
       Obj   : Buffer_Handler_Obj_Access;
    begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (11));
+      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
+      --     (System.Multiprocessors.CPU_Range (11));
       accept Start (Buffer_H  : Buffer_Handler_Obj_Access) do
          Obj := Buffer_H;
       end Start;
@@ -262,8 +262,8 @@ package body Buffer_Handling is
       Init                       : Boolean := True;
       Obj                        : Buffer_Handler_Obj_Access;
    begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (12));
+      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
+      --     (System.Multiprocessors.CPU_Range (12));
       accept Start (Buffer_H  : Buffer_Handler_Obj_Access) do
          Obj := Buffer_H;
       end Start;
@@ -536,8 +536,8 @@ package body Buffer_Handling is
 
          Buffer_Size    : Interfaces.Unsigned_32 := 0;
    begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (5));
+      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
+      --     (System.Multiprocessors.CPU_Range (5));
 
       accept Start (Buffer_H     : Buffer_Handler_Obj_Access;
                     Buffer_Set   : Buffers.Buffer_Produce_Access)

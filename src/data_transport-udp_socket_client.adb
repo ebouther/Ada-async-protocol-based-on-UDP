@@ -1,13 +1,11 @@
-with Ada.Strings.Unbounded;
 with Ada.Text_IO;
-with Ada.Command_Line;
 with Ada.Exceptions;
-with Ada.Calendar;
-with System.Multiprocessors.Dispatching_Domains;
+--  with System.Multiprocessors.Dispatching_Domains;
 with System.Storage_Elements;
 with Ada.Real_Time;
 
 with GNAT.Command_Line;
+with Ada.Command_Line;
 
 pragma Warnings (Off);
 with GNAT.Sockets.Thin;
@@ -16,23 +14,6 @@ pragma Warnings (On);
 with Output_Data;
 
 package body Data_Transport.Udp_Socket_Client is
-
-   Log_Task             : Timer;
-
-   Remove_Task          : Reliable_Udp.Remove_Task;
-   Append_Task          : Reliable_Udp.Append_Task;
-   Ack_Task             : Reliable_Udp.Ack_Task;
-
-   Check_Integrity_Task : Buffer_Handling.Check_Buf_Integrity_Task;
-   PMH_Buffer_Task      : Buffer_Handling.PMH_Buffer_Addr_Task;
-   Release_Buf_Task     : Buffer_Handling.Release_Full_Buf_Task;
-
-   Start_Time           : Ada.Calendar.Time;
-
-   Nb_Packet_Received   : Interfaces.Unsigned_64 := 0;
-   Packet_Number        : Reliable_Udp.Packet_Number_Type := 0;
-   Total_Missed         : Interfaces.Unsigned_64 := 0;
-   Nb_Output            : Natural := 0;
 
 
    task body Socket_Client_Task is
@@ -47,17 +28,19 @@ package body Data_Transport.Udp_Socket_Client is
       Data_Addr         : System.Address;
       Recv_Offset       : Interfaces.Unsigned_64 := Base_Udp.Pkt_Max + 1;
 
-      Consumer          : Consumer_Type;
+      Consumer          : constant Consumer_Access := new Consumer_Type;
 
       use System.Storage_Elements;
       use type Interfaces.C.int;
       use type Buffers.Buffer_Produce_Access;
    begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (16));
+      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
+      --     (System.Multiprocessors.CPU_Range (16));
       select
-         accept Initialise (Host : String;
-                            Port : GNAT.Sockets.Port_Type) do
+         accept Initialise (Buf_Name   : Ada.Strings.Unbounded.Unbounded_String;
+                            End_Point  : Ada.Strings.Unbounded.Unbounded_String;
+                            Host       : String;
+                            Port       : GNAT.Sockets.Port_Type) do
 
             --  Cons_Addr := GNAT.Sockets.Addresses
             --            (GNAT.Sockets.Get_Host_By_Name (Host));
@@ -66,13 +49,16 @@ package body Data_Transport.Udp_Socket_Client is
             Cons_Addr := Any_Inet_Addr;
             Cons_Port := Port;
 
+            Consumer.Buffer_Name := Buf_Name;
+            Consumer.End_Point := End_Point;
             Init_Consumer (Consumer);
+
             Init_Udp (Server, Cons_Addr, Cons_Port);
             if Buffer_Set /= null then
                Handle_Data.Start (Consumer.Buffer_Handler, Buffer_Set);
             end if;
 
-            PMH_Buffer_Task.Start (Consumer.Buffer_Handler);
+            Consumer.PMH_Buffer_Task.Start (Consumer.Buffer_Handler);
 
          end Initialise;
       or
@@ -100,7 +86,7 @@ package body Data_Transport.Udp_Socket_Client is
                exit;
          else
             if Recv_Offset > Base_Udp.Pkt_Max then
-               PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
+               Consumer.PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
                Recv_Offset := Recv_Offset mod Base_Udp.Sequence_Size;
             end if;
 
@@ -135,58 +121,58 @@ package body Data_Transport.Udp_Socket_Client is
    --  Init_Consumer  --
    ---------------------
 
-   procedure Init_Consumer (Consumer : in out Consumer_Type) is
+   procedure Init_Consumer (Consumer : Consumer_Access) is
 
-      Log_File : Ada.Text_IO.File_Type;
+      --  Log_File : Ada.Text_IO.File_Type;
       use Ada.Strings.Unbounded;
    begin
       Parse_Arguments (Consumer);
 
-      Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "log.csv");
-      Ada.Text_IO.Put_Line (Log_File,
-                  "Nb_Output;Nb_Received;Packet_Nb;Dropped;Elapsed_Time");
-      Ada.Text_IO.Close (Log_File);
+      --  Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "log.csv");
+      --  Ada.Text_IO.Put_Line (Log_File,
+      --              "Nb_Output;Nb_Received;Packet_Nb;Dropped;Elapsed_Time");
+      --  Ada.Text_IO.Close (Log_File);
 
-      Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "buffers.log");
-      Ada.Text_IO.Close (Log_File);
+      --  Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "buffers.log");
+      --  Ada.Text_IO.Close (Log_File);
 
-      Web_Interfaces.Init_WebServer (Consumer.Web_Interface);
+      --  Web_Interfaces.Init_WebServer (Consumer.Web_Interface); *********** DO NOT FORGET TO UNCOMMENT ***************
 
-      Release_Buf_Task.Start (Consumer.Buffer_Handler);
-      Ack_Task.Start (Consumer.Ack_Mgr);
-      Check_Integrity_Task.Start (Consumer.Buffer_Handler);
+      Consumer.Release_Buf_Task.Start (Consumer.Buffer_Handler);
+      Consumer.Ack_Task.Start (Consumer.Ack_Mgr);
+      Consumer.Check_Integrity_Task.Start (Consumer.Buffer_Handler);
 
       Buffer_Handling.Init_Buffers (Consumer.Buffer_Handler,
                                     To_String (Consumer.Buffer_Name),
                                     To_String (Consumer.End_Point));
 
-      Log_Task.Start (Consumer.Web_Interface);
+      Consumer.Log_Task.Start (Consumer);
 
-      Append_Task.Start (Consumer.Ack_Mgr, Consumer.Ack_Fifo);
-      Remove_Task.Initialize (Consumer.Ack_Mgr);
+      Consumer.Append_Task.Start (Consumer.Ack_Mgr, Consumer.Ack_Fifo);
+      Consumer.Remove_Task.Initialize (Consumer.Ack_Mgr);
 
    end Init_Consumer;
 
 
-   -------------------
-   --  Stop_Server  --
-   -------------------
+   --  -------------------
+   --  --  Stop_Server  --
+   --  -------------------
 
-   procedure Stop_Server is
-   begin
-      Log_Task.Stop;
-      Ack_Task.Stop;
-      Remove_Task.Stop;
-      PMH_Buffer_Task.Stop;
+   --  procedure Stop_Server is
+   --  begin
+   --     Log_Task.Stop;
+   --     Ack_Task.Stop;
+   --     Remove_Task.Stop;
+   --     PMH_Buffer_Task.Stop;
 
-   end Stop_Server;
+   --  end Stop_Server;
 
 
    -----------------------
    --  Parse_Arguments  --
    -----------------------
 
-   procedure Parse_Arguments (Consumer :  in out Consumer_Type) is
+   procedure Parse_Arguments (Consumer :  Consumer_Access) is
       use GNAT.Command_Line;
       use Ada.Command_Line;
       use Ada.Text_IO;
@@ -272,12 +258,12 @@ package body Data_Transport.Udp_Socket_Client is
       Last_Missed    : Interfaces.Unsigned_64 := 0;
       Last_Nb        : Interfaces.Unsigned_64 := 0;
       Elapsed_Time   : Duration;
-      Web_Interface  : Web_Interfaces.Web_Interface_Access;
+      Consumer       : Consumer_Access;
    begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (14));
-      accept Start (Web_I  : Web_Interfaces.Web_Interface_Access) do
-         Web_Interface  := Web_I;
+      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
+      --     (System.Multiprocessors.CPU_Range (14));
+      accept Start (Cons      : Consumer_Access) do
+         Consumer := Cons;
       end Start;
       loop
          select
@@ -285,20 +271,20 @@ package body Data_Transport.Udp_Socket_Client is
             exit;
          else
             delay 1.0;
-            Elapsed_Time := Ada.Calendar.Clock - Start_Time;
+            Elapsed_Time := Ada.Calendar.Clock - Consumer.Start_Time;
             Output_Data.Display
-               (Web_Interface,
-                True,
+               (Consumer.Web_Interface,
+                False,
                 Elapsed_Time,
-                Packet_Number,
-                Total_Missed,
+                Consumer.Packet_Number,
+                Consumer.Total_Missed,
                 Last_Missed,
-                Nb_Packet_Received,
+                Consumer.Nb_Packet_Received,
                 Last_Nb,
-                Nb_Output);
-            Last_Nb := Nb_Packet_Received;
-            Last_Missed := Total_Missed;
-            Nb_Output := Nb_Output + 1;
+                Consumer.Nb_Output);
+            Last_Nb := Consumer.Nb_Packet_Received;
+            Last_Missed := Consumer.Total_Missed;
+            Consumer.Nb_Output := Consumer.Nb_Output + 1;
          end select;
       end loop;
    end Timer;
@@ -308,7 +294,7 @@ package body Data_Transport.Udp_Socket_Client is
    --  Wait_Producer_HandShake  --
    -------------------------------
 
-   procedure Wait_Producer_HandShake (Consumer  : in out Consumer_Type;
+   procedure Wait_Producer_HandShake (Consumer  : Consumer_Access;
                                       Host      : GNAT.Sockets.Inet_Addr_Type;
                                       Port      : GNAT.Sockets.Port_Type) is
       Socket   : Socket_Type;
@@ -352,7 +338,7 @@ package body Data_Transport.Udp_Socket_Client is
    --  Process_Packet  --
    ----------------------
 
-   procedure Process_Packet (Consumer     : in out Consumer_Type;
+   procedure Process_Packet (Consumer     : Consumer_Access;
                              Data         : in Base_Udp.Packet_Stream;
                              Last         : in Ada.Streams.Stream_Element_Offset;
                              Recv_Offset  : in out Interfaces.Unsigned_64;
@@ -375,8 +361,8 @@ package body Data_Transport.Udp_Socket_Client is
          Header.Ack := (if Last = 6 then True else False);
          pragma Warnings (On);
 
-         Buffer_Handling.Save_Ack (Consumer.Buffer_Handler, Header.Seq_Nb, Packet_Number, Data);
-         Remove_Task.Remove (Header.Seq_Nb);
+         Buffer_Handling.Save_Ack (Consumer.Buffer_Handler, Header.Seq_Nb, Consumer.Packet_Number, Data);
+         Consumer.Remove_Task.Remove (Header.Seq_Nb);
          Recv_Offset := Recv_Offset - 1;
       else
          --  Activate Ack to differenciate size packets from "normal" packets.
@@ -384,27 +370,27 @@ package body Data_Transport.Udp_Socket_Client is
          Header.Ack := (if Last = 6 then True else False);
          pragma Warnings (On);
 
-         Nb_Packet_Received := Nb_Packet_Received + 1;
-         if Nb_Packet_Received = 1 then
-            Start_Time := Ada.Calendar.Clock;
+         Consumer.Nb_Packet_Received := Consumer.Nb_Packet_Received + 1;
+         if Consumer.Nb_Packet_Received = 1 then
+            Consumer.Start_Time := Ada.Calendar.Clock;
          end if;
 
-         if Header.Seq_Nb /= Packet_Number then
-            if Header.Seq_Nb > Packet_Number then
+         if Header.Seq_Nb /= Consumer.Packet_Number then
+            if Header.Seq_Nb > Consumer.Packet_Number then
                Nb_Missed := Interfaces.Unsigned_64
-                              (Header.Seq_Nb - Packet_Number);
-               Total_Missed := Total_Missed + Nb_Missed;
+                              (Header.Seq_Nb - Consumer.Packet_Number);
+               Consumer.Total_Missed := Consumer.Total_Missed + Nb_Missed;
             else
                Nb_Missed := Interfaces.Unsigned_64 (Header.Seq_Nb
-                              + (Base_Udp.Pkt_Max - Packet_Number)) + 1;
-               Total_Missed := Total_Missed + Nb_Missed;
+                              + (Base_Udp.Pkt_Max - Consumer.Packet_Number)) + 1;
+               Consumer.Total_Missed := Consumer.Total_Missed + Nb_Missed;
             end if;
 
-            Consumer.Ack_Fifo.all.Append_Wait ((From, Packet_Number, Header.Seq_Nb - 1));
-            Packet_Number := Header.Seq_Nb;
+            Consumer.Ack_Fifo.all.Append_Wait ((From, Consumer.Packet_Number, Header.Seq_Nb - 1));
+            Consumer.Packet_Number := Header.Seq_Nb;
             Last_Addr := Data_Addr;
             if Recv_Offset + Nb_Missed >= Base_Udp.Sequence_Size then
-               PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
+               Consumer.PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
             end if;
             Buffer_Handling.Copy_To_Correct_Location
                                           (Recv_Offset, Nb_Missed, Data, Data_Addr);
@@ -412,7 +398,7 @@ package body Data_Transport.Udp_Socket_Client is
             Recv_Offset := Recv_Offset + Nb_Missed;
          end if;
          --  mod type (doesn't need to be set to 0 on max value)
-         Packet_Number := Packet_Number + 1;
+         Consumer.Packet_Number := Consumer.Packet_Number + 1;
       end if;
    end Process_Packet;
 

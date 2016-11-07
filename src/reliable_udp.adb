@@ -1,6 +1,6 @@
 with Ada.Streams;
 with Ada.Exceptions;
-with System.Multiprocessors.Dispatching_Domains;
+--  with System.Multiprocessors.Dispatching_Domains;
 with Ada.Text_IO;
 
 package body Reliable_Udp is
@@ -72,8 +72,8 @@ package body Reliable_Udp is
       Fifo     : Synchronized_Queue_Access;
       Ack_Mgr  : Ack_Management_Access;
    begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (6));
+      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
+      --     (System.Multiprocessors.CPU_Range (6));
       accept Start (Ack_M     : Ack_Management_Access;
                     Ack_Fifo  : Synchronized_Queue_Access) do
          Fifo  := Ack_Fifo;
@@ -108,8 +108,8 @@ package body Reliable_Udp is
       Pkt      : Packet_Number_Type;
       Ack_Mgr  : Ack_Management_Access;
    begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (7));
+      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
+      --     (System.Multiprocessors.CPU_Range (7));
       accept Initialize (Ack_M : Ack_Management_Access) do
          Ack_Mgr  := Ack_M;
       end Initialize;
@@ -148,8 +148,8 @@ package body Reliable_Udp is
       use type Ada.Real_Time.Time;
       use type Ada.Real_Time.Time_Span;
    begin
-      System.Multiprocessors.Dispatching_Domains.Set_CPU
-         (System.Multiprocessors.CPU_Range (8));
+      --  System.Multiprocessors.Dispatching_Domains.Set_CPU
+      --     (System.Multiprocessors.CPU_Range (8));
 
       GNAT.Sockets.Create_Socket (Socket,
                                   GNAT.Sockets.Family_Inet,

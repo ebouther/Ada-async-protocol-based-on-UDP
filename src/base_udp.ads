@@ -29,7 +29,7 @@ package Base_Udp is
    Pkt_Max        : constant := Sequence_Size - 1;
 
    --  Number of pmh buffers used (PMH_Buf_Nb + 1 are initialized)
-   PMH_Buf_Nb     : constant := 15;
+   PMH_Buf_Nb     : constant := 7;
 
    --  Buffer Size, has to be a multiple of 4096
    Buffer_Size    : Integer := ((Integer (Sequence_Size

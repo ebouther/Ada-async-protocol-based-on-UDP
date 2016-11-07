@@ -8,16 +8,19 @@ with Ada.Strings.Unbounded;
 
 procedure Udp_Consumer is
    Total_Bytes_Received : Interfaces.Unsigned_64 := 0;
-   Buffer : aliased Buffers.Local.Local_Buffer_Type;
-   Client : Data_Transport.Udp_Socket_Client.Socket_Client_Task
-      (null);
+   Buffer   : aliased Buffers.Local.Local_Buffer_Type;
+   Client   : Data_Transport.Udp_Socket_Client.Socket_Client_Task
+               (null);
+   Client_2 : Data_Transport.Udp_Socket_Client.Socket_Client_Task
+               (null);
       --  (Buffer'Unchecked_Access);
    --  type Data_Array is array (1 .. 1024) of Integer;
    Options : constant String := "buffer_name= host_name= port= watchdog=";
    use Ada.Strings.Unbounded;
    Host_Name : Unbounded_String := To_Unbounded_String ("localhost");
    Buffer_Name : Unbounded_String := To_Unbounded_String ("blue");
-   Port : GNAT.Sockets.Port_Type := 8042;
+   Port     : GNAT.Sockets.Port_Type := 50001;
+   Port_2   : constant GNAT.Sockets.Port_Type := 50002;
    --  Watchdog_Counter : Natural;
    --  Watchdog_Limit : Positive := 10;
    use type Buffers.Buffer_Size_Type;
@@ -39,6 +42,7 @@ procedure Udp_Consumer is
    end Timer_Task;
 
    Timer : Timer_Task;
+   use Ada.Strings.Unbounded;
 begin
 
    loop
@@ -59,8 +63,16 @@ begin
    end loop;
    Buffer.Set_Name (To_String (Buffer_Name));
    Buffer.Initialise (10, Size => 409600000);
-   Client.Initialise (To_String (Host_Name), Port);
+   Client.Initialise (To_Unbounded_String ("toto"),
+                      To_Unbounded_String ("http://127.0.0.1:5678"),
+                      To_String (Host_Name),
+                      Port);
+   Client_2.Initialise (To_Unbounded_String ("titi"),
+                        To_Unbounded_String ("http://127.0.0.1:5678"),
+                        To_String (Host_Name),
+                        Port_2);
    Client.Connect;
+   Client_2.Connect;
    loop
       --  Ada.Text_IO.Put_Line ("consuming buffer loop");
       --  Watchdog_Counter := 0;

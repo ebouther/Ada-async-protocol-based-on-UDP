@@ -124,6 +124,14 @@ package body Data_Transport.Udp_Socket_Server is
                and Not_A_Msg = False
                and Recv_Msg = Send_Msg;
       end loop;
+   exception
+      when E : others =>
+         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Ada.Exceptions.Exception_Name (E)
+            & ASCII.LF & ASCII.ESC & "[33m"
+            & Ada.Exceptions.Exception_Message (E)
+            & ASCII.ESC & "[0m");
+         raise;
    end Consumer_HandShake;
 
 

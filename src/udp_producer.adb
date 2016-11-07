@@ -15,6 +15,9 @@ procedure Udp_Producer is
    pragma Warnings (Off);
    Producer    : Data_Transport.Udp_Socket_Server.Producer_Access :=
                   new Data_Transport.Udp_Socket_Server.Producer_Type;
+
+   Producer_2  : Data_Transport.Udp_Socket_Server.Producer_Access :=
+                  new Data_Transport.Udp_Socket_Server.Producer_Type;
    pragma Warnings (On);
 
    Used_Bytes  : constant Interfaces.Unsigned_64 := 409600000;
@@ -23,11 +26,14 @@ procedure Udp_Producer is
    Buffer      : aliased Buffers.Local.Local_Buffer_Type;
    Server      : Data_Transport.Udp_Socket_Server.Socket_Server_Task
                      (Buffer'Unchecked_Access);
+   Server_2    : Data_Transport.Udp_Socket_Server.Socket_Server_Task
+                     (Buffer'Unchecked_Access);
    type Data_Array is array (1 .. Used_Bytes / Integer'Size) of Integer;
-   Port                 : GNAT.Sockets.Port_Type := 8042;
+   Port                 : GNAT.Sockets.Port_Type := 50001;
+   Port_2               : constant GNAT.Sockets.Port_Type := 50002;
    use Ada.Strings.Unbounded;
    Buffer_Name          : Unbounded_String := To_Unbounded_String ("blue");
-   Network_Interface    : Unbounded_String := To_Unbounded_String ("lo");
+   Network_Interface    : Unbounded_String := To_Unbounded_String ("stare-2");
    Options              : constant String := "buffer_name= port= hostname=";
    A_Task_Communication : aliased Utiles_Task.Task_Communication;
    A_Terminate_Task     : Utiles_Task.Terminate_Task (A_Task_Communication'Access);
@@ -51,8 +57,10 @@ begin
 
    Buffer.Initialise (10, Size => Buffers.Buffer_Size_Type (Used_Bytes));
    Server.Initialise (Producer, To_String (Network_Interface), Port);
+   Server_2.Initialise (Producer_2, "stare-2", Port_2);
    Ada.Text_IO.Put_Line ("Get port :" & Port'Img);
    Server.Connect;
+   Server_2.Connect;
    Ada.Text_IO.Put_Line ("Connect done");
    loop
       exit when A_Task_Communication.Stop_Enabled;

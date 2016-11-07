@@ -1,6 +1,8 @@
+with Ada.Calendar;
 with Ada.Unchecked_Deallocation;
 with Ada.Unchecked_Conversion;
 with Ada.Streams;
+with Ada.Strings.Unbounded;
 with GNAT.Sockets;
 with Interfaces.C;
 with System;
@@ -10,7 +12,6 @@ with Buffers;
 with Base_Udp;
 with Reliable_Udp;
 with Buffer_Handling;
-with Web_Interfaces;
 
 package Data_Transport.Udp_Socket_Client is
    pragma Optimize (Time);
@@ -23,8 +24,11 @@ package Data_Transport.Udp_Socket_Client is
    --  Main Task
    task type Socket_Client_Task (Buffer_Set : Buffers.Buffer_Produce_Access)
       is new Transport_Layer_Interface with
-      entry Initialise (Host : String;
-                        Port : GNAT.Sockets.Port_Type);
+
+      entry Initialise (Buf_Name   : Ada.Strings.Unbounded.Unbounded_String;
+                        End_Point  : Ada.Strings.Unbounded.Unbounded_String;
+                        Host       : String;
+                        Port       : GNAT.Sockets.Port_Type);
       overriding entry Connect;
       overriding entry Disconnect;
    end Socket_Client_Task;
@@ -37,23 +41,24 @@ package Data_Transport.Udp_Socket_Client is
       new Ada.Unchecked_Conversion
          (GNAT.Sockets.Socket_Type, Interfaces.C.int);
 
-   --  Log Data every seconds.
-   task type Timer is
-      entry Start (Web_I   : Web_Interfaces.Web_Interface_Access);
-      entry Stop;
-   end Timer;
-
    --  Append some stuff to Base_Udp.Consumer_Type.
    --  Cannot do it in Base_Udp because of circular dependencies.
    type Consumer_Type is new Base_Udp.Consumer_Type with private;
+   type Consumer_Access is access Consumer_Type;
+
+   --  Log Data every seconds.
+   task type Timer is
+      entry Start (Cons      : Consumer_Access);
+      entry Stop;
+   end Timer;
 
    --  A "connect" alternative for udp. Enables to wait for producer.
-   procedure Wait_Producer_HandShake (Consumer  : in out Consumer_Type;
+   procedure Wait_Producer_HandShake (Consumer  : Consumer_Access;
                                       Host      : GNAT.Sockets.Inet_Addr_Type;
                                       Port      : GNAT.Sockets.Port_Type);
 
    --  Main part of algorithm, does all the processing once a packet is receive.
-   procedure Process_Packet (Consumer     : in out Consumer_Type;
+   procedure Process_Packet (Consumer     : Consumer_Access;
                              Data         : in Base_Udp.Packet_Stream;
                              Last         : in Ada.Streams.Stream_Element_Offset;
                              Recv_Offset  : in out Interfaces.Unsigned_64;
@@ -61,20 +66,16 @@ package Data_Transport.Udp_Socket_Client is
                              From         : in Sock_Addr_Type);
 
    --  Get command line parameters and modify default values if needed.
-   procedure Parse_Arguments (Consumer : in out Consumer_Type);
+   procedure Parse_Arguments (Consumer : Consumer_Access);
 
    --  Starts all tasks used by client.
-   procedure Init_Consumer (Consumer   : in out Consumer_Type);
+   procedure Init_Consumer (Consumer   : Consumer_Access);
 
    --  Creates socket and Sets Socket Opt.
    procedure Init_Udp (Server       : in out Socket_Type;
                        Host         : GNAT.Sockets.Inet_Addr_Type;
                        Port         : GNAT.Sockets.Port_Type;
                        TimeOut_Opt  : Boolean := True);
-
-   pragma Warnings (Off);
-   procedure Stop_Server;
-   pragma Warnings (On);
 
 private
 
@@ -88,6 +89,24 @@ private
 
          Buffer_Handler : Buffer_Handling.Buffer_Handler_Obj_Access :=
                               new Buffer_Handling.Buffer_Handler_Obj;
+
+         Log_Task             : Timer;
+
+         Remove_Task          : Reliable_Udp.Remove_Task;
+         Append_Task          : Reliable_Udp.Append_Task;
+         Ack_Task             : Reliable_Udp.Ack_Task;
+
+         Check_Integrity_Task : Buffer_Handling.Check_Buf_Integrity_Task;
+         PMH_Buffer_Task      : Buffer_Handling.PMH_Buffer_Addr_Task;
+         Release_Buf_Task     : Buffer_Handling.Release_Full_Buf_Task;
+
+         Start_Time           : Ada.Calendar.Time;
+
+         Nb_Packet_Received   : Interfaces.Unsigned_64 := 0;
+         Packet_Number        : Reliable_Udp.Packet_Number_Type := 0;
+         Total_Missed         : Interfaces.Unsigned_64 := 0;
+         Nb_Output            : Natural := 0;
+
       end record;
 
 end Data_Transport.Udp_Socket_Client;
