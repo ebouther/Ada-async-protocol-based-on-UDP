@@ -77,7 +77,7 @@ package body Data_Transport.Udp_Socket_Server is
                begin
                   loop
                      Rcv_Ack (Producer);
-                     --  Give server 2s to be sure it has all packets
+                     --  Give consumer 2s to be sure it has all packets
                      if Ada.Calendar.Clock - Start_Time > 2.0 then
                         goto HandShake;
                      end if;
@@ -115,7 +115,8 @@ package body Data_Transport.Udp_Socket_Server is
       loop
          Send_Packet (Producer => Producer,
                       Payload => Send_Data);
-         delay 0.2;
+         --  Wait a little bit for consumer's response.
+         delay 0.1;
          exit when GNAT.Sockets.Thin.C_Recv
                (To_Int (Producer.Socket),
                 Recv_Data (Recv_Data'First)'Address,
@@ -123,6 +124,9 @@ package body Data_Transport.Udp_Socket_Server is
                 64) /= -1
                and Not_A_Msg = False
                and Recv_Msg = Send_Msg;
+         --  If consumer did not reply, wait for it's timeout (1s),
+         --  otherwise it'd be considered as a packet ack.
+         delay 1.5;
       end loop;
    exception
       when E : others =>

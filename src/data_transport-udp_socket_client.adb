@@ -296,7 +296,9 @@ package body Data_Transport.Udp_Socket_Client is
 
    procedure Wait_Producer_HandShake (Consumer  : Consumer_Access;
                                       Host      : GNAT.Sockets.Inet_Addr_Type;
-                                      Port      : GNAT.Sockets.Port_Type) is
+                                      Port      : GNAT.Sockets.Port_Type)
+   is
+      Dbg   : Boolean := False;
       Socket   : Socket_Type;
       Data     : Base_Udp.Packet_Stream;
       Head     : Reliable_Udp.Header_Type;
@@ -315,6 +317,9 @@ package body Data_Transport.Udp_Socket_Client is
       Init_Udp (Socket, Host, Port, False);
       loop
          GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
+         if Reliable_Udp.Producer_Address = From then
+            Dbg := True;
+         end if;
          Reliable_Udp.Producer_Address := From;
 
          if Consumer.Acquisition and Msg = 0 then  --  Means producer is ready.
@@ -322,7 +327,9 @@ package body Data_Transport.Udp_Socket_Client is
          end if;
       end loop;
       Head.Ack := False;
-      GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
+      if Dbg then
+         GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
+      end if;
       GNAT.Sockets.Close_Socket (Socket);
    exception
       when E : others =>
