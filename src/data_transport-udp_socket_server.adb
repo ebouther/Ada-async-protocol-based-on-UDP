@@ -175,6 +175,10 @@ package body Data_Transport.Udp_Socket_Server is
                     Seq_Nb => Packet_Number);
          Producer.Last_Packets (Packet_Number).Is_Buffer_Size := True;
          Send_Packet (Producer, Producer.Last_Packets (Packet_Number).Data, True);
+         Ada.Text_IO.Put_Line ("Counter : " & Producer.Counter'Img);
+         --  DBG  --
+         Producer.Counter := 0;
+         -----------
          Packet_Number := Packet_Number + 1;
          Send_All_Stream (Producer, Data, Packet_Number);
       exception
@@ -196,19 +200,21 @@ package body Data_Transport.Udp_Socket_Server is
 
    procedure Send_All_Stream (Producer       : Producer_Access;
                               Payload        : Ada.Streams.Stream_Element_Array;
-                              Packet_Number  : in out Reliable_Udp.Packet_Number_Type) is
+                              Packet_Number  : in out Reliable_Udp.Packet_Number_Type)
+   is
       use type Ada.Streams.Stream_Element_Array;
 
-      First : Ada.Streams.Stream_Element_Offset := Payload'First;
-      Index : Ada.Streams.Stream_Element_Offset := First - 1;
-      Last  : Ada.Streams.Stream_Element_Offset;
+      First    : Ada.Streams.Stream_Element_Offset := Payload'First;
+      Offset   : Ada.Streams.Stream_Element_Offset;
+      Last     : Ada.Streams.Stream_Element_Offset;
+      pragma Unreferenced (Offset);
    begin
       loop
          Rcv_Ack (Producer);
          declare
             Head     : Ada.Streams.Stream_Element_Array (1 .. 2);
             Header   : Reliable_Udp.Header_Type := (Ack => False,
-                                               Seq_Nb => Packet_Number);
+                                                    Seq_Nb => Packet_Number);
 
             for Header'Address use Head'Address;
          begin
@@ -228,7 +234,9 @@ package body Data_Transport.Udp_Socket_Server is
             end if;
             Producer.Last_Packets (Packet_Number).Is_Buffer_Size := False;
             GNAT.Sockets.Send_Socket (Producer.Socket, Producer.Last_Packets (Packet_Number).Data,
-                                       Index, Producer.Address);
+                                       Offset, Producer.Address);
+
+            Producer.Counter := Producer.Counter + 1;
 
             Packet_Number := Packet_Number + 1;
          end;

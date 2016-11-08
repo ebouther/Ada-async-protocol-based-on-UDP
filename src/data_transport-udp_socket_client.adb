@@ -219,7 +219,8 @@ package body Data_Transport.Udp_Socket_Client is
    procedure Init_Udp (Server       : in out Socket_Type;
                        Host         : GNAT.Sockets.Inet_Addr_Type;
                        Port         : GNAT.Sockets.Port_Type;
-                       TimeOut_Opt  : Boolean := True) is
+                       TimeOut_Opt  : Boolean := True)
+   is
       Address     : Sock_Addr_Type;
       Busy        : Interfaces.C.int := 50;
       Opt_Return  : Interfaces.C.int;
@@ -298,7 +299,6 @@ package body Data_Transport.Udp_Socket_Client is
                                       Host      : GNAT.Sockets.Inet_Addr_Type;
                                       Port      : GNAT.Sockets.Port_Type)
    is
-      Dbg   : Boolean := False;
       Socket   : Socket_Type;
       Data     : Base_Udp.Packet_Stream;
       Head     : Reliable_Udp.Header_Type;
@@ -317,19 +317,11 @@ package body Data_Transport.Udp_Socket_Client is
       Init_Udp (Socket, Host, Port, False);
       loop
          GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
-         if Reliable_Udp.Producer_Address = From then
-            Dbg := True;
-         end if;
          Reliable_Udp.Producer_Address := From;
-
-         if Consumer.Acquisition and Msg = 0 then  --  Means producer is ready.
-            exit;
-         end if;
+         exit when Consumer.Acquisition and Msg = 0; --  Means producer is ready.
       end loop;
       Head.Ack := False;
-      if Dbg then
-         GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
-      end if;
+      GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
       GNAT.Sockets.Close_Socket (Socket);
    exception
       when E : others =>
@@ -368,7 +360,10 @@ package body Data_Transport.Udp_Socket_Client is
          Header.Ack := (if Last = 6 then True else False);
          pragma Warnings (On);
 
-         Buffer_Handling.Save_Ack (Consumer.Buffer_Handler, Header.Seq_Nb, Consumer.Packet_Number, Data);
+         Buffer_Handling.Save_Ack (Consumer.Buffer_Handler,
+                                   Header.Seq_Nb,
+                                   Consumer.Packet_Number,
+                                   Data);
          Consumer.Remove_Task.Remove (Header.Seq_Nb);
          Recv_Offset := Recv_Offset - 1;
       else
@@ -393,15 +388,17 @@ package body Data_Transport.Udp_Socket_Client is
                Consumer.Total_Missed := Consumer.Total_Missed + Nb_Missed;
             end if;
 
-            Consumer.Ack_Fifo.all.Append_Wait ((From, Consumer.Packet_Number, Header.Seq_Nb - 1));
+            Consumer.Ack_Fifo.all.Append_Wait
+               ((From, Consumer.Packet_Number, Header.Seq_Nb - 1));
             Consumer.Packet_Number := Header.Seq_Nb;
             Last_Addr := Data_Addr;
             if Recv_Offset + Nb_Missed >= Base_Udp.Sequence_Size then
                Consumer.PMH_Buffer_Task.New_Buffer_Addr (Buffer_Ptr => Data_Addr);
             end if;
             Buffer_Handling.Copy_To_Correct_Location
-                                          (Recv_Offset, Nb_Missed, Data, Data_Addr);
-            Buffer_Handling.Mark_Empty_Cell (Recv_Offset, Data_Addr, Last_Addr, Nb_Missed);
+                     (Recv_Offset, Nb_Missed, Data, Data_Addr);
+            Buffer_Handling.Mark_Empty_Cell
+                     (Recv_Offset, Data_Addr, Last_Addr, Nb_Missed);
             Recv_Offset := Recv_Offset + Nb_Missed;
          end if;
          --  mod type (doesn't need to be set to 0 on max value)

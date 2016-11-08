@@ -232,7 +232,7 @@ package body Buffer_Handling is
 
             Release_Free_Buffer_At (Obj, Obj.Buffer_Handler.First);
 
-            Get_Filled_Buf (Obj);
+            --  Get_Filled_Buf (Obj);
 
             Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.First).Handle.Reuse;
 
@@ -311,7 +311,7 @@ package body Buffer_Handling is
    function Search_Empty_Mark
                         (Obj           : Buffer_Handler_Obj_Access;
                          First, Last   : Handle_Index_Type;
-                         Data          : in Base_Udp.Packet_Stream;
+                         Data          : Base_Udp.Packet_Stream;
                          Seq_Nb        : Reliable_Udp.Packet_Number_Type) return Boolean
 
    is
@@ -395,7 +395,6 @@ package body Buffer_Handling is
                              Dest_Buffer     : Buffers.Buffer_Produce_Access;
                              Size            : Interfaces.Unsigned_32;
                              Buffer_Size     : in out Interfaces.Unsigned_32;
-                             Packet_Nb       : in out Interfaces.Unsigned_64;
                              Src_Index       : in out Interfaces.Unsigned_64;
                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
                              Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
@@ -405,7 +404,6 @@ package body Buffer_Handling is
       Zero_Buf_Size  : exception;
       use type Buffers.Buffer_Handle_Access;
    begin
-      Packet_Nb := 0;
       if Size = 0 then
          raise Zero_Buf_Size with "Buffer Size = 0";
       end if;
@@ -489,10 +487,15 @@ package body Buffer_Handling is
                               Base_Udp.Load_Size - Base_Udp.Header_Size;
 
    begin
+
       if Unsigned_64 (Dest_Index) + Offset > Unsigned_64 (Buffer_Size) then
+         --  "Patched" in Handle_Data_Task.
+         --  Did not find the cause of this error.
+         --  Happens when many packets are dropped.
          if Unsigned_32 (Dest_Index) > Buffer_Size then
             raise Bad_Index with "Index [" & Unsigned_32 (Dest_Index)'Img
-                     & "] bigger that buffer size [" & Buffer_Size'Img & "]";
+                     & "] bigger than buffer size [" & Buffer_Size'Img
+                     & "]";
          end if;
          Offset := Unsigned_64 (Buffer_Size - Unsigned_32 (Dest_Index));
       end if;
@@ -558,16 +561,36 @@ package body Buffer_Handling is
             for Header'Address use Src_Data_Stream (Src_Index)'Address;
             for Size'Address use Src_Data_Stream (Src_Index) (Base_Udp.Header_Size + 1)'Address;
             New_Buffer  : Boolean renames Header.Ack;
+            New_Size    : Interfaces.Unsigned_32;
          begin
             Packet_Nb := Packet_Nb + 1;
+            Obj.Diff_Counter  := Obj.Diff_Counter + 1;
+
             if New_Buffer then
+               if Packet_Nb /= Obj.Last_Packet_Nb then
+                  Ada.Text_IO.Put_Line ("!!!!!!!!  Packet_Nb : " & Packet_Nb'Img);
+                  Ada.Text_IO.Put_Line ("!!!!!!!!  Last_Packet_Nb : " & Obj.Last_Packet_Nb'Img);
+                  Ada.Text_IO.Put_Line ("!!!!!!!!  Size : " & Size'Img);
+                  Obj.Diff_Counter := 0;
+               end if;
+               Obj.Last_Packet_Nb := Packet_Nb;
+               Packet_Nb := 0;
+            end if;
+
+            if New_Buffer
+               or Interfaces.Unsigned_32 (Dest_Index) > Buffer_Size -- Patch, should not happen
+            then
+               if Interfaces.Unsigned_32 (Dest_Index) > Buffer_Size then
+                  New_Size := Buffer_Size;
+               else
+                  New_Size := Size;
+               end if;
                --  Loop if True which means that the buffer data is in next src_buffer
                --  and src_data_stream (declared above) has to be reload with new buffer.
                if New_Dest_Buffer (Obj,
                                    Dest_Buffer,
-                                   Size,
+                                   New_Size,
                                    Buffer_Size,
-                                   Packet_Nb,
                                    Src_Index,
                                    Src_Handle,
                                    Dest_Index,

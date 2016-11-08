@@ -74,7 +74,7 @@ package Buffer_Handling is
    --  and then store content inside.
    function Search_Empty_Mark (Obj           : Buffer_Handler_Obj_Access;
                                First, Last   : Handle_Index_Type;
-                               Data          : in Base_Udp.Packet_Stream;
+                               Data          : Base_Udp.Packet_Stream;
                                Seq_Nb        : Reliable_Udp.Packet_Number_Type) return Boolean;
 
    procedure Save_Ack (Obj             : Buffer_Handler_Obj_Access;
@@ -100,7 +100,6 @@ package Buffer_Handling is
                              Dest_Buffer     : Buffers.Buffer_Produce_Access;
                              Size            : Interfaces.Unsigned_32;
                              Buffer_Size     : in out Interfaces.Unsigned_32;
-                             Packet_Nb       : in out Interfaces.Unsigned_64;
                              Src_Index       : in out Interfaces.Unsigned_64;
                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
                              Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
@@ -159,6 +158,10 @@ private
          Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
 
          Production        : Buffers.Shared.Produce.Produce_Couple_Type;
+
+         --  DBG
+         Last_Packet_Nb    : Interfaces.Unsigned_64 := 0;
+         Diff_Counter      : Interfaces.Unsigned_64 := 0;
       end record;
 
 end Buffer_Handling;

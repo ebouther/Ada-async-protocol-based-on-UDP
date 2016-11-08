@@ -80,6 +80,9 @@ private
       Address           : GNAT.Sockets.Sock_Addr_Type;
       Acquisition       : Boolean := True;
       Last_Packets      : History_Array;
+
+      --  DBG
+      Counter           : Interfaces.Unsigned_64 := 0;
    end record;
 
 end Data_Transport.Udp_Socket_Server;

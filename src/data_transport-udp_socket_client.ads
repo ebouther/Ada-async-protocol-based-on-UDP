@@ -81,14 +81,14 @@ private
 
    type Consumer_Type is new Base_Udp.Consumer_Type with
       record
-         Ack_Mgr        : Reliable_Udp.Ack_Management_Access :=
-                              new Reliable_Udp.Ack_Management;
+         Ack_Mgr              : Reliable_Udp.Ack_Management_Access :=
+                                    new Reliable_Udp.Ack_Management;
 
-         Ack_Fifo       : Reliable_Udp.Synchronized_Queue_Access :=
-                              new Reliable_Udp.Sync_Queue.Synchronized_Queue;
+         Ack_Fifo             : Reliable_Udp.Synchronized_Queue_Access :=
+                                    new Reliable_Udp.Sync_Queue.Synchronized_Queue;
 
-         Buffer_Handler : Buffer_Handling.Buffer_Handler_Obj_Access :=
-                              new Buffer_Handling.Buffer_Handler_Obj;
+         Buffer_Handler       : Buffer_Handling.Buffer_Handler_Obj_Access :=
+                                    new Buffer_Handling.Buffer_Handler_Obj;
 
          Log_Task             : Timer;
 
@@ -101,7 +101,6 @@ private
          Release_Buf_Task     : Buffer_Handling.Release_Full_Buf_Task;
 
          Start_Time           : Ada.Calendar.Time;
-
          Nb_Packet_Received   : Interfaces.Unsigned_64 := 0;
          Packet_Number        : Reliable_Udp.Packet_Number_Type := 0;
          Total_Missed         : Interfaces.Unsigned_64 := 0;
