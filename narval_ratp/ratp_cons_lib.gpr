@@ -5,7 +5,7 @@ library project ratp_cons_lib is
 
   for Library_Name use "ratp_cons";
   for Library_Kind use "relocatable";
-  for Library_Dir use ".";
+  for Library_Dir use "../lib/";
   for Library_ALI_Dir use "shared_ali";
   for Library_Interface use ("plugin_interfaces.ratp_cons");
   for Object_Dir use "obj";

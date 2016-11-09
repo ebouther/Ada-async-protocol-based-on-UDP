@@ -564,23 +564,16 @@ package body Buffer_Handling is
             New_Size    : Interfaces.Unsigned_32;
          begin
             Packet_Nb := Packet_Nb + 1;
-            Obj.Diff_Counter  := Obj.Diff_Counter + 1;
-
-            if New_Buffer then
-               if Packet_Nb /= Obj.Last_Packet_Nb then
-                  Ada.Text_IO.Put_Line ("!!!!!!!!  Packet_Nb : " & Packet_Nb'Img);
-                  Ada.Text_IO.Put_Line ("!!!!!!!!  Last_Packet_Nb : " & Obj.Last_Packet_Nb'Img);
-                  Ada.Text_IO.Put_Line ("!!!!!!!!  Size : " & Size'Img);
-                  Obj.Diff_Counter := 0;
-               end if;
-               Obj.Last_Packet_Nb := Packet_Nb;
-               Packet_Nb := 0;
-            end if;
 
             if New_Buffer
-               or Interfaces.Unsigned_32 (Dest_Index) > Buffer_Size -- Patch, should not happen
+               or (Interfaces.Unsigned_32 (Dest_Index) > Buffer_Size -- Patch, should not happen
+                     and New_Buffer = False)
             then
-               if Interfaces.Unsigned_32 (Dest_Index) > Buffer_Size then
+               if Interfaces.Unsigned_32 (Dest_Index) > Buffer_Size
+                     and New_Buffer = False
+               then
+                  Ada.Text_IO.Put_Line ("Index [ " & Interfaces.Unsigned_32 (Dest_Index)'Img &
+                     "] bigger than buffer size [ " & Buffer_Size'Img & "]");
                   New_Size := Buffer_Size;
                else
                   New_Size := Size;

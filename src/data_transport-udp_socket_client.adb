@@ -33,6 +33,7 @@ package body Data_Transport.Udp_Socket_Client is
       use System.Storage_Elements;
       use type Interfaces.C.int;
       use type Buffers.Buffer_Produce_Access;
+      use type Reliable_Udp.Packet_Number_Type;
    begin
       --  System.Multiprocessors.Dispatching_Domains.Set_CPU
       --     (System.Multiprocessors.CPU_Range (16));
@@ -75,14 +76,17 @@ package body Data_Transport.Udp_Socket_Client is
 
       <<HandShake>>
       Ada.Text_IO.Put_Line ("...Waiting for Producer...");
-      Wait_Producer_HandShake (Consumer, Cons_Addr, Cons_Port);
+      if Wait_Producer_HandShake (Consumer, Cons_Addr, Cons_Port) = 0 then
+         Ada.Text_IO.Put_Line ("Producer disconnected");
+         --  exit;
+      end if;
       Ada.Text_IO.Put_Line ("Producer is ready...");
 
       loop
          select
             accept Disconnect;
                Ada.Text_IO.Put_Line ("[Disconnect]");
-               --  Send producer stop msg
+               Reliable_Udp.Send_Cmd_To_Producer (0);
                exit;
          else
             if Recv_Offset > Base_Udp.Pkt_Max then
@@ -152,20 +156,6 @@ package body Data_Transport.Udp_Socket_Client is
       Consumer.Remove_Task.Initialize (Consumer.Ack_Mgr);
 
    end Init_Consumer;
-
-
-   --  -------------------
-   --  --  Stop_Server  --
-   --  -------------------
-
-   --  procedure Stop_Server is
-   --  begin
-   --     Log_Task.Stop;
-   --     Ack_Task.Stop;
-   --     Remove_Task.Stop;
-   --     PMH_Buffer_Task.Stop;
-
-   --  end Stop_Server;
 
 
    -----------------------
@@ -295,9 +285,9 @@ package body Data_Transport.Udp_Socket_Client is
    --  Wait_Producer_HandShake  --
    -------------------------------
 
-   procedure Wait_Producer_HandShake (Consumer  : Consumer_Access;
-                                      Host      : GNAT.Sockets.Inet_Addr_Type;
-                                      Port      : GNAT.Sockets.Port_Type)
+   function Wait_Producer_HandShake (Consumer  : Consumer_Access;
+                                     Host      : GNAT.Sockets.Inet_Addr_Type;
+                                     Port      : GNAT.Sockets.Port_Type) return Reliable_Udp.Packet_Number_Type
    is
       Socket   : Socket_Type;
       Data     : Base_Udp.Packet_Stream;
@@ -315,21 +305,25 @@ package body Data_Transport.Udp_Socket_Client is
       pragma Unreferenced (Last);
    begin
       Init_Udp (Socket, Host, Port, False);
-      loop
-         GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
-         Reliable_Udp.Producer_Address := From;
-         exit when Consumer.Acquisition and Msg = 0; --  Means producer is ready.
-      end loop;
+      --  loop
+      GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
+      Reliable_Udp.Producer_Address := From;
+      --  -------------
+      pragma Unreferenced (Consumer);
+      --  exit when Consumer.Acquisition and Msg = 0; --  Means producer is ready.
+      --  end loop;
       Head.Ack := False;
       GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
       GNAT.Sockets.Close_Socket (Socket);
+      return Msg;
    exception
       when E : others =>
          Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
-            Ada.Exceptions.Exception_Name (E)
-            & ASCII.LF & ASCII.ESC & "[33m"
-            & Ada.Exceptions.Exception_Message (E)
-            & ASCII.ESC & "[0m");
+            Ada.Exceptions.Exception_Name (E) &
+            ASCII.LF & ASCII.ESC & "[33m" &
+            Ada.Exceptions.Exception_Message (E) &
+            ASCII.ESC & "[0m");
+      raise;
    end Wait_Producer_HandShake;
 
 

@@ -53,9 +53,10 @@ package Data_Transport.Udp_Socket_Client is
    end Timer;
 
    --  A "connect" alternative for udp. Enables to wait for producer.
-   procedure Wait_Producer_HandShake (Consumer  : Consumer_Access;
-                                      Host      : GNAT.Sockets.Inet_Addr_Type;
-                                      Port      : GNAT.Sockets.Port_Type);
+   --  Returns the msg number sent by client. 1 = connect, 0 = Disconnect
+   function Wait_Producer_HandShake (Consumer  : Consumer_Access;
+                                     Host      : GNAT.Sockets.Inet_Addr_Type;
+                                     Port      : GNAT.Sockets.Port_Type) return Reliable_Udp.Packet_Number_Type;
 
    --  Main part of algorithm, does all the processing once a packet is receive.
    procedure Process_Packet (Consumer     : Consumer_Access;

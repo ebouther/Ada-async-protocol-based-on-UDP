@@ -56,8 +56,9 @@ package Data_Transport.Udp_Socket_Server is
    procedure Rcv_Ack (Producer   : Producer_Access);
 
    --  Sends messages to producer, wait for its reply
-   --  with the same message to start acquisition
-   procedure Consumer_HandShake (Producer : Producer_Access);
+   --  with the same message to start / stop acquisition
+   procedure Consumer_HandShake (Producer : Producer_Access;
+                                 Msg      : Reliable_Udp.Packet_Number_Type);
 
    function To_Int is
       new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type,
@@ -80,9 +81,6 @@ private
       Address           : GNAT.Sockets.Sock_Addr_Type;
       Acquisition       : Boolean := True;
       Last_Packets      : History_Array;
-
-      --  DBG
-      Counter           : Interfaces.Unsigned_64 := 0;
    end record;
 
 end Data_Transport.Udp_Socket_Server;

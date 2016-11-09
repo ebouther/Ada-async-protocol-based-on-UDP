@@ -159,9 +159,6 @@ private
 
          Production        : Buffers.Shared.Produce.Produce_Couple_Type;
 
-         --  DBG
-         Last_Packet_Nb    : Interfaces.Unsigned_64 := 0;
-         Diff_Counter      : Interfaces.Unsigned_64 := 0;
       end record;
 
 end Buffer_Handling;

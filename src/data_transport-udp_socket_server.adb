@@ -51,7 +51,7 @@ package body Data_Transport.Udp_Socket_Server is
       end loop;
 
       <<HandShake>>
-      Consumer_HandShake (Producer);
+      Consumer_HandShake (Producer, 1);
       Producer.Acquisition := True;
       delay 0.0001;
       Ada.Text_IO.Put_Line ("Consumer ready, start sending packets...");
@@ -60,6 +60,8 @@ package body Data_Transport.Udp_Socket_Server is
          select
             accept Disconnect;
                GNAT.Sockets.Close_Socket (Producer.Socket);
+               delay 2.0; -- Enough for consumer socket to timeout.
+               Consumer_HandShake (Producer, 0);
                exit;
          else
             if Producer.Acquisition then
@@ -101,7 +103,8 @@ package body Data_Transport.Udp_Socket_Server is
    --  Consumer_HandShake  --
    ------------------------
 
-   procedure Consumer_HandShake (Producer : Producer_Access) is
+   procedure Consumer_HandShake (Producer : Producer_Access;
+                                 Msg      : Reliable_Udp.Packet_Number_Type) is
       Send_Data, Recv_Data : Base_Udp.Packet_Stream;
       Send_Head, Recv_Head : Reliable_Udp.Header_Type;
 
@@ -111,7 +114,7 @@ package body Data_Transport.Udp_Socket_Server is
       Send_Msg    : Reliable_Udp.Packet_Number_Type renames Send_Head.Seq_Nb;
       Not_A_Msg   : Boolean renames Recv_Head.Ack;
    begin
-      Send_Msg := 0;
+      Send_Msg := Msg;
       loop
          Send_Packet (Producer => Producer,
                       Payload => Send_Data);
@@ -175,10 +178,6 @@ package body Data_Transport.Udp_Socket_Server is
                     Seq_Nb => Packet_Number);
          Producer.Last_Packets (Packet_Number).Is_Buffer_Size := True;
          Send_Packet (Producer, Producer.Last_Packets (Packet_Number).Data, True);
-         Ada.Text_IO.Put_Line ("Counter : " & Producer.Counter'Img);
-         --  DBG  --
-         Producer.Counter := 0;
-         -----------
          Packet_Number := Packet_Number + 1;
          Send_All_Stream (Producer, Data, Packet_Number);
       exception
@@ -235,8 +234,6 @@ package body Data_Transport.Udp_Socket_Server is
             Producer.Last_Packets (Packet_Number).Is_Buffer_Size := False;
             GNAT.Sockets.Send_Socket (Producer.Socket, Producer.Last_Packets (Packet_Number).Data,
                                        Offset, Producer.Address);
-
-            Producer.Counter := Producer.Counter + 1;
 
             Packet_Number := Packet_Number + 1;
          end;
@@ -297,10 +294,6 @@ package body Data_Transport.Udp_Socket_Server is
                Ack_Header.Ack := True;
                Send_Packet (Producer, Producer.Last_Packets (Head.Seq_Nb).Data,
                             Producer.Last_Packets (Head.Seq_Nb).Is_Buffer_Size);
-               --  DBG
-               if Producer.Last_Packets (Head.Seq_Nb).Is_Buffer_Size then
-                  Ada.Text_IO.Put_Line ("ReSent a Buffer Size :" & Head.Seq_Nb'Img);
-               end if;
             end;
          else
             if Message = 2 then
@@ -310,6 +303,10 @@ package body Data_Transport.Udp_Socket_Server is
             elsif Message = 1 then
                Ada.Text_IO.Put_Line ("...Consumer asked to START ACQUISITION...");
                Producer.Acquisition := True;
+               exit;
+            elsif Message = 0 then
+               Ada.Text_IO.Put_Line ("...Consumer disconnected...");
+               Producer.Acquisition := False;
                exit;
             end if;
          end if;
