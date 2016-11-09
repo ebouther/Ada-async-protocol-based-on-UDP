@@ -7,29 +7,25 @@ with Ada.Text_IO;
 with Ada.Strings.Unbounded;
 
 procedure Udp_Consumer is
-   Total_Bytes_Received : Interfaces.Unsigned_64 := 0;
-   Buffer   : aliased Buffers.Local.Local_Buffer_Type;
-   Client   : Data_Transport.Udp_Socket_Client.Socket_Client_Task
-      (Buffer'Unchecked_Access);
-   Client_2 : Data_Transport.Udp_Socket_Client.Socket_Client_Task
-      (Buffer'Unchecked_Access);
-      --  (Buffer'Unchecked_Access);
-   --  type Data_Array is array (1 .. 1024) of Integer;
-   Options : constant String := "buffer_name= host_name= port= watchdog=";
    use Ada.Strings.Unbounded;
-   Host_Name : Unbounded_String := To_Unbounded_String ("localhost");
+
+   Total_Bytes_Received : Interfaces.Unsigned_64 := 0;
+   Buffer      : aliased Buffers.Local.Local_Buffer_Type;
+   Client      : access Data_Transport.Udp_Socket_Client.Socket_Client_Task;
+   Options     : constant String := "buffer_name= host_name= port= watchdog= nb_cons=";
+   Host_Name   : Unbounded_String := To_Unbounded_String ("localhost");
    Buffer_Name : Unbounded_String := To_Unbounded_String ("blue");
-   Port     : GNAT.Sockets.Port_Type := 50001;
-   Port_2   : constant GNAT.Sockets.Port_Type := 50002;
-   --  Watchdog_Counter : Natural;
-   --  Watchdog_Limit : Positive := 10;
+   Cons_Nb     : Natural := 1;
+
+   Port     : GNAT.Sockets.Port_Type := 50000;
+
    use type Buffers.Buffer_Size_Type;
 
-   task type Timer_Task is
+   task type Debit_Task is
       entry Start;
-   end Timer_Task;
+   end Debit_Task;
 
-   task body Timer_Task is
+   task body Debit_Task is
       Elapsed_Sec   : Integer := 0;
    begin
       accept Start;
@@ -39,10 +35,11 @@ procedure Udp_Consumer is
          delay 5.0;
          Elapsed_Sec := Elapsed_Sec + 5;
       end loop;
-   end Timer_Task;
+   end Debit_Task;
 
-   Timer : Timer_Task;
+   Debit : Debit_Task;
    use Ada.Strings.Unbounded;
+   use type GNAT.Sockets.Port_Type;
 begin
 
    loop
@@ -55,48 +52,30 @@ begin
             Host_Name := To_Unbounded_String (GNAT.Command_Line.Parameter);
          when 'p' =>
             Port := GNAT.Sockets.Port_Type'Value (GNAT.Command_Line.Parameter);
-         --  when 'w' =>
-         --     Watchdog_Limit := Positive'Value (GNAT.Command_Line.Parameter);
+         when 'n' =>
+            Cons_Nb := Natural'Value (GNAT.Command_Line.Parameter);
          when others =>
             raise Program_Error;
       end case;
    end loop;
    Buffer.Set_Name (To_String (Buffer_Name));
    Buffer.Initialise (10, Size => 409600000);
-   Client.Initialise (To_Unbounded_String ("toto"),
-                      To_Unbounded_String ("http://127.0.0.1:5678"),
-                      To_String (Host_Name),
-                      Port);
-   Client_2.Initialise (To_Unbounded_String ("titi"),
-                        To_Unbounded_String ("http://127.0.0.1:5678"),
-                        To_String (Host_Name),
-                        Port_2);
-   Client.Connect;
-   Client_2.Connect;
+   for I in 1 .. Cons_Nb loop
+      Client := new Data_Transport.Udp_Socket_Client.Socket_Client_Task (Buffer'Unchecked_Access);
+      Client.Initialise (To_Unbounded_String ("cons" & I'Img), -- name of ratp consumer's internal shared buffer.
+                         To_Unbounded_String ("http://127.0.0.1:5678"),
+                         To_String (Host_Name),
+                         Port + GNAT.Sockets.Port_Type (I));
+      Client.Connect;
+   end loop;
+
    loop
-      --  Ada.Text_IO.Put_Line ("consuming buffer loop");
-      --  Watchdog_Counter := 0;
-      loop
-         --  select
          Buffer.Block_Full;
          select
-            Timer.Start;
+            Debit.Start;
          else
             null;
          end select;
-         --  Ada.Text_IO.Put_Line ("block full seen");
-         exit;
-         --  or
-         --     delay 1.0;
-         --     Ada.Text_IO.Put_Line ("watchdog" & Watchdog_Counter'Img);
-         --     Watchdog_Counter := Watchdog_Counter + 1;
-         --     if Watchdog_Counter = Watchdog_Limit then
-         --        Client.Disconnect;
-         --        Ada.Text_IO.Put_Line ("end of test");
-         --        return;
-         --     end if;
-         --  end select;
-      end loop;
       declare
          Buffer_Handle : Buffers.Buffer_Handle_Type;
          use type Interfaces.Unsigned_64;

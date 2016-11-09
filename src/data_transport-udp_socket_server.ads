@@ -18,8 +18,7 @@ package Data_Transport.Udp_Socket_Server is
    --  Main Task
    task type Socket_Server_Task (Buffer_Set : Buffers.Buffer_Consume_Access)
          is new Transport_Layer_Interface with
-      entry Initialise (Obj               : Producer_Access;
-                        Network_Interface : String;
+      entry Initialise (Network_Interface : String;
                         Port              : GNAT.Sockets.Port_Type);
       overriding entry Connect;
       overriding entry Disconnect;

@@ -25,11 +25,10 @@ package body Data_Transport.Udp_Socket_Server is
    begin
       select
          accept Initialise
-           (Obj               : Producer_Access;
-            Network_Interface : String;
+           (Network_Interface : String;
             Port              : GNAT.Sockets.Port_Type)
          do
-            Producer := Obj;
+            Producer := new Data_Transport.Udp_Socket_Server.Producer_Type;
             Producer.Address.Addr := GNAT.Sockets.Addresses
                                     (GNAT.Sockets.Get_Host_By_Name (Network_Interface));
             Producer.Address.Port := Port;
