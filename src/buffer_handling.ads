@@ -65,6 +65,9 @@ package Buffer_Handling is
                            Buffer_Name : String;
                            End_Point   : String);
 
+   --  Stop Production and Consumption Message_Handling
+   procedure Finalize_Buffers (Obj  : Buffer_Handler_Obj_Access);
+
    --  Release Buffer at Handlers (Index) and change its State to Empty
    procedure Release_Free_Buffer_At (Obj     : Buffer_Handler_Obj_Access;
                                      Index   : in Handle_Index_Type);
@@ -134,7 +137,6 @@ package Buffer_Handling is
    --  Get the address of a New Buffer
    task type PMH_Buffer_Addr_Task is
       entry Start (Buffer_H   : Buffer_Handler_Obj_Access);
-      entry Stop;
       entry New_Buffer_Addr (Buffer_Ptr : in out System.Address);
    end PMH_Buffer_Addr_Task;
 
@@ -142,6 +144,7 @@ package Buffer_Handling is
    --  all Packets
    task type Check_Buf_Integrity_Task is
       entry Start (Buffer_H   : Buffer_Handler_Obj_Access);
+      entry Stop;
    end Check_Buf_Integrity_Task;
 
    task type Handle_Data_Task is
@@ -158,7 +161,6 @@ private
          Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
 
          Production        : Buffers.Shared.Produce.Produce_Couple_Type;
-
       end record;
 
 end Buffer_Handling;

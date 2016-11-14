@@ -4,7 +4,7 @@ with AWS.MIME;
 with AWS.Templates;
 with AWS.Messages;
 
-with Reliable_Udp;
+--  with Reliable_Udp;
 
 package body WebSocket is
    use Ada;
@@ -58,12 +58,12 @@ package body WebSocket is
       if Message = "START_ACQ"
          and Obj.Acquisition = False
       then
-         Reliable_Udp.Send_Cmd_To_Producer (1);
+         --  Reliable_Udp.Send_Cmd_To_Producer (1);
          Obj.Acquisition := True;
       elsif Message = "STOP_ACQ"
          and Obj.Acquisition
       then
-         Reliable_Udp.Send_Cmd_To_Producer (2);
+         --  Reliable_Udp.Send_Cmd_To_Producer (2);
          Obj.Acquisition := False;
       end if;
       Obj.Send (Message, Is_Binary => Obj.Kind = Net.WebSocket.Binary);

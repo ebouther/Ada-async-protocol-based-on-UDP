@@ -1,7 +1,9 @@
 with Ada.Text_IO;
 with Ada.Exceptions;
 --  with System.Multiprocessors.Dispatching_Domains;
+with Ada.Task_Identification;
 with System.Storage_Elements;
+with Ada.Strings.Unbounded;
 with Ada.Real_Time;
 
 with GNAT.Command_Line;
@@ -12,6 +14,7 @@ with GNAT.Sockets.Thin;
 pragma Warnings (On);
 
 with Output_Data;
+with Web_Interfaces;
 
 package body Data_Transport.Udp_Socket_Client is
 
@@ -20,17 +23,20 @@ package body Data_Transport.Udp_Socket_Client is
       Handle_Data       : Buffer_Handling.Handle_Data_Task;
 
       Server            : Socket_Type;
-      Cons_Addr         : GNAT.Sockets.Inet_Addr_Type;
-      Cons_Port         : GNAT.Sockets.Port_Type;
 
       From              : Sock_Addr_Type;
       Last              : Ada.Streams.Stream_Element_Offset;
       Data_Addr         : System.Address;
       Recv_Offset       : Interfaces.Unsigned_64 := Base_Udp.Pkt_Max + 1;
 
-      Consumer          : constant Consumer_Access := new Consumer_Type;
+      pragma Warnings (Off);
+      Consumer          : Consumer_Access := new Consumer_Type;
+      pragma Warnings (On);
+
+      Acquisition       : Boolean := False;
 
       use System.Storage_Elements;
+      use Ada.Strings.Unbounded;
       use type Interfaces.C.int;
       use type Buffers.Buffer_Produce_Access;
       use type Reliable_Udp.Packet_Number_Type;
@@ -38,23 +44,24 @@ package body Data_Transport.Udp_Socket_Client is
       --  System.Multiprocessors.Dispatching_Domains.Set_CPU
       --     (System.Multiprocessors.CPU_Range (16));
       select
-         accept Initialise (Buf_Name   : Ada.Strings.Unbounded.Unbounded_String;
-                            End_Point  : Ada.Strings.Unbounded.Unbounded_String;
-                            Host       : String;
-                            Port       : GNAT.Sockets.Port_Type) do
+         accept Initialise (Host       : String;
+                            Port       : GNAT.Sockets.Port_Type;
+                            Buf_Name   : String) do
 
-            --  Cons_Addr := GNAT.Sockets.Addresses
-            --            (GNAT.Sockets.Get_Host_By_Name (Host));
-            pragma Unreferenced (Host);
 
-            Cons_Addr := Any_Inet_Addr;
-            Cons_Port := Port;
+            Consumer.Addr := GNAT.Sockets.Addresses
+                      (GNAT.Sockets.Get_Host_By_Name (Host));
+            Consumer.Port := Port;
+            Consumer.Buffer_Name := To_Unbounded_String (Buf_Name);
+            --  Consumer.Addr := Any_Inet_Addr;
+            --  Consumer.End_Point := End_Point;
 
-            Consumer.Buffer_Name := Buf_Name;
-            Consumer.End_Point := End_Point;
+            --  Web_Interfaces.Set_Port (Consumer.Web_Interface);
+            --  Web_Interfaces.Set_URI (Consumer.Web_Interface);
+
             Init_Consumer (Consumer);
+            Init_Udp (Server, Consumer.Addr, Consumer.Port);
 
-            Init_Udp (Server, Cons_Addr, Cons_Port);
             if Buffer_Set /= null then
                Handle_Data.Start (Consumer.Buffer_Handler, Buffer_Set);
             end if;
@@ -76,9 +83,8 @@ package body Data_Transport.Udp_Socket_Client is
 
       <<HandShake>>
       Ada.Text_IO.Put_Line ("...Waiting for Producer...");
-      if Wait_Producer_HandShake (Consumer, Cons_Addr, Cons_Port) = 0 then
+      if Wait_Producer_HandShake (Consumer) = 0 then
          Ada.Text_IO.Put_Line ("Producer disconnected");
-         --  exit;
       end if;
       Ada.Text_IO.Put_Line ("Producer is ready...");
 
@@ -86,7 +92,8 @@ package body Data_Transport.Udp_Socket_Client is
          select
             accept Disconnect;
                Ada.Text_IO.Put_Line ("[Disconnect]");
-               Reliable_Udp.Send_Cmd_To_Producer (0);
+               Reliable_Udp.Send_Cmd_To_Producer (0, Web_Interfaces.Get_Prod_Addr (Consumer.Web_Interface));
+               Consumer.Log_Task.Stop;
                exit;
          else
             if Recv_Offset > Base_Udp.Pkt_Max then
@@ -100,17 +107,35 @@ package body Data_Transport.Udp_Socket_Client is
                for Data'Address use Data_Addr + Storage_Offset
                                                    (Recv_Offset * Base_Udp.Load_Size);
                use type Ada.Streams.Stream_Element_Offset;
+               use Ada.Task_Identification;
             begin
                GNAT.Sockets.Receive_Socket (Server, Data, Last, From);
+               if not Acquisition then
+                  Acquisition := True;
+               end if;
                Process_Packet (Consumer, Data, Last, Recv_Offset, Data_Addr, From);
                Recv_Offset := Recv_Offset + 1;
             exception
                when Socket_Error =>
                   Ada.Text_IO.Put_Line ("Socket Timeout");
+                  if Acquisition then
+                     Ada.Text_IO.Put_Line ("Producer disconnected");
+                     Consumer.Log_Task.Stop;
+                     Consumer.Check_Integrity_Task.Stop;
+                     Buffer_Handling.Finalize_Buffers (Consumer.Buffer_Handler);
+                     Abort_Task (Consumer.Remove_Task'Identity);
+                     Abort_Task (Consumer.Append_Task'Identity);
+                     Abort_Task (Consumer.Ack_Task'Identity);
+                     Abort_Task (Consumer.PMH_Buffer_Task'Identity);
+                     Abort_Task (Consumer.Release_Buf_Task'Identity);
+                     Abort_Task (Handle_Data'Identity);
+                     exit;
+                  end if;
                   goto HandShake;
             end;
          end select;
       end loop;
+      Ada.Text_IO.Put_Line ("Consumer stopped");
       exception
          when E : others =>
             Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
@@ -140,7 +165,8 @@ package body Data_Transport.Udp_Socket_Client is
       --  Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "buffers.log");
       --  Ada.Text_IO.Close (Log_File);
 
-      --  Web_Interfaces.Init_WebServer (Consumer.Web_Interface); *********** DO NOT FORGET TO UNCOMMENT ***************
+
+      --  Web_Interfaces.Init_WebServer (Consumer.Web_Interface);
 
       Consumer.Release_Buf_Task.Start (Consumer.Buffer_Handler);
       Consumer.Ack_Task.Start (Consumer.Ack_Mgr);
@@ -285,9 +311,7 @@ package body Data_Transport.Udp_Socket_Client is
    --  Wait_Producer_HandShake  --
    -------------------------------
 
-   function Wait_Producer_HandShake (Consumer  : Consumer_Access;
-                                     Host      : GNAT.Sockets.Inet_Addr_Type;
-                                     Port      : GNAT.Sockets.Port_Type) return Reliable_Udp.Packet_Number_Type
+   function Wait_Producer_HandShake (Consumer  : Consumer_Access) return Reliable_Udp.Packet_Number_Type
    is
       Socket   : Socket_Type;
       Data     : Base_Udp.Packet_Stream;
@@ -304,14 +328,15 @@ package body Data_Transport.Udp_Socket_Client is
       use type Reliable_Udp.Packet_Number_Type;
       pragma Unreferenced (Last);
    begin
-      Init_Udp (Socket, Host, Port, False);
-      --  loop
+      Init_Udp (Server => Socket,
+                Host => Consumer.Addr,
+                Port => Consumer.Port,
+                TimeOut_Opt => False);
       GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
-      Reliable_Udp.Producer_Address := From;
-      --  -------------
-      pragma Unreferenced (Consumer);
-      --  exit when Consumer.Acquisition and Msg = 0; --  Means producer is ready.
-      --  end loop;
+      if Msg = 1 then
+         Web_Interfaces.Set_Prod_Addr
+            (Consumer.Web_Interface, From);
+      end if;
       Head.Ack := False;
       GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
       GNAT.Sockets.Close_Socket (Socket);

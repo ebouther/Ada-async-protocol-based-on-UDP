@@ -2,7 +2,6 @@ with Ada.Calendar;
 with Ada.Unchecked_Deallocation;
 with Ada.Unchecked_Conversion;
 with Ada.Streams;
-with Ada.Strings.Unbounded;
 with GNAT.Sockets;
 with Interfaces.C;
 with System;
@@ -25,10 +24,9 @@ package Data_Transport.Udp_Socket_Client is
    task type Socket_Client_Task (Buffer_Set : Buffers.Buffer_Produce_Access)
       is new Transport_Layer_Interface with
 
-      entry Initialise (Buf_Name   : Ada.Strings.Unbounded.Unbounded_String;
-                        End_Point  : Ada.Strings.Unbounded.Unbounded_String;
-                        Host       : String;
-                        Port       : GNAT.Sockets.Port_Type);
+      entry Initialise (Host       : String;
+                        Port       : GNAT.Sockets.Port_Type;
+                        Buf_Name   : String);
       overriding entry Connect;
       overriding entry Disconnect;
    end Socket_Client_Task;
@@ -54,9 +52,7 @@ package Data_Transport.Udp_Socket_Client is
 
    --  A "connect" alternative for udp. Enables to wait for producer.
    --  Returns the msg number sent by client. 1 = connect, 0 = Disconnect
-   function Wait_Producer_HandShake (Consumer  : Consumer_Access;
-                                     Host      : GNAT.Sockets.Inet_Addr_Type;
-                                     Port      : GNAT.Sockets.Port_Type) return Reliable_Udp.Packet_Number_Type;
+   function Wait_Producer_HandShake (Consumer  : Consumer_Access) return Reliable_Udp.Packet_Number_Type;
 
    --  Main part of algorithm, does all the processing once a packet is receive.
    procedure Process_Packet (Consumer     : Consumer_Access;
@@ -106,6 +102,9 @@ private
          Packet_Number        : Reliable_Udp.Packet_Number_Type := 0;
          Total_Missed         : Interfaces.Unsigned_64 := 0;
          Nb_Output            : Natural := 0;
+
+         Addr                 : GNAT.Sockets.Inet_Addr_Type;
+         Port                 : GNAT.Sockets.Port_Type;
 
       end record;
 

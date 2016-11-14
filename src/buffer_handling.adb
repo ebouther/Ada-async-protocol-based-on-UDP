@@ -101,6 +101,13 @@ package body Buffer_Handling is
    end Init_Buffers;
 
 
+   procedure Finalize_Buffers (Obj  : Buffer_Handler_Obj_Access) is
+   begin
+      Obj.Production.Message_Handling.Stop;
+      Obj.Consumption.Message_Handling.Stop;
+   end Finalize_Buffers;
+
+
    ------------------------------
    --  Release_Free_Buffer_At  --
    ------------------------------
@@ -146,26 +153,31 @@ package body Buffer_Handling is
          Obj   := Buffer_H;
       end Start;
       loop
-         if Obj.Buffer_Handler.Handlers (Index).State = Near_Full then
-            Addr := Obj.Buffer_Handler.Handlers (Index).Handle.Get_Address;
-            N := 0;
-            Parse_Buffer :
-               while N <= Base_Udp.Pkt_Max loop
-                  declare
-                     Data  :  Interfaces.Unsigned_32;
-                     for Data'Address use Addr + Storage_Offset
-                                                   (N * Base_Udp.Load_Size);
-                  begin
-                     --  Exit if buffer is still waiting for dropped packet payload.
-                     exit Parse_Buffer when Data = 16#DEAD_BEEF#;
-                  end;
-                  N := N + 1;
-               end loop Parse_Buffer;
-            if N = Base_Udp.Pkt_Max + 1 then
-               Obj.Buffer_Handler.Handlers (Index).State := Full;
+         select
+            accept Stop;
+               exit;
+         else
+            if Obj.Buffer_Handler.Handlers (Index).State = Near_Full then
+               Addr := Obj.Buffer_Handler.Handlers (Index).Handle.Get_Address;
+               N := 0;
+               Parse_Buffer :
+                  while N <= Base_Udp.Pkt_Max loop
+                     declare
+                        Data  :  Interfaces.Unsigned_32;
+                        for Data'Address use Addr + Storage_Offset
+                                                      (N * Base_Udp.Load_Size);
+                     begin
+                        --  Exit if buffer is still waiting for dropped packet payload.
+                        exit Parse_Buffer when Data = 16#DEAD_BEEF#;
+                     end;
+                     N := N + 1;
+                  end loop Parse_Buffer;
+               if N = Base_Udp.Pkt_Max + 1 then
+                  Obj.Buffer_Handler.Handlers (Index).State := Full;
+               end if;
             end if;
-         end if;
-         Index := Index + 1;
+            Index := Index + 1;
+         end select;
       end loop;
    end Check_Buf_Integrity_Task;
 
@@ -223,27 +235,31 @@ package body Buffer_Handling is
    begin
       --  System.Multiprocessors.Dispatching_Domains.Set_CPU
       --     (System.Multiprocessors.CPU_Range (11));
-      accept Start (Buffer_H  : Buffer_Handler_Obj_Access) do
-         Obj := Buffer_H;
-      end Start;
-      loop
-         delay 0.0; -- Doesn't work without rescheduling; -- edit: Might not be needed anymore
-         if Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.First).State = Full then
+      select
+         accept Start (Buffer_H  : Buffer_Handler_Obj_Access) do
+            Obj := Buffer_H;
+         end Start;
+         loop
+            delay 0.0; -- Doesn't work without rescheduling (Many losses);
+            if Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.First).State = Full then
 
-            Release_Free_Buffer_At (Obj, Obj.Buffer_Handler.First);
+               Release_Free_Buffer_At (Obj, Obj.Buffer_Handler.First);
 
-            --  Get_Filled_Buf (Obj);
+               --  Get_Filled_Buf (Obj); --  DBG
 
-            Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.First).Handle.Reuse;
+               Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.First).Handle.Reuse;
 
-            Obj.Production.Producer.Get_Free_Buffer
-               (Obj.Buffer_Handler.Handlers
-                  (Obj.Buffer_Handler.First).Handle);
+               Obj.Production.Producer.Get_Free_Buffer
+                  (Obj.Buffer_Handler.Handlers
+                     (Obj.Buffer_Handler.First).Handle);
 
-            Obj.Buffer_Handler.First := Obj.Buffer_Handler.First + 1;
-            Ada.Text_IO.Put_Line ("First : " & Obj.Buffer_Handler.First'Img);
-         end if;
-      end loop;
+               Obj.Buffer_Handler.First := Obj.Buffer_Handler.First + 1;
+               Ada.Text_IO.Put_Line ("First : " & Obj.Buffer_Handler.First'Img);
+            end if;
+         end loop;
+      or
+         terminate;
+      end select;
    exception
       when E : others =>
          Ada.Text_IO.Put_Line ("exception : " &
@@ -264,35 +280,38 @@ package body Buffer_Handling is
    begin
       --  System.Multiprocessors.Dispatching_Domains.Set_CPU
       --     (System.Multiprocessors.CPU_Range (12));
-      accept Start (Buffer_H  : Buffer_Handler_Obj_Access) do
-         Obj := Buffer_H;
-      end Start;
-      loop
-         select
-            accept Stop;
-               exit;
-         or
-            accept New_Buffer_Addr (Buffer_Ptr   : in out System.Address)
-            do
-               if Obj.Buffer_Handler.Current + 1 = Obj.Buffer_Handler.First
-                  and not Init
-               then
-                  Ada.Exceptions.Raise_Exception (Not_Released_Fast_Enough'Identity,
-                     "All buffers are used. Make sure a consumer was launched.");
-               end if;
-               Buffer_Ptr := Obj.Buffer_Handler.Handlers
-                                (Obj.Buffer_Handler.Current + 1).
-                                    Handle.Get_Address;
-            end New_Buffer_Addr;
-               if not Init then
-                  Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.Current).
-                                                      State := Near_Full;
-               end if;
-               Obj.Buffer_Handler.Current := Obj.Buffer_Handler.Current + 1;
-               Init := False;
-               Ada.Text_IO.Put_Line ("Current : " & Obj.Buffer_Handler.Current'Img);
-         end select;
-      end loop;
+      select
+         accept Start (Buffer_H  : Buffer_Handler_Obj_Access) do
+            Obj := Buffer_H;
+         end Start;
+         loop
+            select
+               accept New_Buffer_Addr (Buffer_Ptr   : in out System.Address)
+               do
+                  if Obj.Buffer_Handler.Current + 1 = Obj.Buffer_Handler.First
+                     and not Init
+                  then
+                     Ada.Exceptions.Raise_Exception (Not_Released_Fast_Enough'Identity,
+                        "All buffers are used. Make sure a consumer was launched.");
+                  end if;
+                  Buffer_Ptr := Obj.Buffer_Handler.Handlers
+                                   (Obj.Buffer_Handler.Current + 1).
+                                       Handle.Get_Address;
+               end New_Buffer_Addr;
+                  if not Init then
+                     Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.Current).
+                                                         State := Near_Full;
+                  end if;
+                  Obj.Buffer_Handler.Current := Obj.Buffer_Handler.Current + 1;
+                  Init := False;
+                  Ada.Text_IO.Put_Line ("Current : " & Obj.Buffer_Handler.Current'Img);
+            or
+               terminate;
+            end select;
+         end loop;
+      or
+         terminate;
+      end select;
    exception
       when E : others =>
 
@@ -542,54 +561,66 @@ package body Buffer_Handling is
       --  System.Multiprocessors.Dispatching_Domains.Set_CPU
       --     (System.Multiprocessors.CPU_Range (5));
 
-      accept Start (Buffer_H     : Buffer_Handler_Obj_Access;
-                    Buffer_Set   : Buffers.Buffer_Produce_Access)
-      do
-         Dest_Buffer := Buffer_Set;
-         Obj := Buffer_H;
-      end Start;
-      delay 0.0;
-      Src_Handle := new Buffers.Buffer_Handle_Type;
-      Obj.Consumption.Consumer.Get_Full_Buffer (Src_Handle.all);
-      loop
-         declare
-            Src_Data_Stream    : Base_Udp.Sequence_Type;
-            for Src_Data_Stream'Address use Buffers.Get_Address (Src_Handle.all);
+      select
+         accept Start (Buffer_H     : Buffer_Handler_Obj_Access;
+                       Buffer_Set   : Buffers.Buffer_Produce_Access)
+         do
+            Dest_Buffer := Buffer_Set;
+            Obj := Buffer_H;
+         end Start;
+         delay 0.0;
+         Src_Handle := new Buffers.Buffer_Handle_Type;
+         Obj.Consumption.Consumer.Get_Full_Buffer (Src_Handle.all);
+         loop
+            declare
+               Src_Data_Stream    : Base_Udp.Sequence_Type;
+               for Src_Data_Stream'Address use Buffers.Get_Address (Src_Handle.all);
 
-            Header      : Reliable_Udp.Header_Type;
-            Size        : Interfaces.Unsigned_32;
-            for Header'Address use Src_Data_Stream (Src_Index)'Address;
-            for Size'Address use Src_Data_Stream (Src_Index) (Base_Udp.Header_Size + 1)'Address;
-            New_Buffer  : Boolean renames Header.Ack;
-            New_Size    : Interfaces.Unsigned_32;
-         begin
-            Packet_Nb := Packet_Nb + 1;
+               Header      : Reliable_Udp.Header_Type;
+               Size        : Interfaces.Unsigned_32;
+               for Header'Address use Src_Data_Stream (Src_Index)'Address;
+               for Size'Address use Src_Data_Stream (Src_Index) (Base_Udp.Header_Size + 1)'Address;
+               New_Buffer  : Boolean renames Header.Ack;
+               New_Size    : Interfaces.Unsigned_32;
+            begin
+               Packet_Nb := Packet_Nb + 1;
 
-            if New_Buffer
-               or (Interfaces.Unsigned_32 (Dest_Index) > Buffer_Size -- Patch, should not happen
-                     and New_Buffer = False)
-            then
-               if Interfaces.Unsigned_32 (Dest_Index) > Buffer_Size
-                     and New_Buffer = False
+               if New_Buffer
+                  or (Interfaces.Unsigned_32 (Dest_Index) > Buffer_Size -- Patch, should not happen
+                        and New_Buffer = False)
                then
-                  Ada.Text_IO.Put_Line ("Index [ " & Interfaces.Unsigned_32 (Dest_Index)'Img &
-                     "] bigger than buffer size [ " & Buffer_Size'Img & "]");
-                  New_Size := Buffer_Size;
+                  if Interfaces.Unsigned_32 (Dest_Index) > Buffer_Size
+                        and New_Buffer = False
+                  then
+                     Ada.Text_IO.Put_Line ("Index [ " & Interfaces.Unsigned_32 (Dest_Index)'Img &
+                        "] bigger than buffer size [ " & Buffer_Size'Img & "]");
+                     New_Size := Buffer_Size;
+                  else
+                     New_Size := Size;
+                  end if;
+                  --  Loop if True which means that the buffer data is in next src_buffer
+                  --  and src_data_stream (declared above) has to be reload with new buffer.
+                  if New_Dest_Buffer (Obj,
+                                      Dest_Buffer,
+                                      New_Size,
+                                      Buffer_Size,
+                                      Src_Index,
+                                      Src_Handle,
+                                      Dest_Index,
+                                      Dest_Handle,
+                                      Src_Data_Stream) = False
+                  then
+                     Copy_Packet_Data_To_Dest
+                            (Obj,
+                             Buffer_Size,
+                             Src_Index,
+                             Src_Handle,
+                             Dest_Handle,
+                             Dest_Index,
+                             Src_Data_Stream);
+
+                  end if;
                else
-                  New_Size := Size;
-               end if;
-               --  Loop if True which means that the buffer data is in next src_buffer
-               --  and src_data_stream (declared above) has to be reload with new buffer.
-               if New_Dest_Buffer (Obj,
-                                   Dest_Buffer,
-                                   New_Size,
-                                   Buffer_Size,
-                                   Src_Index,
-                                   Src_Handle,
-                                   Dest_Index,
-                                   Dest_Handle,
-                                   Src_Data_Stream) = False
-               then
                   Copy_Packet_Data_To_Dest
                          (Obj,
                           Buffer_Size,
@@ -598,21 +629,13 @@ package body Buffer_Handling is
                           Dest_Handle,
                           Dest_Index,
                           Src_Data_Stream);
-
                end if;
-            else
-               Copy_Packet_Data_To_Dest
-                      (Obj,
-                       Buffer_Size,
-                       Src_Index,
-                       Src_Handle,
-                       Dest_Handle,
-                       Dest_Index,
-                       Src_Data_Stream);
-            end if;
 
-         end;
-      end loop;
+            end;
+         end loop;
+      or
+         terminate;
+      end select;
       exception
          when E : others =>
          Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &

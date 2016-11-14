@@ -12,12 +12,16 @@ procedure Udp_Consumer is
    Total_Bytes_Received : Interfaces.Unsigned_64 := 0;
    Buffer      : aliased Buffers.Local.Local_Buffer_Type;
    Client      : access Data_Transport.Udp_Socket_Client.Socket_Client_Task;
-   Options     : constant String := "buffer_name= host_name= port= watchdog= nb_cons=";
-   Host_Name   : Unbounded_String := To_Unbounded_String ("localhost");
+   Options     : constant String := "buffer_name= port= watchdog= nb_cons=";
    Buffer_Name : Unbounded_String := To_Unbounded_String ("blue");
    Cons_Nb     : Natural := 1;
 
-   Port     : GNAT.Sockets.Port_Type := 50000;
+   Port        : GNAT.Sockets.Port_Type := 50000;
+   --  AWS_Port    : constant Integer := 8080;
+
+   pragma Warnings (Off);
+   Disconnect  : Boolean   := False;
+   pragma Warnings (On);
 
    use type Buffers.Buffer_Size_Type;
 
@@ -33,6 +37,7 @@ procedure Udp_Consumer is
          Ada.Text_IO.Put_Line ("////////////\\\// DEBIT : "
             & Long_Float'Image (Long_Float (Total_Bytes_Received) / Long_Float (Elapsed_Sec) * 8.0));
          delay 5.0;
+         --  Disconnect := True;
          Elapsed_Sec := Elapsed_Sec + 5;
       end loop;
    end Debit_Task;
@@ -48,8 +53,6 @@ begin
             exit;
          when 'b' =>
             Buffer_Name := To_Unbounded_String (GNAT.Command_Line.Parameter);
-         when 'h' =>
-            Host_Name := To_Unbounded_String (GNAT.Command_Line.Parameter);
          when 'p' =>
             Port := GNAT.Sockets.Port_Type'Value (GNAT.Command_Line.Parameter);
          when 'n' =>
@@ -61,21 +64,24 @@ begin
    Buffer.Set_Name (To_String (Buffer_Name));
    Buffer.Initialise (10, Size => 409600000);
    for I in 1 .. Cons_Nb loop
-      Client := new Data_Transport.Udp_Socket_Client.Socket_Client_Task (Buffer'Unchecked_Access);
-      Client.Initialise (To_Unbounded_String ("cons" & I'Img), -- name of ratp consumer's internal shared buffer.
-                         To_Unbounded_String ("http://127.0.0.1:5678"),
-                         To_String (Host_Name),
-                         Port + GNAT.Sockets.Port_Type (I));
+      Client := new Data_Transport.Udp_Socket_Client.Socket_Client_Task
+                     (Buffer'Unchecked_Access);
+      Client.Initialise ("stare-2",
+                         Port + GNAT.Sockets.Port_Type (I),
+                         "cons" & I'Img); -- name of ratp consumer's internal shared buffer.
       Client.Connect;
    end loop;
 
    loop
-         Buffer.Block_Full;
-         select
-            Debit.Start;
-         else
-            null;
-         end select;
+      if Disconnect then
+         Client.Disconnect;
+      end if;
+      Buffer.Block_Full;
+      select
+         Debit.Start;
+      else
+         null;
+      end select;
       declare
          Buffer_Handle : Buffers.Buffer_Handle_Type;
          use type Interfaces.Unsigned_64;
@@ -99,4 +105,3 @@ begin
       end;
    end loop;
 end Udp_Consumer;
-

@@ -16,8 +16,6 @@ package Reliable_Udp is
    use type Interfaces.Unsigned_32;
    use type Interfaces.Unsigned_64;
 
-   Producer_Address    : GNAT.Sockets.Sock_Addr_Type;
-
    --  Stored in packet header to identify which packet was lost
    type Packet_Number_Type is mod 2 ** (Base_Udp.Header'Size - 1);
 
@@ -87,8 +85,9 @@ package Reliable_Udp is
 
    type Synchronized_Queue_Access is access Sync_Queue.Synchronized_Queue;
 
-   --  ** Move Send_Cmd_To_Producer somewhere else. :/
-   procedure Send_Cmd_To_Producer (Cmd : Packet_Number_Type);
+   --  ** Move Send_Cmd_To_Producer somewhere else.
+   procedure Send_Cmd_To_Producer (Cmd       : Reliable_Udp.Packet_Number_Type;
+                                   Prod_Addr : GNAT.Sockets.Sock_Addr_Type);
 
    procedure Append_Ack (Ack_Mgr          : in Ack_Management_Access;
                          First_D          : in Reliable_Udp.Packet_Number_Type;
@@ -99,7 +98,6 @@ package Reliable_Udp is
    task type Ack_Task is
       pragma Priority (System.Priority'First);
       entry Start (Ack_M   : in Ack_Management_Access);
-      entry Stop;
    end Ack_Task;
 
    --  Appends packets to Losses Array
@@ -112,7 +110,6 @@ package Reliable_Udp is
    task type Remove_Task is
       entry Initialize (Ack_M : Ack_Management_Access);
       entry Remove (Packet : in Packet_Number_Type);
-      entry Stop;
    end Remove_Task;
 
 end Reliable_Udp;

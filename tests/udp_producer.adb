@@ -63,9 +63,9 @@ begin
          Ada.Text_IO.Put_Line ("Prod [" & I'Img & " ] connected.");
       end loop Init_Connect_Servers;
 
-   Get_Fill_Buffers :
+   Fill_Buffers :
       loop
-         exit Get_Fill_Buffers when A_Task_Communication.Stop_Enabled;
+         exit Fill_Buffers when A_Task_Communication.Stop_Enabled;
          declare
             Buffer_Handle : Buffers.Buffer_Handle_Type;
          begin
@@ -84,7 +84,7 @@ begin
             Buffers.Set_Used_Bytes (Buffer_Handle, Buffers.Buffer_Size_Type (Used_Bytes));
             Buffer.Release_Free_Buffer (Buffer_Handle);
          end;
-      end loop Get_Fill_Buffers;
+      end loop Fill_Buffers;
 
    Ada.Text_IO.Put_Line ("[Disconnect]");
    --  Should disconnect all producers..

@@ -10,7 +10,9 @@ package body Reliable_Udp is
    --  Send_Cmd_To_Producer  --
    ----------------------------
 
-   procedure Send_Cmd_To_Producer (Cmd : Reliable_Udp.Packet_Number_Type) is
+   procedure Send_Cmd_To_Producer (Cmd       : Reliable_Udp.Packet_Number_Type;
+                                   Prod_Addr : GNAT.Sockets.Sock_Addr_Type)
+   is
       Data        : Ada.Streams.Stream_Element_Array (1 .. Reliable_Udp.Header_Type'Size);
       Head        : Reliable_Udp.Header_Type;
       Offset      : Ada.Streams.Stream_Element_Offset;
@@ -21,11 +23,11 @@ package body Reliable_Udp is
    begin
       Head.Seq_Nb := Cmd;
       Head.Ack    := False;
-      --  Add Socket to Consumer, to avoid initialization at each call.
+      --  Add Socket to Consumer, to avoid socket creation at each call.
       GNAT.Sockets.Create_Socket (Socket,
                                   GNAT.Sockets.Family_Inet,
                                   GNAT.Sockets.Socket_Datagram);
-      GNAT.Sockets.Send_Socket (Socket, Data, Offset, Producer_Address);
+      GNAT.Sockets.Send_Socket (Socket, Data, Offset, Prod_Addr);
    end Send_Cmd_To_Producer;
 
 
@@ -74,22 +76,26 @@ package body Reliable_Udp is
    begin
       --  System.Multiprocessors.Dispatching_Domains.Set_CPU
       --     (System.Multiprocessors.CPU_Range (6));
-      accept Start (Ack_M     : Ack_Management_Access;
-                    Ack_Fifo  : Synchronized_Queue_Access) do
-         Fifo  := Ack_Fifo;
-         Ack_Mgr  := Ack_M;
-      end Start;
-      loop
-         Fifo.Remove_First_Wait (Ack);
-         if Ack.First_D <= Ack.Last_D then
-            Append_Ack (Ack_Mgr, Ack.First_D, Ack.Last_D, Ack.From);
-         else
-            Append_Ack (Ack_Mgr, Ack.First_D, Base_Udp.Pkt_Max, Ack.From);
-            Append_Ack (Ack_Mgr,
-                        Reliable_Udp.Packet_Number_Type'First,
-                        Ack.Last_D, Ack.From);
-         end if;
-      end loop;
+      select
+         accept Start (Ack_M     : Ack_Management_Access;
+                       Ack_Fifo  : Synchronized_Queue_Access) do
+            Fifo  := Ack_Fifo;
+            Ack_Mgr  := Ack_M;
+         end Start;
+         loop
+            Fifo.Remove_First_Wait (Ack);
+            if Ack.First_D <= Ack.Last_D then
+               Append_Ack (Ack_Mgr, Ack.First_D, Ack.Last_D, Ack.From);
+            else
+               Append_Ack (Ack_Mgr, Ack.First_D, Base_Udp.Pkt_Max, Ack.From);
+               Append_Ack (Ack_Mgr,
+                           Reliable_Udp.Packet_Number_Type'First,
+                           Ack.Last_D, Ack.From);
+            end if;
+         end loop;
+      or
+         terminate;
+      end select;
    exception
       when E : others =>
          Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
@@ -110,18 +116,21 @@ package body Reliable_Udp is
    begin
       --  System.Multiprocessors.Dispatching_Domains.Set_CPU
       --     (System.Multiprocessors.CPU_Range (7));
-      accept Initialize (Ack_M : Ack_Management_Access) do
-         Ack_Mgr  := Ack_M;
-      end Initialize;
+      select
+         accept Initialize (Ack_M : Ack_Management_Access) do
+            Ack_Mgr  := Ack_M;
+         end Initialize;
+      or
+         terminate;
+      end select;
       loop
          select
-            accept Stop;
-            exit;
-         or
             accept Remove (Packet : in Packet_Number_Type) do
                Pkt   := Packet;
             end Remove;
             Ack_Mgr.Clear (Loss_Index_Type (Pkt));
+         or
+            terminate;
          end select;
       end loop;
    end Remove_Task;
@@ -155,15 +164,12 @@ package body Reliable_Udp is
                                   GNAT.Sockets.Family_Inet,
                                   GNAT.Sockets.Socket_Datagram);
 
-      accept Start (Ack_M : in Ack_Management_Access) do
-         Ack_Mgr  := Ack_M;
-      end Start;
-      loop
-         delay 0.0;
-         select
-            accept Stop;
-               exit;
-         else
+      select
+         accept Start (Ack_M : in Ack_Management_Access) do
+            Ack_Mgr  := Ack_M;
+         end Start;
+         loop
+            delay 0.0;
             if not Ack_Mgr.Is_Empty (Index) then
                Element := Ack_Mgr.Get (Index);
                if Ada.Real_Time.Clock - Element.Last_Ack >
@@ -177,8 +183,10 @@ package body Reliable_Udp is
                end if;
             end if;
             Index := Index + 1;
-         end select;
-      end loop;
+         end loop;
+      or
+         terminate;
+      end select;
    end Ack_Task;
 
 

@@ -1,6 +1,7 @@
 with Ada.Text_IO;
 with Ada.Calendar;
 with Ada.Exceptions;
+with Ada.Task_Identification;
 
 pragma Warnings (Off);
 with GNAT.Sockets.Thin;
@@ -22,6 +23,8 @@ package body Data_Transport.Udp_Socket_Server is
    task body Socket_Server_Task is
       Packet_Number  : Reliable_Udp.Packet_Number_Type := 0;
       Producer       : Producer_Access;
+
+      use Ada.Task_Identification;
    begin
       select
          accept Initialise
@@ -59,8 +62,12 @@ package body Data_Transport.Udp_Socket_Server is
          select
             accept Disconnect;
                GNAT.Sockets.Close_Socket (Producer.Socket);
-               delay 2.0; -- Enough for consumer socket to timeout.
-               Consumer_HandShake (Producer, 0);
+               Abort_Task (Current_Task);
+               --  delay 2.0; -- Enough for consumer socket to timeout.
+               --  Consumer_HandShake (Producer, 0);
+               --  loop
+               --     Rcv_Ack (Producer);
+               --  end loop;
                exit;
          else
             if Producer.Acquisition then
@@ -130,14 +137,6 @@ package body Data_Transport.Udp_Socket_Server is
          --  otherwise it'd be considered as a packet ack.
          delay 1.5;
       end loop;
-   exception
-      when E : others =>
-         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
-            Ada.Exceptions.Exception_Name (E)
-            & ASCII.LF & ASCII.ESC & "[33m"
-            & Ada.Exceptions.Exception_Message (E)
-            & ASCII.ESC & "[0m");
-         raise;
    end Consumer_HandShake;
 
 
@@ -179,14 +178,6 @@ package body Data_Transport.Udp_Socket_Server is
          Send_Packet (Producer, Producer.Last_Packets (Packet_Number).Data, True);
          Packet_Number := Packet_Number + 1;
          Send_All_Stream (Producer, Data, Packet_Number);
-      exception
-         when E : others =>
-            Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
-               Ada.Exceptions.Exception_Name (E)
-               & ASCII.LF & ASCII.ESC & "[33m"
-               & Ada.Exceptions.Exception_Message (E)
-               & ASCII.ESC & "[0m");
-            raise;
       end;
       Buffer_Set.Release_Full_Buffer (Buffer_Handle);
    end Send_Buffer_Data;
@@ -278,6 +269,8 @@ package body Data_Transport.Udp_Socket_Server is
 
       Is_Not_Msg  : Boolean renames Head.Ack;
       Message     : Reliable_Udp.Packet_Number_Type renames Head.Seq_Nb;
+
+      use Ada.Task_Identification;
    begin
       loop
          Res := GNAT.Sockets.Thin.C_Recv
@@ -304,9 +297,7 @@ package body Data_Transport.Udp_Socket_Server is
                Producer.Acquisition := True;
                exit;
             elsif Message = 0 then
-               Ada.Text_IO.Put_Line ("...Consumer disconnected...");
-               Producer.Acquisition := False;
-               exit;
+               Abort_Task (Current_Task);
             end if;
          end if;
       end loop;
