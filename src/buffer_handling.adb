@@ -50,7 +50,8 @@ package body Buffer_Handling is
                            --  End_Point            : String;
                            Logger               : Log4ada.Loggers.Logger_Access)
    is
-      --  Ret  : Interfaces.C.int;
+      Ret         : Interfaces.C.int;
+      Mlock_Error : exception;
 
       use type Common_Types.Buffer_Size_Type;
       use type Interfaces.C.int;
@@ -91,6 +92,13 @@ package body Buffer_Handling is
          --  Obj.Production.Producer.Get_Free_Buffer
          Obj.Buffer.Get_Free_Buffer
             (Obj.Buffer_Handler.Handlers (I).Handle);
+
+         Ret := mlock (Obj.Buffer_Handler.Handlers (I).Handle.Get_Address,
+                       Interfaces.C.size_t (Obj.Buffer_Handler.Handlers (I).Handle.Get_Available_Bytes));
+         if Ret = -1 then
+            Perror ("Mlock Error");
+            raise Mlock_Error;
+         end if;
       end loop;
       Logger.Debug_Out (ASCII.ESC & "[32;1m" & "Buffers   [✓]" & ASCII.ESC & "[0m");
 

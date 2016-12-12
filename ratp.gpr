@@ -25,6 +25,10 @@ project ratp is
                                      "-gnato"); 
   end Compiler;
 
-  for main use ("udp_producer.adb", "udp_consumer.adb", "consumer.adb");
+  for main use ("udp_producer.adb",
+                "udp_consumer.adb",
+                "consumer.adb",
+                "test_ctl_cons.adb",
+                "test_ctl_prod.adb");
 
 end ratp;
