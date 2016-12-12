@@ -11,9 +11,10 @@ with Buffers;
 with Base_Udp;
 with Reliable_Udp;
 with Buffer_Handling;
+with Log4ada.Loggers;
 
 package Data_Transport.Udp_Socket_Client is
-   pragma Optimize (Time);
+   --  pragma Optimize (Time);
 
    use GNAT.Sockets;
 
@@ -26,7 +27,7 @@ package Data_Transport.Udp_Socket_Client is
 
       entry Initialise (Host       : String;
                         Port       : GNAT.Sockets.Port_Type;
-                        Buf_Name   : String);
+                        Logger     : Log4ada.Loggers.Logger_Access);
       overriding entry Connect;
       overriding entry Disconnect;
    end Socket_Client_Task;
@@ -52,7 +53,8 @@ package Data_Transport.Udp_Socket_Client is
 
    --  A "connect" alternative for udp. Enables to wait for producer.
    --  Returns the msg number sent by client. 1 = connect, 0 = Disconnect
-   function Wait_Producer_HandShake (Consumer  : Consumer_Access) return Reliable_Udp.Packet_Number_Type;
+   function Wait_Producer_HandShake (Consumer  : Consumer_Access;
+                                     Logger    : Log4ada.Loggers.Logger_Access) return Reliable_Udp.Packet_Number_Type;
 
    --  Main part of algorithm, does all the processing once a packet is receive.
    procedure Process_Packet (Consumer     : Consumer_Access;
@@ -66,7 +68,8 @@ package Data_Transport.Udp_Socket_Client is
    procedure Parse_Arguments (Consumer : Consumer_Access);
 
    --  Starts all tasks used by client.
-   procedure Init_Consumer (Consumer   : Consumer_Access);
+   procedure Init_Consumer (Consumer : Consumer_Access;
+                            Logger   : Log4ada.Loggers.Logger_Access);
 
    --  Creates socket and Sets Socket Opt.
    procedure Init_Udp (Server       : in out Socket_Type;

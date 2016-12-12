@@ -9,6 +9,7 @@ with Buffers;
 
 with Reliable_Udp;
 with Base_Udp;
+with Log4ada.Loggers;
 
 package Data_Transport.Udp_Socket_Server is
 
@@ -19,7 +20,8 @@ package Data_Transport.Udp_Socket_Server is
    task type Socket_Server_Task (Buffer_Set : Buffers.Buffer_Consume_Access)
          is new Transport_Layer_Interface with
       entry Initialise (Network_Interface : String;
-                        Port              : GNAT.Sockets.Port_Type);
+                        Port              : in out GNAT.Sockets.Port_Type;
+                        Logger            : Log4ada.Loggers.Logger_Access);
       overriding entry Connect;
       overriding entry Disconnect;
    end Socket_Server_Task;
@@ -28,6 +30,9 @@ package Data_Transport.Udp_Socket_Server is
 
    procedure Free is new Ada.Unchecked_Deallocation (Socket_Server_Task,
                                                      Socket_Server_Access);
+
+   --  Returns an available Port, (utilities) could be moved to P42 ?
+   function Get_Free_Port return GNAT.Sockets.Port_Type;
 
    --  Gets Full Buffers, sends the Buffer Size and then All Stream
    --  and finally releases buffer.
@@ -58,7 +63,8 @@ package Data_Transport.Udp_Socket_Server is
    --  Sends messages to producer, wait for its reply
    --  with the same message to start / stop acquisition
    procedure Consumer_HandShake (Producer : Producer_Access;
-                                 Msg      : Reliable_Udp.Packet_Number_Type);
+                                 Msg      : Reliable_Udp.Packet_Number_Type;
+                                 Logger   : Log4ada.Loggers.Logger_Access);
 
    function To_Int is
       new Ada.Unchecked_Conversion (GNAT.Sockets.Socket_Type,

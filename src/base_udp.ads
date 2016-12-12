@@ -48,9 +48,9 @@ package Base_Udp is
          Web_Interface  : Web_Interfaces.Web_Interface_Access :=
                            new Web_Interfaces.Web_Interface;
 
-         --  Used by Buffers' Set_Name
-         Buffer_Name    : Ada.Strings.Unbounded.Unbounded_String :=
-                          Ada.Strings.Unbounded.To_Unbounded_String ("toto");
+         --  --  Used by Buffers' Set_Name
+         --  Buffer_Name    : Ada.Strings.Unbounded.Unbounded_String :=
+         --                   Ada.Strings.Unbounded.To_Unbounded_String ("toto");
 
          --  Consumer Addr
          End_Point      : Ada.Strings.Unbounded.Unbounded_String :=

@@ -23,22 +23,48 @@ package body Data_Transport.Udp_Socket_Server is
    task body Socket_Server_Task is
       Packet_Number  : Reliable_Udp.Packet_Number_Type := 0;
       Producer       : Producer_Access;
+      Logger         : Log4ada.Loggers.Logger_Access;
 
       use Ada.Task_Identification;
+      use type GNAT.Sockets.Port_Type;
    begin
       select
          accept Initialise
            (Network_Interface : String;
-            Port              : GNAT.Sockets.Port_Type)
+            Port              : in out GNAT.Sockets.Port_Type;
+            Logger            : Log4ada.Loggers.Logger_Access)
          do
+            Logger.Debug_Out ("Initialising Consumer step 1, Addr : " & Network_Interface);
             Producer := new Data_Transport.Udp_Socket_Server.Producer_Type;
-            Producer.Address.Addr := GNAT.Sockets.Addresses
-                                    (GNAT.Sockets.Get_Host_By_Name (Network_Interface));
+            Logger.Debug_Out ("Initialising Consumer step 2");
+            Logger.Debug_Out ("Network Interface : " & Network_Interface &
+                              "Port : " & GNAT.Sockets.Port_Type'Image (Port));
+            if Network_Interface = "" then
+               Producer.Address.Addr := GNAT.Sockets.Any_Inet_Addr;
+            else
+               Producer.Address.Addr := GNAT.Sockets.Inet_Addr (Network_Interface);
+            end if;
             Producer.Address.Port := Port;
+            --  Producer.Address.Addr := GNAT.Sockets.Addresses
+            --                          (GNAT.Sockets.Get_Host_By_Name (Network_Interface));
             GNAT.Sockets.Create_Socket
                (Producer.Socket,
                 GNAT.Sockets.Family_Inet,
                 GNAT.Sockets.Socket_Datagram);
+
+            if Port = 0 then
+               Producer.Address.Port := Get_Free_Port;
+               Logger.Debug_Out ("PORT :" & Producer.Address.Port'Img);
+               Port := Producer.Address.Port;
+               --  declare
+               --     New_Address : constant GNAT.Sockets.Sock_Addr_Type :=
+               --       GNAT.Sockets.Get_Socket_Name (Producer.Socket);
+               --  begin
+               --     Port := New_Address.Port;
+               --  end;
+            end if;
+            Socket_Server_Task.Logger := Logger;
+            Logger.Debug_Out ("Consumer is Initialised");
          end Initialise;
       or
          terminate;
@@ -46,6 +72,7 @@ package body Data_Transport.Udp_Socket_Server is
       loop
          select
             accept Connect;
+            Logger.Debug_Out ("Consumer connecting...");
             exit;
          or
             terminate;
@@ -53,21 +80,19 @@ package body Data_Transport.Udp_Socket_Server is
       end loop;
 
       <<HandShake>>
-      Consumer_HandShake (Producer, 1);
+      Logger.Debug_Out ("HandShake");
+      Consumer_HandShake (Producer, 1, Logger);
       Producer.Acquisition := True;
       delay 0.0001;
-      Ada.Text_IO.Put_Line ("Consumer ready, start sending packets...");
+      Logger.Debug_Out ("Consumer ready, start sending packets...");
+      Logger.Debug_Out ("HandShake OK");
 
       loop
          select
+            --  Consumer will Timeout and Disconnect automatically.
             accept Disconnect;
                GNAT.Sockets.Close_Socket (Producer.Socket);
                Abort_Task (Current_Task);
-               --  delay 2.0; -- Enough for consumer socket to timeout.
-               --  Consumer_HandShake (Producer, 0);
-               --  loop
-               --     Rcv_Ack (Producer);
-               --  end loop;
                exit;
          else
             if Producer.Acquisition then
@@ -104,13 +129,39 @@ package body Data_Transport.Udp_Socket_Server is
             & ASCII.ESC & "[0m");
    end Socket_Server_Task;
 
+   ---------------------
+   --  Get_Free_Port  --
+   ---------------------
 
-   ------------------------
+   function Get_Free_Port return GNAT.Sockets.Port_Type is
+      Socket  : GNAT.Sockets.Socket_Type;
+      Address : GNAT.Sockets.Sock_Addr_Type;
+   begin
+      Address.Addr := GNAT.Sockets.Inet_Addr ("127.0.0.1");
+      Address.Port := 0;
+      GNAT.Sockets.Create_Socket
+         (Socket,
+          GNAT.Sockets.Family_Inet,
+          GNAT.Sockets.Socket_Datagram);
+
+      GNAT.Sockets.Bind_Socket (Socket, Address);
+
+      declare
+         New_Address : constant GNAT.Sockets.Sock_Addr_Type :=
+           GNAT.Sockets.Get_Socket_Name (Socket);
+      begin
+         return New_Address.Port;
+      end;
+   end Get_Free_Port;
+
+   --------------------------
    --  Consumer_HandShake  --
-   ------------------------
+   --------------------------
 
    procedure Consumer_HandShake (Producer : Producer_Access;
-                                 Msg      : Reliable_Udp.Packet_Number_Type) is
+                                 Msg      : Reliable_Udp.Packet_Number_Type;
+                                 Logger   : Log4ada.Loggers.Logger_Access)
+   is
       Send_Data, Recv_Data : Base_Udp.Packet_Stream;
       Send_Head, Recv_Head : Reliable_Udp.Header_Type;
 
@@ -122,8 +173,10 @@ package body Data_Transport.Udp_Socket_Server is
    begin
       Send_Msg := Msg;
       loop
+         Logger.Debug_Out ("Send_Packet | Addr : " & GNAT.Sockets.Image (Producer.Address.Addr));
          Send_Packet (Producer => Producer,
                       Payload => Send_Data);
+         Logger.Debug_Out ("Send_Packet OK");
          --  Wait a little bit for consumer's response.
          delay 0.1;
          exit when GNAT.Sockets.Thin.C_Recv
@@ -180,6 +233,13 @@ package body Data_Transport.Udp_Socket_Server is
          Send_All_Stream (Producer, Data, Packet_Number);
       end;
       Buffer_Set.Release_Full_Buffer (Buffer_Handle);
+      exception
+         when E : others =>
+            Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+               Ada.Exceptions.Exception_Name (E)
+               & ASCII.LF & ASCII.ESC & "[33m"
+               & Ada.Exceptions.Exception_Message (E)
+               & ASCII.ESC & "[0m");
    end Send_Buffer_Data;
 
 
@@ -200,6 +260,7 @@ package body Data_Transport.Udp_Socket_Server is
    begin
       loop
          Rcv_Ack (Producer);
+         --  delay 0.000000001; --  DBG
          declare
             Head     : Ada.Streams.Stream_Element_Array (1 .. 2);
             Header   : Reliable_Udp.Header_Type := (Ack => False,
@@ -297,6 +358,7 @@ package body Data_Transport.Udp_Socket_Server is
                Producer.Acquisition := True;
                exit;
             elsif Message = 0 then
+               Ada.Text_IO.Put_Line ("******* Consumer Disconnected *******");
                Abort_Task (Current_Task);
             end if;
          end if;

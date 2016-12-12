@@ -1,12 +1,16 @@
-with Interfaces;
+with Ada.Text_IO;
 with Ada.Strings.Unbounded;
-with Data_Transport.Udp_Socket_Server;
-with Buffers.Local;
+with Ada.Exceptions;
 with GNAT.Sockets;
 with GNAT.Command_Line;
-with Ada.Text_IO;
+with Interfaces;
 
+with Data_Transport.Udp_Socket_Server;
+
+with Log4ada.Appenders.Consoles;
+with Buffers.Local;
 with Utiles_Task;
+with Log4ada.Loggers;
 
 procedure Udp_Producer is
    use type Buffers.Buffer_Size_Type;
@@ -18,20 +22,27 @@ procedure Udp_Producer is
    Buffer               : aliased Buffers.Local.Local_Buffer_Type;
    Buffer_Name          : Unbounded_String := To_Unbounded_String ("blue");
    Buf_Num              : Integer := 0;
-   Used_Bytes           : constant Interfaces.Unsigned_64 := 409600000;
+   Used_Bytes           : constant Interfaces.Unsigned_64 := 409600;
    type Data_Array is array (1 .. Used_Bytes / Integer'Size) of Integer;
 
    Server               : access Data_Transport.Udp_Socket_Server.Socket_Server_Task;
-   Port                 : GNAT.Sockets.Port_Type := 50000;
-   Network_Interface    : Unbounded_String := To_Unbounded_String ("stare-2");
+   Port                 : GNAT.Sockets.Port_Type := 0;
+   --  Consumer ip
+   Network_Interface    : Unbounded_String := To_Unbounded_String ("10.0.0.2");
    Prod_Nb              : Natural := 1;
 
+   Logger               : aliased Log4ada.Loggers.Logger_Type;
+   Console              : aliased Log4ada.Appenders.Consoles.Console_Type;
    Options              : constant String := "buffer_name= port= hostname= nb_prod=";
 
    A_Task_Communication : aliased Utiles_Task.Task_Communication;
    A_Terminate_Task     : Utiles_Task.Terminate_Task (A_Task_Communication'Access);
 
 begin
+   Logger.Set_Level (Log4ada.Debug);
+   Logger.Set_Name ("Udp_Producer");
+   Logger.Add_Appender (Console'Unchecked_Access);
+
    loop
       case GNAT.Command_Line.Getopt (Options) is
          when ASCII.NUL =>
@@ -57,8 +68,11 @@ begin
       for I in 1 .. Prod_Nb loop
          Server := new Data_Transport.Udp_Socket_Server.Socket_Server_Task
                      (Buffer'Unchecked_Access);
-         Server.Initialise (To_String (Network_Interface), Port + GNAT.Sockets.Port_Type (I));
-         Ada.Text_IO.Put_Line ("Prod [" & I'Img & " ] Port :" & Natural (Port + GNAT.Sockets.Port_Type (I))'Img);
+         Server.Initialise (To_String (Network_Interface),
+                            Port,
+                            Logger'Unchecked_Access);
+         Ada.Text_IO.Put_Line ("Prod [" & I'Img & " ] Port :"
+            & Port'Img);
          Server.Connect;
          Ada.Text_IO.Put_Line ("Prod [" & I'Img & " ] connected.");
       end loop Init_Connect_Servers;
@@ -90,4 +104,11 @@ begin
    --  Should disconnect all producers..
    Server.Disconnect;
    Ada.Text_IO.Put_Line ("Exit");
+exception
+   when E : others =>
+      Logger.Error_Out (ASCII.ESC & "[31m" & "Exception : " &
+         Ada.Exceptions.Exception_Name (E)
+         & ASCII.LF & ASCII.ESC & "[33m"
+         & Ada.Exceptions.Exception_Message (E)
+         & ASCII.ESC & "[0m");
 end Udp_Producer;

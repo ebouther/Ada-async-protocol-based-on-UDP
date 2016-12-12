@@ -5,8 +5,10 @@ with Interfaces.C;
 with Reliable_Udp;
 with Base_Udp;
 
-with Buffers.Shared.Produce;
-with Buffers.Shared.Consume;
+with Buffers.Local;
+--  with Buffers.Shared.Produce;
+--  with Buffers.Shared.Consume;
+with Log4ada.Loggers;
 
 package Buffer_Handling is
 
@@ -62,8 +64,9 @@ package Buffer_Handling is
    --  Initialize "PMH_Buf_Nb" of Buffer and attach a buffer
    --  to each Handler of Handle_Array
    procedure Init_Buffers (Obj         : Buffer_Handler_Obj_Access;
-                           Buffer_Name : String;
-                           End_Point   : String);
+                           --  Buffer_Name : String;
+                           --  End_Point   : String;
+                           Logger      : Log4ada.Loggers.Logger_Access);
 
    --  Stop Production and Consumption Message_Handling
    procedure Finalize_Buffers (Obj  : Buffer_Handler_Obj_Access);
@@ -149,7 +152,8 @@ package Buffer_Handling is
 
    task type Handle_Data_Task is
       entry Start (Buffer_H   : Buffer_Handler_Obj_Access;
-                   Buffer_Set : Buffers.Buffer_Produce_Access);
+                   Buffer_Set : Buffers.Buffer_Produce_Access;
+                   Logger     : Log4ada.Loggers.Logger_Access);
    end Handle_Data_Task;
 
 private
@@ -157,10 +161,10 @@ private
    type Buffer_Handler_Obj is limited
       record
          Buffer_Handler    : Buffer_Handler_Type;
+         --  Consumption   : Buffers.Shared.Consume.Consume_Couple_Type;
+         --  Production    : Buffers.Shared.Produce.Produce_Couple_Type;
 
-         Consumption       : Buffers.Shared.Consume.Consume_Couple_Type;
-
-         Production        : Buffers.Shared.Produce.Produce_Couple_Type;
+         Buffer            : Buffers.Local.Local_Buffer_Type;
       end record;
 
 end Buffer_Handling;

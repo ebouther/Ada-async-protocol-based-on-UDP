@@ -4,10 +4,10 @@ all: $(NAME)
 
 $(NAME):
 	mkdir -p obj/ bin/
-	gprbuild -P udp.gpr
+	gprbuild -P ratp.gpr
 
 clean:
-	gprclean -P udp.gpr
+	gprclean -P ratp.gpr
 	make -C narval_ratp/ clean
 	rm -rf obj/ bin/ lib/
 

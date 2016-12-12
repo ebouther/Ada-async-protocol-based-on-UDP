@@ -5,6 +5,9 @@ with GNAT.Command_Line;
 with Interfaces;
 with Ada.Text_IO;
 with Ada.Strings.Unbounded;
+with Ada.Exceptions;
+with Log4ada.Loggers;
+with Log4ada.Appenders.Consoles;
 
 procedure Udp_Consumer is
    use Ada.Strings.Unbounded;
@@ -12,12 +15,17 @@ procedure Udp_Consumer is
    Total_Bytes_Received : Interfaces.Unsigned_64 := 0;
    Buffer      : aliased Buffers.Local.Local_Buffer_Type;
    Client      : access Data_Transport.Udp_Socket_Client.Socket_Client_Task;
-   Options     : constant String := "buffer_name= port= watchdog= nb_cons=";
+   Options     : constant String := "buffer_name= port= hostname= watchdog= nb_cons=";
    Buffer_Name : Unbounded_String := To_Unbounded_String ("blue");
    Cons_Nb     : Natural := 1;
 
-   Port        : GNAT.Sockets.Port_Type := 50000;
+   Logger      : aliased Log4ada.Loggers.Logger_Type;
+   Console     : aliased Log4ada.Appenders.Consoles.Console_Type;
+   Port        : GNAT.Sockets.Port_Type := 0;
    --  AWS_Port    : constant Integer := 8080;
+
+   --  Consumer ip
+   Network_Interface    : Unbounded_String := To_Unbounded_String ("10.0.0.3");
 
    pragma Warnings (Off);
    Disconnect  : Boolean   := False;
@@ -46,6 +54,9 @@ procedure Udp_Consumer is
    use Ada.Strings.Unbounded;
    use type GNAT.Sockets.Port_Type;
 begin
+   Logger.Set_Level (Log4ada.Debug);
+   Logger.Set_Name ("Udp_Producer");
+   Logger.Add_Appender (Console'Unchecked_Access);
 
    loop
       case GNAT.Command_Line.Getopt (Options) is
@@ -57,6 +68,9 @@ begin
             Port := GNAT.Sockets.Port_Type'Value (GNAT.Command_Line.Parameter);
          when 'n' =>
             Cons_Nb := Natural'Value (GNAT.Command_Line.Parameter);
+         when 'h' =>
+            Network_Interface :=
+              To_Unbounded_String (GNAT.Command_Line.Parameter);
          when others =>
             raise Program_Error;
       end case;
@@ -66,9 +80,9 @@ begin
    for I in 1 .. Cons_Nb loop
       Client := new Data_Transport.Udp_Socket_Client.Socket_Client_Task
                      (Buffer'Unchecked_Access);
-      Client.Initialise ("stare-2",
-                         Port + GNAT.Sockets.Port_Type (I),
-                         "cons" & I'Img); -- name of ratp consumer's internal shared buffer.
+      Client.Initialise (To_String (Network_Interface),
+                         Port,
+                         Logger'Unchecked_Access); -- name of ratp consumer's internal shared buffer.
       Client.Connect;
    end loop;
 
@@ -104,4 +118,12 @@ begin
          Buffer.Release_Full_Buffer (Buffer_Handle);
       end;
    end loop;
+exception
+   when E : others =>
+      Logger.Error_Out (ASCII.ESC & "[31m" & "Exception : " &
+         Ada.Exceptions.Exception_Name (E)
+         & ASCII.LF & ASCII.ESC & "[33m"
+         & Ada.Exceptions.Exception_Message (E)
+         & ASCII.ESC & "[0m");
+
 end Udp_Consumer;

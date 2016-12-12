@@ -20,6 +20,8 @@ package body Data_Transport.Udp_Socket_Client is
 
 
    task body Socket_Client_Task is
+      Logger            : Log4ada.Loggers.Logger_Access;
+
       Handle_Data       : Buffer_Handling.Handle_Data_Task;
 
       Server            : Socket_Type;
@@ -46,27 +48,40 @@ package body Data_Transport.Udp_Socket_Client is
       select
          accept Initialise (Host       : String;
                             Port       : GNAT.Sockets.Port_Type;
-                            Buf_Name   : String) do
+                            Logger     : Log4ada.Loggers.Logger_Access)
+         do
+            Socket_Client_Task.Logger := Logger;
 
-
-            Consumer.Addr := GNAT.Sockets.Addresses
-                      (GNAT.Sockets.Get_Host_By_Name (Host));
+            Consumer.Addr := GNAT.Sockets.Inet_Addr (Host);
+               --  GNAT.Sockets.Addresses
+               --         (GNAT.Sockets.Get_Host_By_Name (Host));
             Consumer.Port := Port;
-            Consumer.Buffer_Name := To_Unbounded_String (Buf_Name);
+
+            --  Consumer.Buffer_Name := To_Unbounded_String (Buf_Name);
             --  Consumer.Addr := Any_Inet_Addr;
             --  Consumer.End_Point := End_Point;
 
             --  Web_Interfaces.Set_Port (Consumer.Web_Interface);
             --  Web_Interfaces.Set_URI (Consumer.Web_Interface);
 
-            Init_Consumer (Consumer);
+            Logger.Debug_Out ("Initialising Producer Init_Consumer");
+            Init_Consumer (Consumer, Logger);
+            Logger.Debug_Out ("Initialising Producer Init_Consumer OK");
+
+            Logger.Debug_Out ("Initialising Producer | PORT :" &
+               GNAT.Sockets.Port_Type'Image (Port) & " HOST : " & Host);
             Init_Udp (Server, Consumer.Addr, Consumer.Port);
+            Logger.Debug_Out ("Initialising Producer Init_Udp OK");
 
             if Buffer_Set /= null then
-               Handle_Data.Start (Consumer.Buffer_Handler, Buffer_Set);
+               Logger.Debug_Out ("Initialising Producer Handle_Data");
+               Handle_Data.Start (Consumer.Buffer_Handler, Buffer_Set, Logger);
+               Ada.Text_IO.Put_Line ("Initialising Producer Handle_Data OK");
             end if;
 
             Consumer.PMH_Buffer_Task.Start (Consumer.Buffer_Handler);
+
+            Ada.Text_IO.Put_Line ("Initialising Producer |PMH_Buffer_Task started");
 
          end Initialise;
       or
@@ -75,6 +90,7 @@ package body Data_Transport.Udp_Socket_Client is
       loop
          select
             accept Connect;
+               Ada.Text_IO.Put_Line ("Producer connecting");
                exit;
          or
             terminate;
@@ -83,7 +99,7 @@ package body Data_Transport.Udp_Socket_Client is
 
       <<HandShake>>
       Ada.Text_IO.Put_Line ("...Waiting for Producer...");
-      if Wait_Producer_HandShake (Consumer) = 0 then
+      if Wait_Producer_HandShake (Consumer, Logger) = 0 then
          Ada.Text_IO.Put_Line ("Producer disconnected");
       end if;
       Ada.Text_IO.Put_Line ("Producer is ready...");
@@ -91,8 +107,10 @@ package body Data_Transport.Udp_Socket_Client is
       loop
          select
             accept Disconnect;
-               Ada.Text_IO.Put_Line ("[Disconnect]");
-               Reliable_Udp.Send_Cmd_To_Producer (0, Web_Interfaces.Get_Prod_Addr (Consumer.Web_Interface));
+               Logger.Debug_Out ("Producer disconnecting");
+               --  No HandShake, packet could be dropped
+               Reliable_Udp.Send_Cmd_To_Producer
+                  (0, Web_Interfaces.Get_Prod_Addr (Consumer.Web_Interface));
                Consumer.Log_Task.Stop;
                exit;
          else
@@ -117,7 +135,7 @@ package body Data_Transport.Udp_Socket_Client is
                Recv_Offset := Recv_Offset + 1;
             exception
                when Socket_Error =>
-                  Ada.Text_IO.Put_Line ("Socket Timeout");
+                  Logger.Error_Out ("Socket Timeout");
                   if Acquisition then
                      Ada.Text_IO.Put_Line ("Producer disconnected");
                      Consumer.Log_Task.Stop;
@@ -138,7 +156,7 @@ package body Data_Transport.Udp_Socket_Client is
       Ada.Text_IO.Put_Line ("Consumer stopped");
       exception
          when E : others =>
-            Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+            Logger.Error_Out (ASCII.ESC & "[31m" & "Exception : " &
                Ada.Exceptions.Exception_Name (E)
                & ASCII.LF & ASCII.ESC & "[33m"
                & Ada.Exceptions.Exception_Message (E)
@@ -150,12 +168,13 @@ package body Data_Transport.Udp_Socket_Client is
    --  Init_Consumer  --
    ---------------------
 
-   procedure Init_Consumer (Consumer : Consumer_Access) is
+   procedure Init_Consumer (Consumer : Consumer_Access;
+                            Logger   : Log4ada.Loggers.Logger_Access) is
 
       --  Log_File : Ada.Text_IO.File_Type;
       use Ada.Strings.Unbounded;
    begin
-      Parse_Arguments (Consumer);
+      --  Parse_Arguments (Consumer);
 
       --  Ada.Text_IO.Create (Log_File, Ada.Text_IO.Out_File, "log.csv");
       --  Ada.Text_IO.Put_Line (Log_File,
@@ -166,20 +185,29 @@ package body Data_Transport.Udp_Socket_Client is
       --  Ada.Text_IO.Close (Log_File);
 
 
+      Logger.Debug_Out ("Init Consumer step 1");
       --  Web_Interfaces.Init_WebServer (Consumer.Web_Interface);
 
       Consumer.Release_Buf_Task.Start (Consumer.Buffer_Handler);
+      Logger.Debug_Out ("Init Consumer step 2");
       Consumer.Ack_Task.Start (Consumer.Ack_Mgr);
+      Logger.Debug_Out ("Init Consumer step 3");
       Consumer.Check_Integrity_Task.Start (Consumer.Buffer_Handler);
+      Logger.Debug_Out ("Init Consumer step 4");
 
       Buffer_Handling.Init_Buffers (Consumer.Buffer_Handler,
-                                    To_String (Consumer.Buffer_Name),
-                                    To_String (Consumer.End_Point));
+                                    --  To_String (Consumer.Buffer_Name),
+                                    --  To_String (Consumer.End_Point),
+                                    Logger);
 
+      Logger.Debug_Out ("Init Consumer step 5");
       Consumer.Log_Task.Start (Consumer);
+      Logger.Debug_Out ("Init Consumer step 6");
 
       Consumer.Append_Task.Start (Consumer.Ack_Mgr, Consumer.Ack_Fifo);
+      Logger.Debug_Out ("Init Consumer step 7");
       Consumer.Remove_Task.Initialize (Consumer.Ack_Mgr);
+      Logger.Debug_Out ("Init Consumer step 8");
 
    end Init_Consumer;
 
@@ -199,8 +227,8 @@ package body Data_Transport.Udp_Socket_Client is
                Consumer.End_Point := Ada.Strings.Unbounded.To_Unbounded_String (Parameter);
             elsif Full_Switch = "-aws-port" then
                Consumer.AWS_Port := Integer'Value (Parameter);
-            elsif Full_Switch = "-buf-name" then
-               Consumer.Buffer_Name := Ada.Strings.Unbounded.To_Unbounded_String (Parameter);
+            --  elsif Full_Switch = "-buf-name" then
+            --     Consumer.Buffer_Name := Ada.Strings.Unbounded.To_Unbounded_String (Parameter);
             elsif Full_Switch = "-rtt-us-max" then
                Base_Udp.RTT_US_Max := Integer'Value (Parameter);
             elsif Full_Switch = "-udp-port" then
@@ -311,7 +339,8 @@ package body Data_Transport.Udp_Socket_Client is
    --  Wait_Producer_HandShake  --
    -------------------------------
 
-   function Wait_Producer_HandShake (Consumer  : Consumer_Access) return Reliable_Udp.Packet_Number_Type
+   function Wait_Producer_HandShake (Consumer  : Consumer_Access;
+                                     Logger    : Log4ada.Loggers.Logger_Access) return Reliable_Udp.Packet_Number_Type
    is
       Socket   : Socket_Type;
       Data     : Base_Udp.Packet_Stream;
@@ -328,17 +357,21 @@ package body Data_Transport.Udp_Socket_Client is
       use type Reliable_Udp.Packet_Number_Type;
       pragma Unreferenced (Last);
    begin
+      Logger.Debug_Out ("Wait_Producer_HandShake Init_Udp");
       Init_Udp (Server => Socket,
                 Host => Consumer.Addr,
                 Port => Consumer.Port,
                 TimeOut_Opt => False);
+      Logger.Debug_Out ("Init_Udp OK");
       GNAT.Sockets.Receive_Socket (Socket, Data, Last, From);
+      Logger.Debug_Out ("Receive_Socket OK");
       if Msg = 1 then
          Web_Interfaces.Set_Prod_Addr
             (Consumer.Web_Interface, From);
       end if;
       Head.Ack := False;
       GNAT.Sockets.Send_Socket (Socket, Data, Last, From);
+      Logger.Debug_Out ("Send_Socket OK");
       GNAT.Sockets.Close_Socket (Socket);
       return Msg;
    exception

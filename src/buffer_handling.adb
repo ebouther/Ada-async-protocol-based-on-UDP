@@ -1,10 +1,10 @@
 with Ada.Text_IO;
 with Ada.Exceptions;
-with Ada.Calendar;
+--  with Ada.Calendar;
 --  with System.Multiprocessors.Dispatching_Domains;
 with System.Storage_Elements;
 
-with Dcod_Pmh_Service.Client;
+--  with Dcod_Pmh_Service.Client;
 with Common_Types;
 
 package body Buffer_Handling is
@@ -20,8 +20,10 @@ package body Buffer_Handling is
 
       use Packet_Buffers;
    begin
+      Ada.Text_IO.Put_Line ("Get Full Buffer");
       select
-         Obj.Consumption.Consumer.Get_Full_Buffer (Handle);
+         --  Obj.Consumption.Consumer.Get_Full_Buffer (Handle);
+         Obj.Buffer.Get_Full_Buffer (Handle);
       or
          delay 5.0;
          Ada.Text_IO.Put_Line
@@ -29,7 +31,8 @@ package body Buffer_Handling is
          return;
       end select;
 
-      Obj.Consumption.Consumer.Release_Full_Buffer (Handle);
+      --  Obj.Consumption.Consumer.Release_Full_Buffer (Handle);
+      Obj.Buffer.Release_Full_Buffer (Handle);
    exception
       when E : others =>
          Ada.Text_IO.Put_Line ("exception : " &
@@ -43,34 +46,41 @@ package body Buffer_Handling is
    --------------------
 
    procedure Init_Buffers (Obj                  : Buffer_Handler_Obj_Access;
-                           Buffer_Name          : String;
-                           End_Point            : String) is
-      Ret  : Interfaces.C.int;
+                           --  Buffer_Name          : String;
+                           --  End_Point            : String;
+                           Logger               : Log4ada.Loggers.Logger_Access)
+   is
+      --  Ret  : Interfaces.C.int;
 
       use type Common_Types.Buffer_Size_Type;
       use type Interfaces.C.int;
    begin
-
-      Ret := mlockall (2);
-      if Ret = -1 then
-         Perror ("Mlockall Error");
-      end if;
+      Logger.Debug_Out ("Init_Buffers");
+      --  Ret := mlockall (2);
+      --  if Ret = -1 then
+      --     Perror ("Mlockall Error");
+      --  end if;
 
       --  Need a "+ 1" otherwise it cannot get a
       --  free buffer in Release_Full_Buf
-      Dcod_Pmh_Service.Client.Provide_Buffer (Name => Buffer_Name,
-                                              Size => Base_Udp.Buffer_Size,
-                                              Depth => Base_Udp.PMH_Buf_Nb + 1,
-                                              Endpoint => End_Point);
 
-      Ada.Text_IO.Put_Line ("Buffer   Size :" & Base_Udp.Buffer_Size'Img
+      --  Dcod_Pmh_Service.Client.Provide_Buffer (Name => Buffer_Name,
+      --                                          Size => Base_Udp.Buffer_Size,
+      --                                          Depth => Base_Udp.PMH_Buf_Nb + 1,
+      --                                          Endpoint => End_Point);
+
+      Obj.Buffer.Initialise (Base_Udp.PMH_Buf_Nb + 1,
+                             Size => Buffers.Buffer_Size_Type (Base_Udp.Buffer_Size));
+
+      Logger.Debug_Out ("Buffer   Size :" & Base_Udp.Buffer_Size'Img
          & " Depth : " & Integer (Base_Udp.PMH_Buf_Nb + 1)'Img);
 
-      Obj.Production.Producer.Set_Name (Buffer_Name);
-      Obj.Production.Message_Handling.Start (1.0);
-      Obj.Consumption.Consumer.Set_Name (Buffer_Name);
-      Obj.Consumption.Message_Handling.Start (1.0);
-      Obj.Production.Producer.Is_Initialised;
+      --  Obj.Production.Producer.Set_Name (Buffer_Name);
+      --  Obj.Production.Message_Handling.Start (1.0);
+      --  Obj.Consumption.Consumer.Set_Name (Buffer_Name);
+      --  Obj.Consumption.Message_Handling.Start (1.0);
+      --  Obj.Consumption.Consumer.Is_Initialised;
+      --  Obj.Production.Producer.Is_Initialised;
 
       Obj.Buffer_Handler.First := Obj.Buffer_Handler.Handlers'First;
 
@@ -78,22 +88,23 @@ package body Buffer_Handling is
       Obj.Buffer_Handler.Current := Obj.Buffer_Handler.Handlers'Last;
 
       for I in Obj.Buffer_Handler.Handlers'Range loop
-         Obj.Production.Producer.Get_Free_Buffer
+         --  Obj.Production.Producer.Get_Free_Buffer
+         Obj.Buffer.Get_Free_Buffer
             (Obj.Buffer_Handler.Handlers (I).Handle);
       end loop;
-      Ada.Text_IO.Put_Line (ASCII.ESC & "[32;1m" & "Buffers   [✓]" & ASCII.ESC & "[0m");
+      Logger.Debug_Out (ASCII.ESC & "[32;1m" & "Buffers   [✓]" & ASCII.ESC & "[0m");
 
    exception
       when E : others =>
-         Ada.Text_IO.Put_Line (ASCII.ESC & "[31;1m" & "Buffers   [x]" & ASCII.ESC & "[0m");
-         Ada.Text_IO.Put_Line (ASCII.ESC & "[33m"
+         Logger.Debug_Out (ASCII.ESC & "[31;1m" & "Buffers   [x]" & ASCII.ESC & "[0m");
+         Logger.Debug_Out (ASCII.ESC & "[33m"
             & "Make sure that old buffers were removed"
             & " and that dcod is running before launching udp_server."
             & ASCII.LF & " (ex : $> rm -f /dev/shm/* /dev/mqueue/* &&"
             & " dcod_launch -i -m -l -L $LD_LIBRARY_PATH -v )"
             & ASCII.ESC & "[0m");
 
-         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+         Logger.Debug_Out (ASCII.ESC & "[31m" & "Exception : " &
             Ada.Exceptions.Exception_Name (E)
             & ASCII.LF & ASCII.ESC & "[33m"
             & Ada.Exceptions.Exception_Message (E)
@@ -103,8 +114,9 @@ package body Buffer_Handling is
 
    procedure Finalize_Buffers (Obj  : Buffer_Handler_Obj_Access) is
    begin
-      Obj.Production.Message_Handling.Stop;
-      Obj.Consumption.Message_Handling.Stop;
+      --  Obj.Production.Message_Handling.Stop;
+      --  Obj.Consumption.Message_Handling.Stop;
+      null;
    end Finalize_Buffers;
 
 
@@ -123,7 +135,8 @@ package body Buffer_Handling is
       Buffers.Set_Used_Bytes
          (Buf.Handle, Buffers.Buffer_Size_Type
             (Load_Size * Sequence_Size));
-      Obj.Production.Producer.Release_Free_Buffer (Buf.Handle);
+      --  Obj.Production.Producer.Release_Free_Buffer (Buf.Handle);
+      Obj.Buffer.Release_Free_Buffer (Buf.Handle);
       Buf.State := Empty;
 
    exception
@@ -153,6 +166,7 @@ package body Buffer_Handling is
          Obj   := Buffer_H;
       end Start;
       loop
+         delay 0.0;
          select
             accept Stop;
                exit;
@@ -174,6 +188,8 @@ package body Buffer_Handling is
                   end loop Parse_Buffer;
                if N = Base_Udp.Pkt_Max + 1 then
                   Obj.Buffer_Handler.Handlers (Index).State := Full;
+               --  else
+               --     Ada.Text_IO.Put_Line ("Buffer : " & Index'Img & "Empty");
                end if;
             end if;
             Index := Index + 1;
@@ -249,9 +265,18 @@ package body Buffer_Handling is
 
                Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.First).Handle.Reuse;
 
-               Obj.Production.Producer.Get_Free_Buffer
-                  (Obj.Buffer_Handler.Handlers
-                     (Obj.Buffer_Handler.First).Handle);
+               loop
+                  select
+                     --  Obj.Production.Producer.Get_Free_Buffer
+                     Obj.Buffer.Get_Free_Buffer
+                        (Obj.Buffer_Handler.Handlers
+                           (Obj.Buffer_Handler.First).Handle);
+                     exit;
+                  or
+                     delay 1.0;
+                     Ada.Text_IO.Put_Line ("Get_Free_Buffer Timeout");
+                  end select;
+               end loop;
 
                Obj.Buffer_Handler.First := Obj.Buffer_Handler.First + 1;
                Ada.Text_IO.Put_Line ("First : " & Obj.Buffer_Handler.First'Img);
@@ -291,8 +316,18 @@ package body Buffer_Handling is
                   if Obj.Buffer_Handler.Current + 1 = Obj.Buffer_Handler.First
                      and not Init
                   then
+                     Ada.Text_IO.Put_Line ("1 Buffer State : "
+                        & Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.First).State'Img);
+                     Ada.Text_IO.Put_Line ("2 Buffer State : "
+                        & Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.First + 1).State'Img);
+                     Ada.Text_IO.Put_Line ("3 Buffer State : "
+                        & Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.First + 2).State'Img);
+                     Ada.Text_IO.Put_Line ("4 Buffer State : "
+                        & Obj.Buffer_Handler.Handlers (Obj.Buffer_Handler.First + 3).State'Img);
+
                      Ada.Exceptions.Raise_Exception (Not_Released_Fast_Enough'Identity,
                         "All buffers are used. Make sure a consumer was launched.");
+
                   end if;
                   Buffer_Ptr := Obj.Buffer_Handler.Handlers
                                    (Obj.Buffer_Handler.Current + 1).
@@ -418,8 +453,8 @@ package body Buffer_Handling is
                              Src_Handle      : in out Buffers.Buffer_Handle_Access;
                              Dest_Index      : in out Ada.Streams.Stream_Element_Offset;
                              Dest_Handle     : in out Buffers.Buffer_Handle_Access;
-                             Src_Data_Stream : Base_Udp.Sequence_Type) return Boolean is
-
+                             Src_Data_Stream : Base_Udp.Sequence_Type) return Boolean
+   is
       Zero_Buf_Size  : exception;
       use type Buffers.Buffer_Handle_Access;
    begin
@@ -433,7 +468,13 @@ package body Buffer_Handling is
          Buffers.Free (Dest_Handle);
       end if;
       Dest_Handle := new Buffers.Buffer_Handle_Type;
-      Dest_Buffer.Get_Free_Buffer (Dest_Handle.all);
+      select
+         Dest_Buffer.Get_Free_Buffer (Dest_Handle.all);
+      or
+         delay 1.0;
+         Ada.Text_IO.Put_Line ("Dest Get_Free_Buffer Timeout");
+      end select;
+
       Buffer_Size := Size;
       Dest_Index := 0;
       --  This packet contains a buffer size,
@@ -453,11 +494,13 @@ package body Buffer_Handling is
                              Src_Data_Stream : Base_Udp.Sequence_Type) is
    begin
       if Src_Index > Src_Data_Stream'Last then
-         Obj.Consumption.Consumer.Release_Full_Buffer (Src_Handle.all);
+         --  Obj.Consumption.Consumer.Release_Full_Buffer (Src_Handle.all);
+         Obj.Buffer.Release_Full_Buffer (Src_Handle.all);
 
          Buffers.Free (Src_Handle);
          Src_Handle := new Buffers.Buffer_Handle_Type;
-         Obj.Consumption.Consumer.Get_Full_Buffer (Src_Handle.all);
+         --  Obj.Consumption.Consumer.Get_Full_Buffer (Src_Handle.all);
+         Obj.Buffer.Get_Full_Buffer (Src_Handle.all);
          Src_Index := 1;
       end if;
    end New_Src_Buffer;
@@ -469,11 +512,13 @@ package body Buffer_Handling is
                             Src_Data_Stream  : Base_Udp.Sequence_Type) return Boolean is
    begin
       if Src_Index > Src_Data_Stream'Last then
-         Obj.Consumption.Consumer.Release_Full_Buffer (Src_Handle.all);
+         --  Obj.Consumption.Consumer.Release_Full_Buffer (Src_Handle.all);
+         Obj.Buffer.Release_Full_Buffer (Src_Handle.all);
 
          Buffers.Free (Src_Handle);
          Src_Handle := new Buffers.Buffer_Handle_Type;
-         Obj.Consumption.Consumer.Get_Full_Buffer (Src_Handle.all);
+         --  Obj.Consumption.Consumer.Get_Full_Buffer (Src_Handle.all);
+         Obj.Buffer.Get_Full_Buffer (Src_Handle.all);
          Src_Index := 1;
          return True;
       end if;
@@ -557,20 +602,30 @@ package body Buffer_Handling is
          Dest_Index     : Stream_Element_Offset := 0;
 
          Buffer_Size    : Interfaces.Unsigned_32 := 0;
+
+         Logger         : Log4ada.Loggers.Logger_Access;
    begin
       --  System.Multiprocessors.Dispatching_Domains.Set_CPU
       --     (System.Multiprocessors.CPU_Range (5));
 
       select
          accept Start (Buffer_H     : Buffer_Handler_Obj_Access;
-                       Buffer_Set   : Buffers.Buffer_Produce_Access)
+                       Buffer_Set   : Buffers.Buffer_Produce_Access;
+                       Logger       : Log4ada.Loggers.Logger_Access)
          do
+            Logger.Debug_Out ("Handle_Data Start 1");
+            Handle_Data_Task.Logger := Logger;
+            Logger.Debug_Out ("Handle_Data Start 2");
             Dest_Buffer := Buffer_Set;
             Obj := Buffer_H;
          end Start;
          delay 0.0;
+         Logger.Debug_Out ("Handle_Data step 0");
          Src_Handle := new Buffers.Buffer_Handle_Type;
-         Obj.Consumption.Consumer.Get_Full_Buffer (Src_Handle.all);
+         --  Obj.Consumption.Consumer.Get_Full_Buffer (Src_Handle.all);
+         Logger.Debug_Out ("Handle_Data step 1");
+         Obj.Buffer.Get_Full_Buffer (Src_Handle.all);
+         Logger.Debug_Out ("Handle_Data step 2");
          loop
             declare
                Src_Data_Stream    : Base_Udp.Sequence_Type;
@@ -579,7 +634,8 @@ package body Buffer_Handling is
                Header      : Reliable_Udp.Header_Type;
                Size        : Interfaces.Unsigned_32;
                for Header'Address use Src_Data_Stream (Src_Index)'Address;
-               for Size'Address use Src_Data_Stream (Src_Index) (Base_Udp.Header_Size + 1)'Address;
+               for Size'Address use Src_Data_Stream (Src_Index)
+                                                    (Base_Udp.Header_Size + 1)'Address;
                New_Buffer  : Boolean renames Header.Ack;
                New_Size    : Interfaces.Unsigned_32;
             begin
@@ -638,7 +694,7 @@ package body Buffer_Handling is
       end select;
       exception
          when E : others =>
-         Ada.Text_IO.Put_Line (ASCII.ESC & "[31m" & "Exception : " &
+         Logger.Error_Out (ASCII.ESC & "[31m" & "Exception : " &
             Ada.Exceptions.Exception_Name (E)
             & ASCII.LF & ASCII.ESC & "[33m"
             & Ada.Exceptions.Exception_Message (E)
