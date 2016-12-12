@@ -1,0 +1,201 @@
+.TH RATP_SOURCES 42
+
+.RE 0
+
+\# ---------------------------------------------
+.I base_udp.ads
+.RS 4
+\fBContains main types / constants\fR
+
+
+\# ---------------------------------------------
+.RE 0
+.I data_transport-udp_socket_client.ad[bs]
+.RS 4
+\fB Main task used to Initialise / Connect / Disconnect a RATP Consumer\fR
+.RS 4
+
+\fBSocket_Client_Task;\fR
+
+Overrides Data_Transport
+
+
+\# ---------------------------------------------
+.RE 0
+.I data_transport-udp_socket_server.ad[bs]
+.RS 4
+\fBMain task used to Initialise / Connect / Disconnect a RATP Producer\fR
+.RS 4
+
+\fBSocket_Server_Task;\fR
+
+Overrides Data_Transport
+
+
+\# ---------------------------------------------
+.RE 0
+.I buffer_handling.ad[bs]
+.RS 4
+\fBManage PMH Buffers / All packets' data\fR
+.RS 4
+
+\fBInit_Buffers;\fR
+
+Initialize "PMH_Buf_Nb" of Buffer and attach a buffer
+to each Handler of Handle_Array
+
+
+
+\fBPMH_Buffer_Addr_Task;\fR
+
+Get the address of a New Buffer
+
+
+
+\fBMark_Empty_Cell;\fR
+
+Write 16#DEAD_BEEF# at missed packets location.
+Enables Search_Empty_Mark to save ack in correct Cell
+
+
+
+\fBCopy_To_Correct_Location;\fR
+
+Move Data Received to correct location (Nb_Missed Offset) if previous packets
+were dropped
+
+
+
+\fBSave_Ack;\fR
+
+Search for the location of packet re-sent by producer after being dropped
+and copy its content there.
+
+
+
+\fBSearch_Empty_Mark;\fR
+
+Search position of ack received in current and previous buffers
+and then store content inside.
+
+
+
+\fBCheck_Buf_Integrity_Task;\fR
+
+Change Buffer State from "Near_Full" to "Full" only if it contains
+every Packets
+
+
+
+\fBRelease_Full_Buf_Task;\fR
+
+Release Buffer (to be copied by Handle_Data_Task)
+and Reuse Handler only if Buffer State is "Full"
+
+
+
+\fBHandle_Data_Task;\fR /!\\ Performance Issue /!\\
+Packets should be stored directely in PMH Dest_Buffers.
+
+Copy Consumer's filled local buffers to PMH Buffers
+
+.RS 4
+\fBNew_Dest_Buffer;\fR
+
+Releases current Dest_Buffer (if it's been filled) and get a new Dest_Buffer
+
+\fBCopy_Packet_Data_To_Dest;\fR
+
+Copy Src_Buffer content to Dest_Buffer (ignore packets containing buffer size)
+
+\fBNew_Src_Buffer;\fR
+
+Src_Handle get a new Src_Buffer if it's necessary returns 1 otherwise 0
+.RE 4
+
+
+.RS 8
+\fBRelease_Free_Buffer_At;\fR
+
+Release Buffer at Handlers (Index) and change its State to Empty
+
+
+\fBFinalize_Buffers;\fR
+
+Stop Production and Consumption Message_Handling
+
+
+\# ---------------------------------------------
+.RE 0
+.I reliable_udp.ad[bs]
+.RS 4
+\fBManages Missing packets, send requests to the producer\fR
+.RS 4
+
+\fBAppend_Ack\fR
+
+Send acks to client if it's necessary
+
+\fBAck_Task\fR
+
+Send / re-send acks to producer.
+
+\fBAppend_Task\fR
+
+Add dropped packets' informations to "Losses Array"
+
+\fBRemove_Task\fR
+
+Removes dropped packets' informations from "Losses Array"
+once its content is received
+
+
+\# ---------------------------------------------
+.RE 0
+.I output_data.ad[bs]
+.RS 4
+\fBLOGS, debit.. to file (csv) / stdout / send data to webserver via websockets\fR
+.RS 4
+
+\fBDisplay\fR
+
+Disp stats (stdout)
+
+\fBLog_CSV\fR
+
+Log stats to file (log.csv)
+
+
+\# ---------------------------------------------
+.RE 0
+.I queue.ad[bs]
+.RS 4
+\fBSimple generic FIFO\fR
+.RS 4
+
+
+\# ---------------------------------------------
+.RE 0
+.I web_interfaces.ad[bs]
+.RE 0
+.I websocket.ad[bs]
+
+.I templates/index.thtml
+.RE 0
+.I templates/charts.tjs
+.RE 0
+.I templates/websocket.tjs
+.RS 4
+\fBWebInterface, displays some data sent by "output_data"\fR
+.RS 4
+
+
+\# ---------------------------------------------
+.RE 0
+.I openstack/pem-install.cloudinit
+.RS 4
+\fBCloud-Init script\fR
+.RS 4
+It installs PEM on an openstack virtual machine instance (--user-data)
+it used to compile and setup a RATP test from a github repository
+but it hasn't been updated since last changes.

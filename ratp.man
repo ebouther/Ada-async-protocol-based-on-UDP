@@ -1,0 +1,11 @@
+.TH RATP 1
+.SH NAME
+RATP \- Reliable Asynchronous Transport Protocol
+.SH SYNOPSIS
+
+.SH DESCRIPTION
+.B RATP
+is a \fIreliable\fR transport protocol based on \fIUDP\fR.
+
+.SH OPTIONS
+.TP

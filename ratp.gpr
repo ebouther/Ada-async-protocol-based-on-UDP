@@ -1,0 +1,30 @@
+with "aws";
+with "libbuffers";
+with "libpmhsoap";
+with "networktools";
+with "libtransport";
+
+project ratp is
+
+  for Source_Dirs use ("src", "tests");
+  for Object_Dir use "obj";
+  for Exec_Dir use "bin";
+
+  --  package Binder is
+  --   for Default_Switches ("ada") use ("-E");
+  --  end Binder;
+
+  package Compiler is
+   for Default_Switches ("ada") use ("-g",
+                                     "-gnaty3abcefhiklM122prst",
+                                     "-gnatf",
+                                     "-gnatL",
+                                     "-gnatwa",
+                                     "-gnat12",
+                                     "-gnatwae",
+                                     "-gnato"); 
+  end Compiler;
+
+  for main use ("udp_producer.adb", "udp_consumer.adb", "consumer.adb");
+
+end ratp;
